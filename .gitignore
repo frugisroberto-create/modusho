@@ -1,0 +1,32 @@
+# dependencies
+node_modules/
+
+# next.js
+.next/
+out/
+
+# env
+.env
+.env.local
+
+# debug
+npm-debug.log*
+
+# misc
+.DS_Store
+*.tsbuildinfo
+
+# uploads
+public/uploads/*
+!public/uploads/.gitkeep
+
+# claude
+.claude/
+
+# source assets (not code)
+*.docx
+*.pdf
+SOP_OUTPUT/
+HO_*.png
+HO_*.pdf
+Brand*.docx

@@ -1,0 +1,101 @@
+@import "tailwindcss";
+
+/* === Design System HO Collection === */
+
+@theme {
+  /* Colors */
+  --color-terracotta: #964733;
+  --color-terracotta-light: #B8614A;
+  --color-terracotta-dark: #7A3828;
+  --color-sage: #4E564F;
+  --color-sage-light: #848B82;
+  --color-sage-dark: #323E2E;
+  --color-mauve: #7E636B;
+  --color-mauve-light: #9B8690;
+  --color-ivory: #FEFBF4;
+  --color-ivory-medium: #F0EFE9;
+  --color-ivory-dark: #E8E5DC;
+  --color-charcoal: #333333;
+  --color-charcoal-dark: #141413;
+  --color-alert-red: #C0392B;
+  --color-alert-yellow: #D4A017;
+  --color-info-blue: #5B7B8A;
+
+  /* Font families */
+  --font-heading: "Playfair Display", Georgia, serif;
+  --font-body: "Cardo", Georgia, serif;
+  --font-ui: "Inter", -apple-system, sans-serif;
+}
+
+/* === Base styles === */
+
+body {
+  background-color: #FEFBF4;
+  color: #333333;
+  font-family: var(--font-ui);
+}
+
+h1, h2, h3 {
+  font-family: var(--font-heading);
+  color: #141413;
+}
+
+/* === Scrollbar === */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+::-webkit-scrollbar-track {
+  background: #FEFBF4;
+}
+::-webkit-scrollbar-thumb {
+  background: #B8614A;
+  border-radius: 3px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: #964733;
+}
+
+/* === Form inputs global === */
+input[type="text"],
+input[type="email"],
+input[type="password"],
+input[type="date"],
+input[type="number"],
+textarea,
+select {
+  border-color: #E8E5DC;
+  border-radius: 6px;
+  padding: 10px 14px;
+  font-family: var(--font-ui);
+  color: #333333;
+  background-color: #FEFBF4;
+}
+
+input:focus,
+textarea:focus,
+select:focus {
+  border-color: #964733;
+  outline: none;
+  box-shadow: 0 0 0 2px rgba(150, 71, 51, 0.15);
+}
+
+::placeholder {
+  color: #848B82;
+}
+
+/* === Loading skeleton === */
+@keyframes skeleton-pulse {
+  0%, 100% { background-color: #F0EFE9; }
+  50% { background-color: #E8E5DC; }
+}
+.skeleton {
+  animation: skeleton-pulse 1.5s ease-in-out infinite;
+  border-radius: 6px;
+}
+
+/* === Print === */
+@media print {
+  body { background: white; }
+  .no-print { display: none !important; }
+}

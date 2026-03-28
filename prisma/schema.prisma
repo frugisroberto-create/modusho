@@ -1,0 +1,235 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum Role {
+  OPERATOR
+  HOD
+  HOTEL_MANAGER
+  ADMIN
+  SUPER_ADMIN
+}
+
+enum ContentType {
+  SOP
+  DOCUMENT
+  MEMO
+}
+
+enum ContentStatus {
+  DRAFT
+  REVIEW_HM
+  REVIEW_ADMIN
+  PUBLISHED
+  RETURNED
+  ARCHIVED
+}
+
+enum ReviewAction {
+  APPROVED
+  RETURNED
+  FORWARDED
+}
+
+enum StaticDocumentType {
+  BRAND_BOOK
+  STANDARD_BOOK
+}
+
+model User {
+  id           String  @id @default(cuid())
+  email        String  @unique
+  name         String
+  passwordHash String
+  role         Role    @default(OPERATOR)
+  canView      Boolean @default(true)
+  canEdit      Boolean @default(false)
+  canApprove   Boolean @default(false)
+  isActive     Boolean @default(true)
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  propertyAssignments  PropertyAssignment[]
+  contentPermissions   UserContentPermission[]
+  createdContents      Content[]              @relation("ContentCreatedBy")
+  updatedContents      Content[]              @relation("ContentUpdatedBy")
+  acknowledgments      ContentAcknowledgment[]
+  reviews              ContentReview[]
+  statusChanges        ContentStatusHistory[] @relation("StatusChangedBy")
+
+  @@index([role])
+  @@index([email])
+}
+
+model UserContentPermission {
+  id          String      @id @default(cuid())
+  userId      String
+  contentType ContentType
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, contentType])
+  @@index([userId])
+}
+
+model Property {
+  id       String  @id @default(cuid())
+  name     String
+  code     String  @unique
+  city     String
+  isActive Boolean @default(true)
+
+  departments         Department[]
+  propertyAssignments PropertyAssignment[]
+  contents            Content[]
+  memos               Memo[]
+  staticDocuments     StaticDocument[]
+
+  @@index([code])
+}
+
+model Department {
+  id         String   @id @default(cuid())
+  name       String
+  code       String
+  propertyId String
+  property   Property @relation(fields: [propertyId], references: [id])
+
+  propertyAssignments PropertyAssignment[]
+  contents            Content[]
+
+  @@unique([propertyId, code])
+  @@index([propertyId])
+}
+
+model PropertyAssignment {
+  id           String      @id @default(cuid())
+  userId       String
+  propertyId   String
+  departmentId String?
+
+  user       User        @relation(fields: [userId], references: [id], onDelete: Cascade)
+  property   Property    @relation(fields: [propertyId], references: [id], onDelete: Cascade)
+  department Department? @relation(fields: [departmentId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, propertyId, departmentId])
+  @@index([userId])
+  @@index([propertyId])
+  @@index([departmentId])
+}
+
+model Content {
+  id           String        @id @default(cuid())
+  type         ContentType
+  title        String
+  body         String
+  status       ContentStatus @default(DRAFT)
+  version      Int           @default(1)
+  propertyId   String
+  departmentId String?
+  createdById  String
+  updatedById  String
+  publishedAt  DateTime?
+  createdAt    DateTime      @default(now())
+  updatedAt    DateTime      @updatedAt
+
+  property    Property    @relation(fields: [propertyId], references: [id])
+  department  Department? @relation(fields: [departmentId], references: [id])
+  createdBy   User        @relation("ContentCreatedBy", fields: [createdById], references: [id])
+  updatedBy   User        @relation("ContentUpdatedBy", fields: [updatedById], references: [id])
+
+  acknowledgments ContentAcknowledgment[]
+  reviews         ContentReview[]
+  statusHistory   ContentStatusHistory[]
+  memo            Memo?
+
+  @@index([propertyId])
+  @@index([departmentId])
+  @@index([status])
+  @@index([type])
+  @@index([createdAt])
+  @@index([publishedAt])
+  @@index([propertyId, status])
+  @@index([propertyId, departmentId, status])
+  @@index([propertyId, type, status])
+}
+
+model ContentAcknowledgment {
+  id             String   @id @default(cuid())
+  contentId      String
+  userId         String
+  acknowledgedAt DateTime @default(now())
+  required       Boolean  @default(true)
+
+  content Content @relation(fields: [contentId], references: [id], onDelete: Cascade)
+  user    User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([contentId, userId])
+  @@index([contentId])
+  @@index([userId])
+}
+
+model ContentReview {
+  id         String       @id @default(cuid())
+  contentId  String
+  reviewerId String
+  action     ReviewAction
+  note       String?
+  createdAt  DateTime     @default(now())
+
+  content  Content @relation(fields: [contentId], references: [id], onDelete: Cascade)
+  reviewer User    @relation(fields: [reviewerId], references: [id])
+
+  @@index([contentId])
+  @@index([reviewerId])
+}
+
+model ContentStatusHistory {
+  id          String         @id @default(cuid())
+  contentId   String
+  fromStatus  ContentStatus?
+  toStatus    ContentStatus
+  changedById String
+  changedAt   DateTime       @default(now())
+  note        String?
+
+  content   Content @relation(fields: [contentId], references: [id], onDelete: Cascade)
+  changedBy User    @relation("StatusChangedBy", fields: [changedById], references: [id])
+
+  @@index([contentId])
+  @@index([changedById])
+  @@index([changedAt])
+}
+
+model Memo {
+  id        String    @id @default(cuid())
+  contentId String    @unique
+  propertyId String
+  expiresAt DateTime?
+  isPinned  Boolean   @default(false)
+
+  content  Content  @relation(fields: [contentId], references: [id], onDelete: Cascade)
+  property Property @relation(fields: [propertyId], references: [id])
+
+  @@index([propertyId])
+  @@index([expiresAt])
+}
+
+model StaticDocument {
+  id         String             @id @default(cuid())
+  type       StaticDocumentType
+  title      String
+  fileUrl    String
+  propertyId String?
+  uploadedAt DateTime           @default(now())
+
+  property Property? @relation(fields: [propertyId], references: [id])
+
+  @@index([propertyId])
+  @@index([type])
+}

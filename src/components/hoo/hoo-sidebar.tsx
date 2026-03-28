@@ -1,0 +1,101 @@
+"use client";
+
+import Link from "next/link";
+import { usePathname } from "next/navigation";
+import { signOut } from "next-auth/react";
+import { useState } from "react";
+import { HoLogo } from "@/components/ui/ho-logo";
+
+const NAV_ITEMS = [
+  { href: "/dashboard", label: "Dashboard", icon: "M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6" },
+  { href: "/approvals", label: "Approvazioni", icon: "M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" },
+  { href: "/hoo-sop", label: "SOP", icon: "M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" },
+  { href: "/memo", label: "Memo", icon: "M7 8h10M7 12h4m1 8l-4-4H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-3l-4 4z" },
+  { href: "/properties", label: "Strutture", icon: "M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" },
+  { href: "/users", label: "Utenti", icon: "M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z" },
+  { href: "/reports", label: "Report", icon: "M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" },
+  { href: "/library", label: "Libreria", icon: "M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253" },
+];
+
+interface HooSidebarProps {
+  userName: string;
+  userRole: string;
+}
+
+export function HooSidebar({ userName, userRole }: HooSidebarProps) {
+  const pathname = usePathname();
+  const [mobileOpen, setMobileOpen] = useState(false);
+
+  const sidebar = (
+    <aside className="fixed inset-y-0 left-0 w-[260px] bg-sage text-white flex flex-col z-40">
+      {/* Logo */}
+      <div className="px-5 py-5 border-b border-white/10">
+        <Link href="/dashboard">
+          <HoLogo variant="horizontal" color="light" size={140} />
+        </Link>
+      </div>
+
+      {/* Nav */}
+      <nav className="flex-1 py-4 overflow-y-auto">
+        {NAV_ITEMS.map((item) => {
+          const isActive = pathname.startsWith(item.href);
+          return (
+            <Link
+              key={item.href}
+              href={item.href}
+              onClick={() => setMobileOpen(false)}
+              className={`flex items-center gap-3 px-5 py-2.5 text-sm font-ui transition-colors ${
+                isActive
+                  ? "bg-white/10 border-l-[3px] border-l-terracotta text-white"
+                  : "text-white/70 hover:bg-white/5 hover:text-white/90 border-l-[3px] border-l-transparent"
+              }`}
+            >
+              <svg className={`w-5 h-5 shrink-0 ${isActive ? "opacity-100" : "opacity-70"}`}
+                fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d={item.icon} />
+              </svg>
+              {item.label}
+            </Link>
+          );
+        })}
+      </nav>
+
+      {/* User */}
+      <div className="border-t border-white/10 px-5 py-4">
+        <p className="text-sm font-ui font-medium truncate text-white/90">{userName}</p>
+        <p className="text-xs font-ui text-white/50 mt-0.5">{userRole}</p>
+        <button
+          onClick={() => signOut({ callbackUrl: "/login" })}
+          className="mt-2.5 text-xs font-ui text-white/40 hover:text-white/70 transition-colors"
+        >
+          Esci
+        </button>
+      </div>
+    </aside>
+  );
+
+  return (
+    <>
+      {/* Mobile hamburger */}
+      <button
+        onClick={() => setMobileOpen(true)}
+        className="lg:hidden fixed top-4 left-4 z-50 p-2 bg-sage rounded-lg text-white"
+      >
+        <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" />
+        </svg>
+      </button>
+
+      {/* Desktop sidebar */}
+      <div className="hidden lg:block">{sidebar}</div>
+
+      {/* Mobile overlay */}
+      {mobileOpen && (
+        <>
+          <div className="fixed inset-0 bg-black/40 z-30 lg:hidden" onClick={() => setMobileOpen(false)} />
+          <div className="lg:hidden">{sidebar}</div>
+        </>
+      )}
+    </>
+  );
+}
