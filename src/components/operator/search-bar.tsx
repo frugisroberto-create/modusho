@@ -90,7 +90,8 @@ export function SearchBar() {
           onChange={handleChange}
           onFocus={() => results.length > 0 && setOpen(true)}
           placeholder="Cerca procedure, documenti, memo..."
-          className="w-full h-[52px] pl-14 pr-6 text-base font-body border border-ivory-dark rounded-full bg-ivory focus:border-terracotta focus:shadow-none"
+          style={{ paddingLeft: 56 }}
+          className="w-full h-[52px] pr-6 text-base font-body border border-ivory-dark rounded-full bg-ivory focus:border-terracotta focus:shadow-none"
         />
         {loading && (
           <div className="absolute right-6 top-1/2 -translate-y-1/2">

@@ -18,7 +18,7 @@ export async function POST(
 
   // Verifica che il contenuto esista e sia PUBLISHED
   const content = await prisma.content.findUnique({
-    where: { id: contentId },
+    where: { id: contentId, isDeleted: false },
     select: { id: true, status: true, propertyId: true, departmentId: true },
   });
 

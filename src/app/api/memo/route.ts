@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
-import { getAccessiblePropertyIds, checkAccess } from "@/lib/rbac";
+import { getAccessiblePropertyIds, checkAccess, canUserManageContentType } from "@/lib/rbac";
 import { z } from "zod/v4";
 
 const memoQuerySchema = z.object({
@@ -97,9 +97,8 @@ export async function POST(request: NextRequest) {
   const session = await getServerSession(authOptions);
   if (!session?.user) return NextResponse.json({ error: "Non autenticato" }, { status: 401 });
 
-  const { role } = session.user;
-  if (role !== "HOTEL_MANAGER" && role !== "ADMIN" && role !== "SUPER_ADMIN") {
-    return NextResponse.json({ error: "Accesso negato" }, { status: 403 });
+  if (!session.user.canEdit) {
+    return NextResponse.json({ error: "Non hai permessi di modifica" }, { status: 403 });
   }
 
   const body = await request.json();
@@ -107,6 +106,12 @@ export async function POST(request: NextRequest) {
   if (!parsed.success) return NextResponse.json({ error: "Parametri non validi", details: parsed.error.issues }, { status: 400 });
 
   const { title, body: memoBody, propertyId, expiresAt, isPinned } = parsed.data;
+
+  // Verifica permesso sul tipo MEMO
+  const canManageMemo = await canUserManageContentType(session.user.id, "MEMO");
+  if (!canManageMemo) {
+    return NextResponse.json({ error: "Non hai permesso di creare memo" }, { status: 403 });
+  }
   const userId = session.user.id;
 
   const hasAccess = await checkAccess(userId, "HOTEL_MANAGER", propertyId);

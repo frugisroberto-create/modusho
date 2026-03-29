@@ -28,7 +28,7 @@ export async function GET(request: NextRequest) {
 
   // KPI globali
   const [sopTotal, sopPublished, sopDraft, sopReviewHm, sopReviewAdmin, sopReturned, sopArchived] = await Promise.all([
-    prisma.content.count({ where: { ...pFilter, type: "SOP" } }),
+    prisma.content.count({ where: { ...pFilter, isDeleted: false, type: "SOP" } }),
     prisma.content.count({ where: { ...pFilter, type: "SOP", status: "PUBLISHED" } }),
     prisma.content.count({ where: { ...pFilter, type: "SOP", status: "DRAFT" } }),
     prisma.content.count({ where: { ...pFilter, type: "SOP", status: "REVIEW_HM" } }),
@@ -38,11 +38,11 @@ export async function GET(request: NextRequest) {
   ]);
 
   const sopApprovedInPeriod = await prisma.contentStatusHistory.count({
-    where: { toStatus: "PUBLISHED", changedAt: { gte: periodFrom, lte: periodTo }, content: { ...pFilter, type: "SOP" } },
+    where: { toStatus: "PUBLISHED", changedAt: { gte: periodFrom, lte: periodTo }, content: { ...pFilter, isDeleted: false, type: "SOP" } },
   });
 
   const sopReturnedInPeriod = await prisma.contentStatusHistory.count({
-    where: { toStatus: "RETURNED", changedAt: { gte: periodFrom, lte: periodTo }, content: { ...pFilter, type: "SOP" } },
+    where: { toStatus: "RETURNED", changedAt: { gte: periodFrom, lte: periodTo }, content: { ...pFilter, isDeleted: false, type: "SOP" } },
   });
 
   // Tempo medio workflow
@@ -55,7 +55,7 @@ export async function GET(request: NextRequest) {
   `;
 
   // Presa visione
-  const publishedContent = await prisma.content.count({ where: { ...pFilter, status: "PUBLISHED", type: { in: ["SOP", "DOCUMENT"] } } });
+  const publishedContent = await prisma.content.count({ where: { ...pFilter, isDeleted: false, status: "PUBLISHED", type: { in: ["SOP", "DOCUMENT"] } } });
   const totalOperators = await prisma.user.count({ where: { role: "OPERATOR", isActive: true, propertyAssignments: { some: { propertyId: { in: propertyIds } } } } });
   const totalAcks = await prisma.contentAcknowledgment.count({ where: { content: { propertyId: { in: propertyIds } } } });
   const expectedAcks = publishedContent * totalOperators;
@@ -96,8 +96,8 @@ export async function GET(request: NextRequest) {
     const wFrom = new Date(Date.now() - (i + 1) * 7 * 86400000);
     const wTo = new Date(Date.now() - i * 7 * 86400000);
     const [approved, returned] = await Promise.all([
-      prisma.contentStatusHistory.count({ where: { toStatus: "PUBLISHED", changedAt: { gte: wFrom, lt: wTo }, content: { ...pFilter, type: "SOP" } } }),
-      prisma.contentStatusHistory.count({ where: { toStatus: "RETURNED", changedAt: { gte: wFrom, lt: wTo }, content: { ...pFilter, type: "SOP" } } }),
+      prisma.contentStatusHistory.count({ where: { toStatus: "PUBLISHED", changedAt: { gte: wFrom, lt: wTo }, content: { ...pFilter, isDeleted: false, type: "SOP" } } }),
+      prisma.contentStatusHistory.count({ where: { toStatus: "RETURNED", changedAt: { gte: wFrom, lt: wTo }, content: { ...pFilter, isDeleted: false, type: "SOP" } } }),
     ]);
     weeks.push({
       label: `${wFrom.toLocaleDateString("it-IT", { day: "2-digit", month: "2-digit" })} - ${wTo.toLocaleDateString("it-IT", { day: "2-digit", month: "2-digit" })}`,

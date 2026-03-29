@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
-import { getAccessiblePropertyIds, getAccessibleDepartmentIds, checkAccess } from "@/lib/rbac";
+import { getAccessiblePropertyIds, getAccessibleDepartmentIds, checkAccess, canUserManageContentType } from "@/lib/rbac";
 import { changeContentStatus } from "@/lib/content-status";
 import { z } from "zod/v4";
 
@@ -66,6 +66,7 @@ export async function GET(request: NextRequest) {
 
   // Build where clause
   const where: Record<string, unknown> = {
+    isDeleted: false,
     propertyId: { in: filteredPropertyIds },
     OR: [
       { departmentId: null },
@@ -145,9 +146,9 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: "Non autenticato" }, { status: 401 });
   }
 
-  // Solo ADMIN e SUPER_ADMIN possono creare contenuti
-  if (session.user.role !== "ADMIN" && session.user.role !== "SUPER_ADMIN") {
-    return NextResponse.json({ error: "Accesso negato" }, { status: 403 });
+  // Verifica canEdit
+  if (!session.user.canEdit) {
+    return NextResponse.json({ error: "Non hai permessi di modifica" }, { status: 403 });
   }
 
   const body = await request.json();
@@ -159,10 +160,16 @@ export async function POST(request: NextRequest) {
   const { type, title, body: contentBody, propertyId, departmentId, sendToReview } = parsed.data;
   const userId = session.user.id;
 
-  // RBAC: verifica accesso alla property
-  const hasAccess = await checkAccess(userId, "ADMIN", propertyId);
+  // Verifica permesso sul tipo di contenuto
+  const canManageType = await canUserManageContentType(userId, type);
+  if (!canManageType) {
+    return NextResponse.json({ error: `Non hai permesso di creare contenuti di tipo ${type}` }, { status: 403 });
+  }
+
+  // RBAC: verifica accesso alla property e department
+  const hasAccess = await checkAccess(userId, "HOD", propertyId, departmentId ?? undefined);
   if (!hasAccess) {
-    return NextResponse.json({ error: "Accesso negato a questa property" }, { status: 403 });
+    return NextResponse.json({ error: "Accesso negato a questa property/reparto" }, { status: 403 });
   }
 
   const initialStatus = sendToReview ? "REVIEW_HM" : "DRAFT";

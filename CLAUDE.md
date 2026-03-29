@@ -1,8 +1,8 @@
-# DomusGO — CLAUDE.md
+# ModusHO — CLAUDE.md
 
 ## Cos'è questo progetto
 
-DomusGO è un sistema di governance operativa per gruppo alberghiero (HO Collection).
+ModusHO è un sistema di governance operativa per gruppo alberghiero (HO Collection).
 NON è un archivio documenti. NON è un CMS. NON è un LMS.
 
 È un sistema che:
@@ -38,7 +38,7 @@ Funzioni:
 **La home è il centro dell'esperienza, non i menu o le liste.**
 
 ### Lato HOO (Head of Operations)
-Il HOO usa DomusGO come strumento di governo operativo e monitoraggio dell'avanzamento. Non è un utente che "usa" il sistema — è chi lo governa.
+Il HOO usa ModusHO come strumento di governo operativo e monitoraggio dell'avanzamento. Non è un utente che "usa" il sistema — è chi lo governa.
 
 Funzioni:
 
@@ -121,6 +121,7 @@ Property {
   id
   name          // es. "The Nicolaus Hotel", "Hi Hotel Bari", "Patria Palace"
   code          // es. "NCL", "HIB", "PPL"
+  tagline       // es. "Your business destination", "Welcome modern travellers" — tagline breve come da sito hocollection.com (opzionale)
   city          // es. "Bari", "Lecce", "Roma", "Taranto", "Castellaneta Marina"
   address       // indirizzo completo (opzionale)
   description   // descrizione breve della struttura (opzionale)
@@ -144,18 +145,40 @@ Department {
 ```
 Content {
   id
-  type: SOP | DOCUMENT | MEMO
+  type: SOP | DOCUMENT | MEMO | BRAND_BOOK | STANDARD_BOOK
+  code              // GENERATO AUTOMATICAMENTE — es. "NCL-FO-001", "PAT-FB-012"
   title
   body              // rich text (HTML sanitizzato o Markdown)
+  fileUrl           // percorso file .docx originale (se caricato)
   status: DRAFT | REVIEW_HM | REVIEW_ADMIN | PUBLISHED | RETURNED | ARCHIVED
   version           // incrementale
   propertyId        // a quale struttura appartiene
   departmentId      // a quale reparto (nullable = trasversale)
-  createdById
+  createdById       // CHI L'HA CREATA — l'HOD autore. Visibile sulla SOP.
+  submittedById     // CHI L'HA INVIATA per approvazione (può coincidere con createdBy)
   updatedById
   publishedAt
+  isDeleted         // SOFT DELETE — default false. Se true, il contenuto è eliminato.
+  deletedAt         // timestamp eliminazione
+  deletedById       // chi ha eliminato
   createdAt
   updatedAt
+
+  // DESTINATARI — a chi è rivolta la SOP
+  targetAudience    ContentTarget[]
+}
+
+ContentTarget {
+  id
+  contentId
+  targetType: ROLE | DEPARTMENT | USER
+  // Se ROLE: targetRole indica il ruolo destinatario (es. OPERATOR)
+  targetRole: Role?         // es. OPERATOR, HOD
+  // Se DEPARTMENT: targetDepartmentId indica il reparto destinatario
+  targetDepartmentId: String?
+  // Se USER: targetUserId indica uno specifico utente
+  targetUserId: String?
+  // Nota: almeno uno tra targetRole, targetDepartmentId, targetUserId deve essere valorizzato
 }
 
 ContentAcknowledgment {
@@ -202,17 +225,35 @@ Memo {
 }
 ```
 
-### Contenuti statici
+### Brand Book e Standard Book
+
+Brand Book e Standard Book NON sono più PDF statici. Sono contenuti testuali a pieno titolo, gestiti con titolo + corpo (rich text), creabili e modificabili da ADMIN e SUPER_ADMIN.
+
+Utilizzano il modello Content esistente con type = BRAND_BOOK o STANDARD_BOOK.
 
 ```
-StaticDocument {
-  id
-  type: BRAND_BOOK | STANDARD_BOOK
-  title
-  fileUrl           // PDF statico
-  propertyId (nullable — se null, vale per tutto il gruppo)
-  uploadedAt
+// Già nel modello Content:
+Content {
+  type: SOP | DOCUMENT | MEMO | BRAND_BOOK | STANDARD_BOOK
+  // title, body (rich text), fileUrl (allegato opzionale), ecc.
+  // propertyId: se null → vale per tutto il gruppo
 }
+```
+
+**Regole specifiche:**
+- Creazione: solo ADMIN e SUPER_ADMIN
+- Modifica: solo ADMIN e SUPER_ADMIN
+- Eliminazione: solo ADMIN e SUPER_ADMIN
+- NON seguono il workflow SOP (no DRAFT → REVIEW_HM → ecc.)
+- Vengono pubblicati direttamente (status = PUBLISHED alla creazione)
+- propertyId nullable: se null, il contenuto è di gruppo (visibile a tutte le strutture)
+- Visibili a TUTTI i ruoli (OPERATOR, HOD, HOTEL_MANAGER, ADMIN, SUPER_ADMIN)
+- Presa visione obbligatoria configurabile (come per le SOP)
+
+**Navigazione operatore:**
+La barra di navigazione deve avere 4 tab:
+```
+Home | SOP | Documenti | Brand Book | Standard Book
 ```
 
 ## Workflow SOP — REGOLE NON NEGOZIABILI
@@ -236,7 +277,9 @@ PUBLISHED → ARCHIVED (quando sostituita da nuova versione)
 | Inoltrare a REVIEW_ADMIN | HOTEL_MANAGER della property |
 | Approvare/pubblicare | ADMIN, SUPER_ADMIN |
 | Restituire | HOTEL_MANAGER, ADMIN, SUPER_ADMIN |
-| Archiviare | ADMIN, SUPER_ADMIN |
+| Archiviare | HOTEL_MANAGER, ADMIN, SUPER_ADMIN |
+| **Modificare dopo pubblicazione** | **HOTEL_MANAGER, ADMIN, SUPER_ADMIN** |
+| **Eliminare (soft delete)** | **HOTEL_MANAGER, ADMIN, SUPER_ADMIN** |
 
 ### Regole RETURNED
 - La nota è OBBLIGATORIA. Se manca, il sistema blocca.
@@ -244,8 +287,113 @@ PUBLISHED → ARCHIVED (quando sostituita da nuova versione)
 - Una SOP restituita torna a DRAFT.
 
 ### Regole ARCHIVED
-- Una SOP pubblicata può essere archiviata quando viene sostituita.
+- Una SOP pubblicata può essere archiviata da HOTEL_MANAGER, ADMIN o SUPER_ADMIN.
 - Le SOP archiviate restano visibili in uno storico ma non appaiono nelle viste operative.
+
+### Azioni post-pubblicazione — HOTEL_MANAGER, ADMIN, SUPER_ADMIN
+
+Dopo la pubblicazione, i ruoli HOTEL_MANAGER, ADMIN e SUPER_ADMIN possono:
+
+**1. Modificare** un contenuto PUBLISHED (SOP, Document, Memo):
+- La modifica crea una NUOVA VERSIONE (version +1)
+- Il contenuto resta PUBLISHED durante la modifica (non torna a DRAFT)
+- La modifica viene tracciata in ContentStatusHistory con nota descrittiva
+- Il campo `updatedById` registra chi ha modificato
+- I destinatari NON devono rifare la presa visione (salvo flag esplicito "richiedi nuova presa visione")
+
+**2. Archiviare** un contenuto PUBLISHED:
+- Transizione PUBLISHED → ARCHIVED
+- Nota obbligatoria (motivo dell'archiviazione)
+- Il contenuto sparisce dalle viste operative ma resta nello storico
+- Le prese visione precedenti restano registrate
+
+**3. Eliminare** un contenuto (qualsiasi stato):
+- SOFT DELETE: il campo `isDeleted` viene impostato a true, `deletedAt` registra il timestamp, `deletedById` registra chi ha eliminato
+- Il contenuto NON viene mai rimosso fisicamente dal DB
+- I contenuti eliminati NON appaiono in nessuna vista (né operatore né HOO)
+- Solo SUPER_ADMIN può vedere i contenuti eliminati (vista admin dedicata)
+- L'eliminazione è reversibile solo da SUPER_ADMIN
+
+**Queste regole valgono per TUTTI i tipi di contenuto**: SOP, DOCUMENT, MEMO.
+
+## Archiviazione automatica SOP — REGOLE
+
+Il sistema di archiviazione delle SOP è COMPLETAMENTE AUTOMATICO. L'utente NON deve catalogare, rinominare o organizzare manualmente. Il sistema gestisce tutto in base al contesto.
+
+### Codifica automatica SOP
+
+Ogni SOP riceve un codice auto-generato nel formato:
+
+```
+{PROPERTY_CODE}-{DEPT_CODE}-{NUMERO_SEQUENZIALE}
+```
+
+Esempi reali (dal Patria Palace):
+- `PAT-FO-001` — Prenotazione e pre-arrival (Front Office)
+- `PAT-FB-012` — Servizio al tavolo cena (F&B)
+- `PAT-SP-003` — Percorso SPA (Spa/Esperienze)
+- `NCL-FO-001` — Prima SOP Front Office del Nicolaus
+
+### Codici reparto standard
+
+| Reparto | Codice |
+|---------|--------|
+| Front Office | FO |
+| Housekeeping / Room Division | RM |
+| F&B | FB |
+| Maintenance | MT |
+| Spa/Wellness | SP |
+| Administration / Back of House | QA |
+
+Per reparti custom aggiunti dall'utente: il codice reparto viene auto-generato (prime 2 lettere uppercase) o specificato dall'admin.
+
+### Regole di generazione codice
+
+1. **Property code**: preso dal campo `code` della property assegnata (es. NCL, HIB, PPL)
+2. **Department code**: preso dal campo `code` del department (es. FO, FB, SP)
+3. **Numero sequenziale**: auto-incrementale per combinazione property+department, con zero-padding a 3 cifre (001, 002, ..., 999)
+4. Il codice è **immutabile** dopo la creazione — non cambia se la SOP viene modificata, restituita o archiviata
+5. Il codice è **unico** a livello di sistema (constraint unique su `Content.code`)
+
+### Archiviazione file su filesystem
+
+Quando viene caricato un file .docx associato a una SOP, il sistema lo salva automaticamente:
+
+```
+/uploads/sops/{PROPERTY_CODE}/{DEPT_CODE}/{CODE} - {TITLE_SANITIZED}.docx
+```
+
+Esempio:
+```
+/uploads/sops/PAT/FO/PAT-FO-001 - Prenotazione e pre-arrival.docx
+/uploads/sops/NCL/FB/NCL-FB-003 - Mise en place ristorante.docx
+```
+
+Le directory vengono create automaticamente se non esistono.
+
+### Cosa è automatico (l'utente NON sceglie)
+
+- **Codice SOP**: generato dal sistema in base a property + department + sequenziale
+- **Cartella di salvataggio**: derivata da property code + department code
+- **Nome file**: composto da codice + titolo
+- **Property**: ereditata dal contesto utente (se assegnato a una sola property) oppure selezionata nel form di creazione
+- **Department**: selezionato dal form (dropdown dei reparti della property), poi tutto il resto è automatico
+
+### Cosa sceglie l'utente
+
+- **Titolo** della SOP
+- **Reparto** (dropdown dei reparti disponibili per la property)
+- **Property** (solo se l'utente ha accesso a più property — altrimenti auto-assegnata)
+- **Corpo** della SOP (testo o upload .docx)
+
+### Import bulk SOP esistenti
+
+Per le SOP già prodotte (es. le 78 SOP del Patria Palace in SOP_OUTPUT/), il sistema deve supportare import bulk:
+- Lettura della cartella di input
+- Parsing del nome file per estrarre codice e titolo (es. "PAT-FO-001 - Prenotazione e pre-arrival.docx")
+- Creazione automatica del record Content con property, department e codice corretti
+- Salvataggio del file nella struttura di archiviazione corretta
+- Status iniziale: DRAFT (pronto per il workflow di approvazione)
 
 ## Sistema di autorizzazione (RBAC)
 
@@ -321,40 +469,90 @@ La dashboard NON deve privilegiare:
 - informazioni non azionabili
 - complessità visiva
 
-## Design System — Identità visiva HO Collection
+## Design System — Replica fedele del sito hocollection.com
 
-L'interfaccia DomusGO deve ispirarsi all'identità visiva di HO Collection (hocollection.com). Elegante, calda, minimal. NON deve sembrare un software enterprise generico.
+L'interfaccia ModusHO deve replicare FEDELMENTE l'impostazione grafica del sito hocollection.com. Stessi font, stesse dimensioni, stessi colori, stessa disposizione. NON deve sembrare un software enterprise generico.
 
-### Logo e brand identity
+### Riferimento: valori CSS esatti estratti da hocollection.com
 
-Il sistema usa i loghi ufficiali di HO Collection, NON un logo generato.
+Questi sono i valori reali del sito HO Collection da replicare:
 
-**File disponibili in `public/images/`:**
-- `ho-logo-verticale.png` — logo verticale completo: simbolo + "HO COLLECTION — INSPIRED HOTELS" impilato. **LOGO PRINCIPALE per la home operatore.**
-- `ho-logo-orizzontale.png` — logo orizzontale: simbolo + testo su una riga. Per header e contesti orizzontali.
-- `ho-simbolo.png` — solo simbolo (cerchio con tratto). Per favicon, sidebar, spazi compatti.
+**Header/Nav bar:**
+- Sfondo: `rgb(150, 71, 51)` = `#964733` (terracotta)
+- Altezza: ~70px (la barra di navigazione, non il banner completo)
+- Nav links: font Wulkan Display (fallback: Playfair Display, Georgia, serif), 14px, weight 400, colore bianco
+- Logo "HO COLLECTION / INSPIRED HOTELS" centrato nell'header, bianco
 
-**File sorgente nella root del progetto (alta risoluzione):**
-- `HO_Logo_Orizzontale_Nero.png` (3509×709, RGBA)
-- `HO_Simbolo_Nero.png` (1772×2364, RGBA)
+**Hero section (sotto header):**
+- Sfondo: `rgb(240, 239, 233)` = `#F0EFE9` (avorio)
+- Tagline (es. "YOUR BUSINESS DESTINATION"): SOPRA il nome hotel, Brooklyn (fallback: Inter), 12px, uppercase, letter-spacing 1px, colore `rgba(51,51,51,0.5)` (grigio sfumato 50%)
+- Nome hotel (es. "The Nicolaus Hotel"): SOTTO la tagline, Wulkan Display (fallback: Playfair Display), **50px**, weight 500, colore `#964733` (terracotta), line-height 1.5
+- Descrizione: Cardo, 16px, weight 400, line-height 27px, colore `#333`, text-align center
+- Bottoni CTA: Brooklyn SemiBold (fallback: Inter 600), 12.6px, uppercase, letter-spacing 1px, sfondo `#964733`, colore bianco, padding 10px 52px 16px, **border-radius 0** (squadrati, NIENTE arrotondamento)
 
-**Nota**: tutti i loghi sono in nero su sfondo trasparente. Su sfondi scuri (sidebar, header terracotta) devono essere visualizzati in BIANCO. Usa CSS `filter: brightness(0) invert(1)`.
+### Logo ModusHO
+
+Il sistema usa il logo ModusHO (simbolo HO Collection con check di governance al centro).
+
+**File disponibili in `public/`:**
+- `modusho-logo-final.svg` — logo verticale completo: simbolo + "MODUSHO" + "GOVERNANCE OPERATIVA"
+- `modusho-simbolo.svg` — solo simbolo (cerchio HO + check). Per sidebar, header, favicon.
+
+**File originali HO Collection (per contesti dove serve il brand madre):**
+- `images/ho-logo-verticale.png` — logo verticale HO Collection
+- `images/ho-logo-orizzontale.png` — logo orizzontale HO Collection
+- `images/ho-simbolo.png` — solo simbolo HO Collection
+
+**Nota**: loghi in nero su trasparente. Su sfondi scuri usare CSS `filter: brightness(0) invert(1)`.
 
 **Gerarchia di brand:**
-- **HO Collection** = brand madre, domina visivamente
-- **DomusGO** = nome commerciale del software, sottotitolo discreto
+- **ModusHO** = brand del software, logo principale nell'app
+- **HO Collection** = brand madre, presente nell'header come riferimento
 
 **Dove usare cosa:**
 
 | Contesto | File | Dettagli |
 |----------|------|----------|
-| Home operatore (hero, SOPRA la barra di ricerca) | `ho-logo-verticale.png` | DOMINANTE. Grande (max-width 300px), centrato. Nessun testo aggiuntivo sotto il logo. |
-| Login | `ho-logo-verticale.png` | Centrato, max-width 250px. Nessun testo aggiuntivo. |
-| Sidebar HOO (in alto) | `ho-simbolo.png` | Bianco (filter invert), 32px, + testo "DomusGO" bianco accanto |
-| Header operatore | `ho-simbolo.png` | Bianco, 24px, a sinistra |
-| Favicon | `ho-simbolo.png` | Ridotto a 32×32 |
-| Report PDF export | `ho-logo-orizzontale.png` | In header del documento |
-| Empty states / pagine vuote | `ho-simbolo.png` | Grande centrato, opacità 15%, decorativo |
+| Header operatore (barra terracotta) | `modusho-simbolo.svg` + testo "MODUSHO" | Bianco (filter invert), simbolo 28px, testo Inter 14px uppercase letter-spacing 3px. A sinistra. |
+| Home operatore (hero, SOPRA barra ricerca) | Nessun logo grande | Al posto del logo: tagline piccola + nome hotel grande (come sito HO) |
+| Login | `modusho-logo-final.svg` | Centrato, max-width 280px |
+| Sidebar HOO (in alto) | `modusho-simbolo.svg` | Bianco, 32px, + testo "ModusHO" bianco accanto |
+| Favicon | `modusho-simbolo.svg` | Ridotto a 32×32 |
+| Report PDF export | `modusho-logo-final.svg` | In header del documento |
+
+### Layout home operatore — RICALCA hocollection.com/hotels/[hotel]
+
+La home operatore deve avere ESATTAMENTE questa struttura (come la pagina hotel su hocollection.com):
+
+```
+┌─────────────────────────────────────────────────────────────┐
+│  [ModusHO simbolo] MODUSHO     Home SOP Doc BB SB    [Hotel ▼] [Nome] [Esci]  │  ← header terracotta
+├─────────────────────────────────────────────────────────────┤
+│                                                             │
+│              YOUR BUSINESS DESTINATION                      │  ← tagline: Inter 12px uppercase grigio 50%
+│                                                             │
+│              The Nicolaus Hotel                             │  ← nome: Playfair Display 50px terracotta
+│                                                             │
+│         ┌──────────────────────────────────┐                │
+│         │  🔍 Cerca procedure, documenti…  │                │  ← barra ricerca (sostituisce i bottoni CTA)
+│         └──────────────────────────────────┘                │
+│                                                             │
+│  Da leggere (6)                                             │  ← sezione contenuti
+│  ┌───────────────┐  ┌───────────────┐                       │
+│  │ MEMO          │  │ SOP           │                       │
+│  │ Titolo...     │  │ Titolo...     │                       │
+│  └───────────────┘  └───────────────┘                       │
+└─────────────────────────────────────────────────────────────┘
+```
+
+**Regole precise:**
+1. Tagline SOPRA il nome hotel — MAI sotto
+2. Tagline: font Inter/sans-serif, 12px, uppercase, letter-spacing 1px, colore `rgba(51,51,51,0.5)`
+3. Nome hotel: font Playfair Display/serif, 50px, weight 500, colore `#964733` (terracotta)
+4. Sfondo hero: `#F0EFE9`
+5. Spaziatura generosa: almeno 30px sopra la tagline, 15px tra tagline e nome, 40px tra nome e barra ricerca
+6. Tutto centrato orizzontalmente
+7. Barra ricerca: bordo 1px `#E8E5DC`, padding generoso, sfondo bianco, border-radius 0 (squadrato come i bottoni del sito HO)
 
 ### Palette colori
 
@@ -393,7 +591,7 @@ Il sistema usa i loghi ufficiali di HO Collection, NON un logo generato.
 
 ### Componenti UI
 
-- **Bottoni primari**: sfondo `#964733`, testo bianco, border-radius 4px, padding generoso, nessuna ombra
+- **Bottoni primari**: sfondo `#964733`, testo bianco, **border-radius 0** (squadrati, come sul sito HO), padding 10px 52px 16px, font Inter 600 12.6px uppercase letter-spacing 1px, nessuna ombra
 - **Bottoni secondari**: sfondo trasparente, bordo 1px `#964733`, testo `#964733`
 - **Card**: sfondo `#F0EFE9`, bordo 1px `#E8E5DC`, border-radius 8px, nessuna box-shadow
 - **Sidebar HOO**: sfondo `#4E564F`, testo bianco, link attivo con accento `#964733`
@@ -409,6 +607,41 @@ Il sistema usa i loghi ufficiali di HO Collection, NON un logo generato.
 - Spaziatura generosa — l'interfaccia deve respirare
 - Tipografia serif per i contenuti, sans-serif per i dati e la UI
 - Sensazione complessiva: hotel di lusso che gestisce le sue operations, non un SaaS generico
+
+## Visibilità autore e destinatari sulla SOP
+
+Ogni SOP deve mostrare CHIARAMENTE due informazioni:
+
+### 1. Chi l'ha creata / inviata
+
+- **Nella card/lista SOP**: "Creata da: [Nome HOD]" — visibile sotto il titolo
+- **Nel dettaglio SOP**: sezione con nome, ruolo e reparto dell'autore
+- **Nella coda approvazioni HOO**: colonna "Inviata da" con nome dell'HOD
+- Il campo `createdById` identifica l'autore originale
+- Il campo `submittedById` identifica chi l'ha inviata per approvazione (normalmente coincide con createdBy, ma può differire se un ADMIN invia una bozza di un HOD)
+- In caso di SOP restituita e re-inviata, `submittedById` si aggiorna all'ultimo che ha inviato
+
+### 2. A chi è rivolta (destinatari)
+
+Ogni SOP ha uno o più destinatari definiti nel modello `ContentTarget`:
+
+- **Per reparto** (caso più comune): "Rivolta a: Operatori Front Office" → tutti gli operatori assegnati a quel reparto vedono la SOP e devono fare presa visione
+- **Per ruolo**: "Rivolta a: Tutti gli Operator" → tutti gli operator della property
+- **Per utente specifico**: targeting individuale (raro, per casi eccezionali)
+- **Trasversale** (departmentId = null, target ROLE = OPERATOR): rivolta a tutti gli operatori della struttura
+
+**Nella UI:**
+- **Card/lista SOP**: "Rivolta a: Front Office" o "Rivolta a: Tutti i reparti"
+- **Dettaglio SOP**: lista completa dei destinatari con stato presa visione (chi ha letto, chi no)
+- **Coda approvazioni**: colonna "Destinatari" con indicazione sintetica
+- **Dashboard KPI**: % presa visione calcolata sul numero di destinatari che hanno confermato
+
+### Regole di targeting
+
+1. Quando un HOD crea una SOP per il proprio reparto: il target di default è DEPARTMENT = suo reparto
+2. Quando un ADMIN crea una SOP trasversale (departmentId = null): deve specificare i destinatari manualmente
+3. I destinatari vengono definiti in fase di creazione e possono essere modificati fino alla pubblicazione
+4. Dopo la pubblicazione, i destinatari sono FISSI — il sistema genera automaticamente i ContentAcknowledgment obbligatori per tutti i destinatari
 
 ## Ricerca
 
@@ -433,7 +666,7 @@ Target: 300 utenti, 250 operatori.
 ## Struttura del progetto
 
 ```
-DomusGO/
+ModusHO/
 ├── CLAUDE.md                 # questo file
 ├── docs/
 │   └── progetto.md           # documento di progetto originale
@@ -571,14 +804,14 @@ Le azioni disponibili dipendono SEMPRE da quattro fattori verificati esplicitame
 
 ## Properties di riferimento (seed data)
 
-| Code | Nome | Città | Sito web |
-|------|------|-------|----------|
-| NCL | The Nicolaus Hotel | Bari | thenicolaushotel.com |
-| HIB | Hi Hotel Bari | Bari | hihotelbari.com |
-| PPL | Patria Palace Hotel | Lecce | patriapalace.com |
-| TCV | I Turchesi Club Village | Castellaneta Marina | iturchesi.com |
-| DEL | Hotel Delfino Taranto | Taranto | hoteldelfino.com |
-| MRW | Mercure Roma West | Roma | mercureromawest.com |
+| Code | Nome | Tagline | Città | Sito web |
+|------|------|---------|-------|----------|
+| NCL | The Nicolaus Hotel | Your business destination | Bari | thenicolaushotel.com |
+| HIB | Hi Hotel Bari | Welcome modern travellers | Bari | hihotelbari.com |
+| PPL | Patria Palace Hotel | Your main door to Salento | Lecce | patriapalace.com |
+| TCV | I Turchesi Club Village | The Summer place to be | Castellaneta Marina | iturchesi.com |
+| DEL | Hotel Delfino Taranto | Sea the Difference | Taranto | hoteldelfino.com |
+| MRW | Mercure Roma West | No place is like Rome | Roma | mercureromawest.com |
 
 Descrizioni sintetiche:
 - **NCL**: Cuore business di Bari. 174 camere, centro congressi, 4 location banqueting, Skyline Rooftop, wellness area, museo verticale d'arte.
@@ -603,7 +836,9 @@ Il sistema deve permettere la gestione completa delle strutture.
 **Lato HOO** — solo ADMIN e SUPER_ADMIN:
 
 1. **Lista strutture**: src/app/(hoo)/properties/page.tsx
-   - Card per ogni property con: logo, nome, città, numero SOP, stato avanzamento
+   - Card per ogni property con: tagline (piccolo, uppercase, colore sage) + nome hotel (grande, font Playfair Display, colore terracotta), città, numero SOP, stato avanzamento
+   - Lo stile delle card riprende il layout del sito hocollection.com: tagline sopra in piccolo, nome hotel grande sotto
+   - NON mostrare il logo HO Collection verticale nelle card — ogni struttura mostra il proprio nome come identità visiva
    - Pulsante "Aggiungi struttura"
 
 2. **Dettaglio struttura**: src/app/(hoo)/properties/[id]/page.tsx
@@ -614,7 +849,7 @@ Il sistema deve permettere la gestione completa delle strutture.
    - Lista operatori assegnati
 
 3. **Crea nuova struttura**: src/app/(hoo)/properties/new/page.tsx
-   - Form: nome, codice, città, indirizzo, descrizione, sito web
+   - Form: nome, codice, tagline, città, indirizzo, descrizione, sito web
    - Upload logo (immagine PNG/JPG, max 2MB, salvata in /public/uploads/logos/)
    - Selezione reparti iniziali (da lista predefinita + possibilità di aggiungerne di custom)
 

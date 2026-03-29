@@ -7,6 +7,7 @@ interface Property {
   id: string;
   name: string;
   code: string;
+  tagline: string | null;
 }
 
 interface OperatorContextValue {

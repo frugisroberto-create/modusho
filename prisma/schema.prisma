@@ -19,6 +19,8 @@ enum ContentType {
   SOP
   DOCUMENT
   MEMO
+  BRAND_BOOK
+  STANDARD_BOOK
 }
 
 enum ContentStatus {
@@ -41,6 +43,12 @@ enum StaticDocumentType {
   STANDARD_BOOK
 }
 
+enum TargetType {
+  ROLE
+  DEPARTMENT
+  USER
+}
+
 model User {
   id           String  @id @default(cuid())
   email        String  @unique
@@ -58,9 +66,12 @@ model User {
   contentPermissions   UserContentPermission[]
   createdContents      Content[]              @relation("ContentCreatedBy")
   updatedContents      Content[]              @relation("ContentUpdatedBy")
+  submittedContents    Content[]              @relation("ContentSubmittedBy")
+  deletedContents      Content[]              @relation("ContentDeletedBy")
   acknowledgments      ContentAcknowledgment[]
   reviews              ContentReview[]
   statusChanges        ContentStatusHistory[] @relation("StatusChangedBy")
+  targetedContents     ContentTarget[]        @relation("ContentTargetUser")
 
   @@index([role])
   @@index([email])
@@ -78,11 +89,18 @@ model UserContentPermission {
 }
 
 model Property {
-  id       String  @id @default(cuid())
-  name     String
-  code     String  @unique
-  city     String
-  isActive Boolean @default(true)
+  id          String   @id @default(cuid())
+  name        String
+  code        String   @unique
+  tagline     String?
+  city        String
+  address     String?
+  description String?  @db.Text
+  website     String?
+  logoUrl     String?
+  isActive    Boolean  @default(true)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
 
   departments         Department[]
   propertyAssignments PropertyAssignment[]
@@ -102,6 +120,7 @@ model Department {
 
   propertyAssignments PropertyAssignment[]
   contents            Content[]
+  contentTargets      ContentTarget[]       @relation("ContentTargetDepartment")
 
   @@unique([propertyId, code])
   @@index([propertyId])
@@ -125,28 +144,37 @@ model PropertyAssignment {
 
 model Content {
   id           String        @id @default(cuid())
+  code         String?       @unique
   type         ContentType
   title        String
   body         String
+  fileUrl      String?
   status       ContentStatus @default(DRAFT)
   version      Int           @default(1)
   propertyId   String
   departmentId String?
-  createdById  String
-  updatedById  String
-  publishedAt  DateTime?
-  createdAt    DateTime      @default(now())
-  updatedAt    DateTime      @updatedAt
+  createdById   String
+  updatedById   String
+  submittedById String?
+  isDeleted     Boolean       @default(false)
+  deletedAt     DateTime?
+  deletedById   String?
+  publishedAt   DateTime?
+  createdAt     DateTime      @default(now())
+  updatedAt     DateTime      @updatedAt
 
   property    Property    @relation(fields: [propertyId], references: [id])
   department  Department? @relation(fields: [departmentId], references: [id])
   createdBy   User        @relation("ContentCreatedBy", fields: [createdById], references: [id])
   updatedBy   User        @relation("ContentUpdatedBy", fields: [updatedById], references: [id])
+  submittedBy User?       @relation("ContentSubmittedBy", fields: [submittedById], references: [id])
+  deletedBy   User?       @relation("ContentDeletedBy", fields: [deletedById], references: [id])
 
-  acknowledgments ContentAcknowledgment[]
-  reviews         ContentReview[]
-  statusHistory   ContentStatusHistory[]
-  memo            Memo?
+  acknowledgments  ContentAcknowledgment[]
+  reviews          ContentReview[]
+  statusHistory    ContentStatusHistory[]
+  targetAudience   ContentTarget[]
+  memo             Memo?
 
   @@index([propertyId])
   @@index([departmentId])
@@ -204,6 +232,22 @@ model ContentStatusHistory {
   @@index([contentId])
   @@index([changedById])
   @@index([changedAt])
+}
+
+model ContentTarget {
+  id                 String      @id @default(cuid())
+  contentId          String
+  targetType         TargetType
+  targetRole         Role?
+  targetDepartmentId String?
+  targetUserId       String?
+  createdAt          DateTime    @default(now())
+
+  content          Content     @relation(fields: [contentId], references: [id], onDelete: Cascade)
+  targetDepartment Department? @relation("ContentTargetDepartment", fields: [targetDepartmentId], references: [id])
+  targetUser       User?       @relation("ContentTargetUser", fields: [targetUserId], references: [id])
+
+  @@index([contentId])
 }
 
 model Memo {

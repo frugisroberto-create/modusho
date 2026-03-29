@@ -20,9 +20,8 @@ export async function PUT(
   const session = await getServerSession(authOptions);
   if (!session?.user) return NextResponse.json({ error: "Non autenticato" }, { status: 401 });
 
-  const { role } = session.user;
-  if (role !== "HOTEL_MANAGER" && role !== "ADMIN" && role !== "SUPER_ADMIN") {
-    return NextResponse.json({ error: "Accesso negato" }, { status: 403 });
+  if (!session.user.canEdit) {
+    return NextResponse.json({ error: "Non hai permessi di modifica" }, { status: 403 });
   }
 
   const { id: memoId } = await params;

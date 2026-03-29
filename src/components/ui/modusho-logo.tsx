@@ -1,11 +1,11 @@
 import { HoLogo } from "./ho-logo";
 
-interface DomusGoLogoProps {
+interface ModusHoLogoProps {
   size?: "sm" | "md" | "lg" | "xl";
   variant?: "dark" | "light";
 }
 
-export function DomusGoLogo({ size = "md", variant = "dark" }: DomusGoLogoProps) {
+export function ModusHoLogo({ size = "md", variant = "dark" }: ModusHoLogoProps) {
   if (size === "sm") {
     return <HoLogo variant="symbol" color={variant} size={24} />;
   }

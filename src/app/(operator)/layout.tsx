@@ -11,12 +11,16 @@ export default async function OperatorLayout({
   const user = await getSessionUser();
   if (!user) redirect("/login");
 
+  // Verifica che l'utente esista ancora nel DB (dopo reset DB il JWT è stale)
+  const dbUser = await prisma.user.findUnique({ where: { id: user.id }, select: { id: true } });
+  if (!dbUser) redirect("/api/auth/signout");
+
   // SUPER_ADMIN vede tutte le property
   let properties;
   if (user.role === "SUPER_ADMIN") {
     properties = await prisma.property.findMany({
       where: { isActive: true },
-      select: { id: true, name: true, code: true },
+      select: { id: true, name: true, code: true, tagline: true },
     });
   } else {
     properties = await getUserProperties(user.id);
@@ -36,6 +40,7 @@ export default async function OperatorLayout({
   const propertyIds = properties.map((p) => p.id);
   const pendingCount = await prisma.content.count({
     where: {
+      isDeleted: false,
       status: "PUBLISHED",
       propertyId: { in: propertyIds },
       acknowledgments: {

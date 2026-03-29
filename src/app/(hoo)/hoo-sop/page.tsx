@@ -77,13 +77,13 @@ export default function HooSopListPage() {
                 <p className="text-xs text-gray-400 mt-1">{new Date(item.createdAt).toLocaleDateString("it-IT")}</p>
               </div>
               <div className="flex gap-2">
-                {item.status === "DRAFT" && (
-                  <Link href={`/hoo-sop/${item.id}/edit`} className="px-3 py-1.5 text-xs text-blue-600 hover:bg-blue-50 rounded-md border border-blue-200">
+                {item.status !== "PUBLISHED" && item.status !== "ARCHIVED" && (
+                  <Link href={`/hoo-sop/${item.id}/edit`} className="px-3 py-1.5 text-xs font-ui text-terracotta hover:bg-terracotta/10 rounded-md border border-terracotta/30">
                     Modifica
                   </Link>
                 )}
                 {(item.status === "REVIEW_ADMIN" || item.status === "REVIEW_HM") && (
-                  <Link href={`/approvals/${item.id}`} className="px-3 py-1.5 text-xs text-orange-600 hover:bg-orange-50 rounded-md border border-orange-200">
+                  <Link href={`/approvals/${item.id}`} className="px-3 py-1.5 text-xs font-ui text-sage hover:bg-sage/10 rounded-md border border-sage/30">
                     Review
                   </Link>
                 )}

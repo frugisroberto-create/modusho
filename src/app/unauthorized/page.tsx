@@ -1,10 +1,10 @@
 import Link from "next/link";
-import { DomusGoLogo } from "@/components/ui/domusgo-logo";
+import { ModusHoLogo } from "@/components/ui/modusho-logo";
 
 export default function UnauthorizedPage() {
   return (
     <div className="min-h-screen flex flex-col items-center justify-center bg-ivory px-4">
-      <DomusGoLogo size="md" />
+      <ModusHoLogo size="md" />
       <div className="mt-8 text-center">
         <h1 className="text-xl font-heading font-semibold text-charcoal-dark mb-3">Accesso non autorizzato</h1>
         <p className="text-sm font-ui text-sage-light mb-6">

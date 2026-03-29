@@ -15,15 +15,18 @@ export default async function EditSopPage({ params }: Props) {
   const { id } = await params;
 
   const content = await prisma.content.findUnique({
-    where: { id },
+    where: { id, isDeleted: false },
     select: { id: true, title: true, body: true, status: true, propertyId: true, departmentId: true },
   });
 
-  if (!content || content.status !== "DRAFT") notFound();
+  if (!content) notFound();
+
+  // Non modificabili se pubblicati o archiviati
+  if (content.status === "PUBLISHED" || content.status === "ARCHIVED") notFound();
 
   return (
     <div>
-      <h1 className="text-xl font-bold text-gray-900 mb-6">Modifica SOP</h1>
+      <h1 className="text-xl font-heading font-semibold text-charcoal-dark mb-6">Modifica SOP</h1>
       <SopForm
         mode="edit"
         contentId={content.id}

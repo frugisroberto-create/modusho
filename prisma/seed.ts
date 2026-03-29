@@ -5,17 +5,20 @@ const prisma = new PrismaClient();
 
 const DEPARTMENT_CODES = [
   { name: "Front Office", code: "FO" },
-  { name: "Housekeeping", code: "HK" },
+  { name: "Room Division", code: "RM" },
   { name: "F&B", code: "FB" },
-  { name: "Maintenance", code: "MNT" },
-  { name: "Spa/Wellness", code: "SPA" },
-  { name: "Administration", code: "ADM" },
+  { name: "Maintenance", code: "MT" },
+  { name: "Spa & Esperienze", code: "SP" },
+  { name: "Back of House", code: "QA" },
 ];
 
 const PROPERTIES = [
-  { name: "The Nicolaus Hotel", code: "NCL", city: "Bari" },
-  { name: "Hi Hotel Bari", code: "HIB", city: "Bari" },
-  { name: "Patria Palace Hotel", code: "PPL", city: "Lecce" },
+  { name: "The Nicolaus Hotel", code: "NCL", tagline: "Your business destination", city: "Bari", description: "Cuore business di Bari. 174 camere, centro congressi, 4 location banqueting, Skyline Rooftop, wellness area, museo verticale d'arte.", website: "thenicolaushotel.com" },
+  { name: "Hi Hotel Bari", code: "HIB", tagline: "Welcome modern travellers", city: "Bari", description: "Smart e design oriented. 88 camere, ristorante Basilico, concept lifestyle per modern travellers.", website: "hihotelbari.com" },
+  { name: "Patria Palace Hotel", code: "PPL", tagline: "Your main door to Salento", city: "Lecce", description: "Hotel di lusso a Lecce, membro Leading Hotels of the World. Esperienza poetica, ristorante stellato, vista senza pari.", website: "patriapalace.com" },
+  { name: "I Turchesi Club Village", code: "TCV", tagline: "The Summer place to be", city: "Castellaneta Marina", description: "Villaggio turistico stagionale. Piscina più grande d'Italia, sport, mare, costa pugliese.", website: "iturchesi.com" },
+  { name: "Hotel Delfino Taranto", code: "DEL", tagline: "Sea the Difference", city: "Taranto", description: "Hotel business/leisure vista mare a Taranto. Camere, suite, sale MICE e banqueting.", website: "hoteldelfino.com" },
+  { name: "Mercure Roma West", code: "MRW", tagline: "No place is like Rome", city: "Roma", description: "Franchising Accor a Roma. Soggiorni business, MICE, area wellness. Standard brand Accor obbligatori.", website: "mercureromawest.com" },
 ];
 
 type Assignment = { propertyCode: string; departmentCode?: string };
@@ -41,7 +44,7 @@ async function main() {
   for (const prop of PROPERTIES) {
     const created = await prisma.property.upsert({
       where: { code: prop.code },
-      update: {},
+      update: { tagline: prop.tagline, description: prop.description, website: prop.website },
       create: prop,
     });
     properties[prop.code] = created.id;
@@ -75,7 +78,7 @@ async function main() {
   // Create users
   const users: UserSeed[] = [
     {
-      email: "super@domusgo.test",
+      email: "super@modusho.test",
       name: "Super Admin",
       role: Role.SUPER_ADMIN,
       canView: true, canEdit: true, canApprove: true,
@@ -83,7 +86,7 @@ async function main() {
       contentTypes: ["SOP", "DOCUMENT", "MEMO"],
     },
     {
-      email: "admin@domusgo.test",
+      email: "admin@modusho.test",
       name: "Admin Generale",
       role: Role.ADMIN,
       canView: true, canEdit: true, canApprove: true,
@@ -95,7 +98,7 @@ async function main() {
       contentTypes: ["SOP", "DOCUMENT", "MEMO"],
     },
     {
-      email: "hm.nicolaus@domusgo.test",
+      email: "hm.nicolaus@modusho.test",
       name: "Hotel Manager Nicolaus",
       role: Role.HOTEL_MANAGER,
       canView: true, canEdit: true, canApprove: true,
@@ -103,7 +106,7 @@ async function main() {
       contentTypes: ["MEMO", "SOP", "DOCUMENT"],
     },
     {
-      email: "hm.hi@domusgo.test",
+      email: "hm.hi@modusho.test",
       name: "Hotel Manager Hi Hotel",
       role: Role.HOTEL_MANAGER,
       canView: true, canEdit: true, canApprove: true,
@@ -111,7 +114,7 @@ async function main() {
       contentTypes: ["MEMO", "SOP", "DOCUMENT"],
     },
     {
-      email: "hm.patria@domusgo.test",
+      email: "hm.patria@modusho.test",
       name: "Hotel Manager Patria Palace",
       role: Role.HOTEL_MANAGER,
       canView: true, canEdit: true, canApprove: true,
@@ -119,7 +122,7 @@ async function main() {
       contentTypes: ["MEMO", "SOP", "DOCUMENT"],
     },
     {
-      email: "hod.fo.nicolaus@domusgo.test",
+      email: "hod.fo.nicolaus@modusho.test",
       name: "HOD Front Office NCL",
       role: Role.HOD,
       canView: true, canEdit: true, canApprove: false,
@@ -127,15 +130,47 @@ async function main() {
       contentTypes: ["SOP", "DOCUMENT"],
     },
     {
-      email: "hod.hk.patria@domusgo.test",
-      name: "HOD Housekeeping PPL",
+      email: "hod.fo.patria@modusho.test",
+      name: "HOD Front Office Patria",
       role: Role.HOD,
       canView: true, canEdit: true, canApprove: false,
-      assignments: [{ propertyCode: "PPL", departmentCode: "HK" }],
+      assignments: [{ propertyCode: "PPL", departmentCode: "FO" }],
       contentTypes: ["SOP", "DOCUMENT"],
     },
     {
-      email: "hod.fb.hi@domusgo.test",
+      email: "hod.rm.patria@modusho.test",
+      name: "HOD Room Division Patria",
+      role: Role.HOD,
+      canView: true, canEdit: true, canApprove: false,
+      assignments: [{ propertyCode: "PPL", departmentCode: "RM" }],
+      contentTypes: ["SOP", "DOCUMENT"],
+    },
+    {
+      email: "hod.fb.patria@modusho.test",
+      name: "HOD F&B Patria",
+      role: Role.HOD,
+      canView: true, canEdit: true, canApprove: false,
+      assignments: [{ propertyCode: "PPL", departmentCode: "FB" }],
+      contentTypes: ["SOP", "DOCUMENT"],
+    },
+    {
+      email: "hod.sp.patria@modusho.test",
+      name: "HOD Spa & Esperienze Patria",
+      role: Role.HOD,
+      canView: true, canEdit: true, canApprove: false,
+      assignments: [{ propertyCode: "PPL", departmentCode: "SP" }],
+      contentTypes: ["SOP", "DOCUMENT"],
+    },
+    {
+      email: "hod.qa.patria@modusho.test",
+      name: "HOD Back of House Patria",
+      role: Role.HOD,
+      canView: true, canEdit: true, canApprove: false,
+      assignments: [{ propertyCode: "PPL", departmentCode: "QA" }],
+      contentTypes: ["SOP", "DOCUMENT"],
+    },
+    {
+      email: "hod.fb.hi@modusho.test",
       name: "HOD F&B Hi Hotel",
       role: Role.HOD,
       canView: true, canEdit: true, canApprove: false,
@@ -143,7 +178,7 @@ async function main() {
       contentTypes: ["SOP", "MEMO"],
     },
     {
-      email: "op.fo.nicolaus@domusgo.test",
+      email: "op.fo.nicolaus@modusho.test",
       name: "Operatore Front Office NCL",
       role: Role.OPERATOR,
       canView: true, canEdit: false, canApprove: false,
@@ -151,15 +186,15 @@ async function main() {
       contentTypes: [],
     },
     {
-      email: "op.hk.nicolaus@domusgo.test",
+      email: "op.hk.nicolaus@modusho.test",
       name: "Operatore Housekeeping NCL",
       role: Role.OPERATOR,
       canView: true, canEdit: false, canApprove: false,
-      assignments: [{ propertyCode: "NCL", departmentCode: "HK" }],
+      assignments: [{ propertyCode: "NCL", departmentCode: "RM" }],
       contentTypes: [],
     },
     {
-      email: "op.fb.hi@domusgo.test",
+      email: "op.fb.hi@modusho.test",
       name: "Operatore F&B Hi Hotel",
       role: Role.OPERATOR,
       canView: true, canEdit: false, canApprove: false,
@@ -221,9 +256,9 @@ async function main() {
   // Create test contents with status history
   console.log("\n  Creating test contents...");
 
-  const adminUser = await prisma.user.findUnique({ where: { email: "admin@domusgo.test" } });
-  const hmNicolaus = await prisma.user.findUnique({ where: { email: "hm.nicolaus@domusgo.test" } });
-  const hmHi = await prisma.user.findUnique({ where: { email: "hm.hi@domusgo.test" } });
+  const adminUser = await prisma.user.findUnique({ where: { email: "admin@modusho.test" } });
+  const hmNicolaus = await prisma.user.findUnique({ where: { email: "hm.nicolaus@modusho.test" } });
+  const hmHi = await prisma.user.findUnique({ where: { email: "hm.hi@modusho.test" } });
 
   if (!adminUser || !hmNicolaus || !hmHi) {
     throw new Error("Required users not found for content seeding");
@@ -310,7 +345,7 @@ async function main() {
   await createContentWithHistory({
     type: "SOP", title: "Pulizia Camera Standard",
     body: "<h2>Sequenza operativa</h2><ol><li>Bussare e annunciare</li><li>Aprire finestre</li><li>Rimuovere biancheria</li><li>Pulire bagno</li><li>Rifare letto</li><li>Spolverare</li><li>Aspirare e lavare</li><li>Controllo finale</li></ol>",
-    finalStatus: "PUBLISHED", propertyCode: "NCL", departmentCode: "HK",
+    finalStatus: "PUBLISHED", propertyCode: "NCL", departmentCode: "RM",
     statusPath: [
       { status: "DRAFT", byUserId: adminUser.id, daysAgo: 25 },
       { status: "REVIEW_HM", byUserId: adminUser.id, daysAgo: 22 },

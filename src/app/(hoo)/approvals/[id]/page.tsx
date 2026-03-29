@@ -16,7 +16,7 @@ export default async function ApprovalDetailPage({ params }: Props) {
   const { id } = await params;
 
   const content = await prisma.content.findUnique({
-    where: { id },
+    where: { id, isDeleted: false },
     include: {
       property: { select: { id: true, name: true, code: true } },
       department: { select: { id: true, name: true, code: true } },

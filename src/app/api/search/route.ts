@@ -106,7 +106,7 @@ export async function GET(request: NextRequest) {
       ) as snippet,
       ts_rank(to_tsvector('italian', c.title || ' ' || c.body), to_tsquery('italian', $1)) as rank
     FROM "Content" c
-    WHERE c.status = 'PUBLISHED'
+    WHERE c.status = 'PUBLISHED' AND c."isDeleted" = false
       AND c."propertyId" = ANY($2::text[])
       AND (c."departmentId" IS NULL OR c."departmentId" = ANY($3::text[]))
       ${typeFilter}
@@ -130,7 +130,7 @@ export async function GET(request: NextRequest) {
     `
     SELECT COUNT(*) as count
     FROM "Content" c
-    WHERE c.status = 'PUBLISHED'
+    WHERE c.status = 'PUBLISHED' AND c."isDeleted" = false
       AND c."propertyId" = ANY($2::text[])
       AND (c."departmentId" IS NULL OR c."departmentId" = ANY($3::text[]))
       ${typeFilter}

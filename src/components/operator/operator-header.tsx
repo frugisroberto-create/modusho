@@ -9,6 +9,7 @@ interface Property {
   id: string;
   name: string;
   code: string;
+  tagline: string | null;
 }
 
 interface OperatorHeaderProps {
@@ -24,6 +25,8 @@ const NAV_ITEMS = [
   { href: "/", label: "Home" },
   { href: "/sop", label: "SOP" },
   { href: "/documents", label: "Documenti" },
+  { href: "/brand-book", label: "Brand Book" },
+  { href: "/standard-book", label: "Standard Book" },
 ];
 
 export function OperatorHeader({

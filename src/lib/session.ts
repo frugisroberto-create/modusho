@@ -13,7 +13,7 @@ export async function getUserProperties(userId: string) {
     where: { userId },
     select: {
       propertyId: true,
-      property: { select: { id: true, name: true, code: true } },
+      property: { select: { id: true, name: true, code: true, tagline: true } },
     },
     distinct: ["propertyId"],
   });

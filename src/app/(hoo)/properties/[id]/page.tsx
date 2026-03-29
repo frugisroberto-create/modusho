@@ -1,162 +1,154 @@
-import { notFound, redirect } from "next/navigation";
-import { getSessionUser } from "@/lib/session";
-import { prisma } from "@/lib/prisma";
-import { checkAccess } from "@/lib/rbac";
+"use client";
 
-interface Props {
-  params: Promise<{ id: string }>;
+import { useState, useEffect, useCallback } from "react";
+import { useParams, useRouter } from "next/navigation";
+import Link from "next/link";
+
+interface Department { id: string; name: string; code: string; sopTotal: number; sopPublished: number }
+interface Operator {
+  id: string; name: string; email: string; role: string;
+  propertyAssignments: { department: { name: string } | null }[];
+}
+interface PropertyDetail {
+  id: string; name: string; code: string; tagline: string | null; city: string;
+  address: string | null; description: string | null; website: string | null; logoUrl: string | null;
+  isActive: boolean; departments: Department[]; operators: Operator[];
 }
 
-export default async function PropertyDetailPage({ params }: Props) {
-  const user = await getSessionUser();
-  if (!user) redirect("/login");
-  if (user.role !== "ADMIN" && user.role !== "SUPER_ADMIN") redirect("/");
+const ROLE_BADGE: Record<string, { label: string; cls: string }> = {
+  SUPER_ADMIN: { label: "SA", cls: "bg-charcoal-dark text-white" },
+  ADMIN: { label: "Admin", cls: "bg-sage text-white" },
+  HOTEL_MANAGER: { label: "HM", cls: "bg-terracotta text-white" },
+  HOD: { label: "HOD", cls: "bg-mauve text-white" },
+  OPERATOR: { label: "Op", cls: "bg-ivory-dark text-charcoal" },
+};
 
-  const { id } = await params;
+export default function PropertyDetailPage() {
+  const { id } = useParams<{ id: string }>();
+  const router = useRouter();
+  const [property, setProperty] = useState<PropertyDetail | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [newDeptName, setNewDeptName] = useState("");
+  const [addingDept, setAddingDept] = useState(false);
 
-  const property = await prisma.property.findUnique({
-    where: { id },
-    include: { departments: { orderBy: { name: "asc" } } },
-  });
+  const fetchProperty = useCallback(async () => {
+    setLoading(true);
+    try {
+      const res = await fetch(`/api/properties/${id}`);
+      if (res.ok) { const json = await res.json(); setProperty(json.data); }
+    } finally { setLoading(false); }
+  }, [id]);
 
-  if (!property) notFound();
+  useEffect(() => { fetchProperty(); }, [fetchProperty]);
 
-  const hasAccess = await checkAccess(user.id, "ADMIN", property.id);
-  if (!hasAccess) notFound();
-
-  // Department breakdown
-  const deptStats = await Promise.all(
-    property.departments.map(async (dept) => {
-      const [total, published, inReview] = await Promise.all([
-        prisma.content.count({ where: { propertyId: id, departmentId: dept.id, type: "SOP" } }),
-        prisma.content.count({ where: { propertyId: id, departmentId: dept.id, type: "SOP", status: "PUBLISHED" } }),
-        prisma.content.count({ where: { propertyId: id, departmentId: dept.id, type: "SOP", status: { in: ["REVIEW_HM", "REVIEW_ADMIN"] } } }),
-      ]);
-      return { ...dept, sopTotal: total, sopPublished: published, sopInReview: inReview };
-    })
-  );
-
-  // Operatori e presa visione
-  const operators = await prisma.user.findMany({
-    where: {
-      role: "OPERATOR",
-      isActive: true,
-      propertyAssignments: { some: { propertyId: id } },
-    },
-    include: {
-      propertyAssignments: {
-        where: { propertyId: id },
-        include: { department: { select: { name: true } } },
-      },
-      acknowledgments: {
-        where: { content: { propertyId: id, status: "PUBLISHED" } },
-        select: { contentId: true },
-      },
-    },
-  });
-
-  const publishedCount = await prisma.content.count({
-    where: { propertyId: id, status: "PUBLISHED", type: { in: ["SOP", "DOCUMENT"] } },
-  });
-
-  // SOP della property
-  const sops = await prisma.content.findMany({
-    where: { propertyId: id, type: "SOP" },
-    select: {
-      id: true, title: true, status: true, publishedAt: true,
-      department: { select: { name: true } },
-    },
-    orderBy: { updatedAt: "desc" },
-    take: 50,
-  });
-
-  const STATUS_COLORS: Record<string, string> = {
-    DRAFT: "bg-gray-100 text-gray-700", REVIEW_HM: "bg-yellow-100 text-yellow-700",
-    REVIEW_ADMIN: "bg-orange-100 text-orange-700", PUBLISHED: "bg-green-100 text-green-700",
-    RETURNED: "bg-red-100 text-red-700", ARCHIVED: "bg-gray-200 text-gray-500",
+  const handleAddDept = async () => {
+    if (!newDeptName.trim()) return;
+    setAddingDept(true);
+    try {
+      const res = await fetch(`/api/properties/${id}/departments`, {
+        method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ name: newDeptName }),
+      });
+      if (res.ok) { setNewDeptName(""); fetchProperty(); }
+    } finally { setAddingDept(false); }
   };
 
+  const handleDeleteDept = async (depId: string) => {
+    const res = await fetch(`/api/properties/${id}/departments/${depId}`, { method: "DELETE" });
+    if (res.ok) fetchProperty();
+  };
+
+  if (loading) return <div className="space-y-4">{[1,2,3].map(i => <div key={i} className="h-32 skeleton" />)}</div>;
+  if (!property) return <p className="text-sage-light font-ui">Struttura non trovata</p>;
+
   return (
-    <div className="max-w-5xl space-y-6">
-      <div>
-        <h1 className="text-xl font-bold text-gray-900">{property.name}</h1>
-        <p className="text-sm text-gray-500">{property.city} &middot; {property.code}</p>
+    <div className="max-w-4xl space-y-6">
+      {/* Header */}
+      <div className="flex items-start justify-between">
+        <div>
+          {property.tagline && (
+            <p className="text-xs font-ui font-medium uppercase tracking-[0.2em] text-sage mb-1">
+              {property.tagline}
+            </p>
+          )}
+          <h1 className="text-3xl font-heading font-semibold text-terracotta">{property.name}</h1>
+          <div className="flex items-center gap-3 mt-2 text-sm font-ui text-sage-light">
+            <span>{property.city}</span>
+            {property.website && (
+              <a href={`https://${property.website}`} target="_blank" rel="noopener noreferrer"
+                className="text-terracotta hover:underline">{property.website}</a>
+            )}
+          </div>
+          {property.description && (
+            <p className="text-sm font-ui text-charcoal/70 mt-3 max-w-xl">{property.description}</p>
+          )}
+        </div>
+        <div className="flex gap-2">
+          <Link href={`/properties/${id}/edit`}
+            className="px-4 py-2 text-sm font-ui font-medium text-white bg-terracotta hover:bg-terracotta-light rounded-lg transition-colors">
+            Modifica
+          </Link>
+          <button onClick={() => router.push("/properties")}
+            className="px-4 py-2 text-sm font-ui text-sage-light hover:text-charcoal transition-colors">Indietro</button>
+        </div>
       </div>
 
-      {/* Breakdown per reparto */}
-      <section className="bg-white rounded-lg border border-gray-200">
-        <div className="px-4 py-3 border-b border-gray-100">
-          <h2 className="text-base font-semibold text-gray-900">Reparti</h2>
-        </div>
-        <table className="w-full text-sm">
-          <thead><tr className="border-b border-gray-100 text-left text-xs text-gray-500 uppercase">
-            <th className="px-4 py-2">Reparto</th><th className="px-4 py-2">SOP totali</th>
-            <th className="px-4 py-2">Pubblicate</th><th className="px-4 py-2">In review</th>
-          </tr></thead>
-          <tbody>
-            {deptStats.map(d => (
-              <tr key={d.id} className="border-b border-gray-50">
-                <td className="px-4 py-2 font-medium">{d.name}</td>
-                <td className="px-4 py-2">{d.sopTotal}</td>
-                <td className="px-4 py-2 text-green-600">{d.sopPublished}</td>
-                <td className="px-4 py-2 text-orange-600">{d.sopInReview}</td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      </section>
-
-      {/* Operatori e presa visione */}
-      <section className="bg-white rounded-lg border border-gray-200">
-        <div className="px-4 py-3 border-b border-gray-100">
-          <h2 className="text-base font-semibold text-gray-900">Operatori — Presa visione</h2>
-        </div>
-        <table className="w-full text-sm">
-          <thead><tr className="border-b border-gray-100 text-left text-xs text-gray-500 uppercase">
-            <th className="px-4 py-2">Nome</th><th className="px-4 py-2">Reparto</th>
-            <th className="px-4 py-2">Letture</th><th className="px-4 py-2">% completamento</th>
-          </tr></thead>
-          <tbody>
-            {operators.map(op => {
-              const deptName = op.propertyAssignments[0]?.department?.name || "Tutti";
-              const ackCount = op.acknowledgments.length;
-              const pct = publishedCount > 0 ? Math.round((ackCount / publishedCount) * 100) : 0;
-              return (
-                <tr key={op.id} className="border-b border-gray-50">
-                  <td className="px-4 py-2 font-medium">{op.name}</td>
-                  <td className="px-4 py-2 text-gray-600">{deptName}</td>
-                  <td className="px-4 py-2">{ackCount}/{publishedCount}</td>
-                  <td className="px-4 py-2">
-                    <span className={`font-medium ${pct < 50 ? "text-red-600" : pct < 80 ? "text-yellow-600" : "text-green-600"}`}>
-                      {pct}%
-                    </span>
-                  </td>
-                </tr>
-              );
-            })}
-          </tbody>
-        </table>
-      </section>
-
-      {/* SOP della property */}
-      <section className="bg-white rounded-lg border border-gray-200">
-        <div className="px-4 py-3 border-b border-gray-100">
-          <h2 className="text-base font-semibold text-gray-900">SOP</h2>
-        </div>
-        <div className="divide-y divide-gray-50">
-          {sops.map(sop => (
-            <div key={sop.id} className="px-4 py-3 flex items-center justify-between">
-              <div>
-                <div className="flex items-center gap-2">
-                  <span className={`text-xs font-medium px-2 py-0.5 rounded ${STATUS_COLORS[sop.status] || ""}`}>{sop.status}</span>
-                  <span className="text-sm font-medium text-gray-900">{sop.title}</span>
-                </div>
-                <p className="text-xs text-gray-500 mt-0.5">{sop.department?.name || "Trasversale"}</p>
+      {/* Reparti */}
+      <section className="bg-ivory-medium border border-ivory-dark rounded-lg p-5">
+        <h2 className="text-base font-heading font-semibold text-charcoal-dark mb-4">Reparti</h2>
+        <div className="space-y-2">
+          {property.departments.map((d) => (
+            <div key={d.id} className="flex items-center justify-between py-2.5 px-3 bg-ivory rounded-lg">
+              <div className="flex items-center gap-3">
+                <span className="font-ui font-medium text-charcoal-dark text-sm">{d.name}</span>
+                <span className="text-xs font-ui text-sage-light">{d.code}</span>
               </div>
-              {sop.publishedAt && <span className="text-xs text-gray-400">{new Date(sop.publishedAt).toLocaleDateString("it-IT")}</span>}
+              <div className="flex items-center gap-4">
+                <span className="text-xs font-ui text-sage-light">
+                  {d.sopPublished}/{d.sopTotal} SOP
+                </span>
+                <button onClick={() => handleDeleteDept(d.id)}
+                  className="text-xs font-ui text-alert-red/50 hover:text-alert-red transition-colors">
+                  Rimuovi
+                </button>
+              </div>
             </div>
           ))}
         </div>
+        <div className="flex gap-2 mt-3 pt-3 border-t border-ivory-dark/50">
+          <input type="text" value={newDeptName} onChange={(e) => setNewDeptName(e.target.value)}
+            placeholder="Nuovo reparto..." className="flex-1 text-sm" />
+          <button onClick={handleAddDept} disabled={addingDept || !newDeptName.trim()}
+            className="px-3 py-2 text-sm font-ui font-medium text-white bg-sage hover:bg-sage-dark rounded-lg disabled:opacity-50 transition-colors">
+            Aggiungi
+          </button>
+        </div>
+      </section>
+
+      {/* Operatori */}
+      <section className="bg-ivory-medium border border-ivory-dark rounded-lg p-5">
+        <h2 className="text-base font-heading font-semibold text-charcoal-dark mb-4">Utenti assegnati</h2>
+        {property.operators.length === 0 ? (
+          <p className="text-sm font-ui text-sage-light">Nessun utente assegnato</p>
+        ) : (
+          <div className="space-y-1">
+            {property.operators.map((op) => {
+              const badge = ROLE_BADGE[op.role] || { label: op.role, cls: "bg-ivory-dark text-charcoal" };
+              const deptName = op.propertyAssignments[0]?.department?.name;
+              return (
+                <div key={op.id} className="flex items-center justify-between py-2 px-3 bg-ivory rounded-lg">
+                  <div className="flex items-center gap-2">
+                    <span className={`text-[10px] font-ui font-medium px-1.5 py-0.5 rounded ${badge.cls}`}>{badge.label}</span>
+                    <Link href={`/users/${op.id}`} className="text-sm font-ui font-medium text-charcoal-dark hover:text-terracotta transition-colors">
+                      {op.name}
+                    </Link>
+                  </div>
+                  <span className="text-xs font-ui text-sage-light">{deptName || "Tutti i reparti"}</span>
+                </div>
+              );
+            })}
+          </div>
+        )}
       </section>
     </div>
   );

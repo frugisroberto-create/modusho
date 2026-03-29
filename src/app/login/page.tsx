@@ -3,7 +3,7 @@
 import { signIn } from "next-auth/react";
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { DomusGoLogo } from "@/components/ui/domusgo-logo";
+import { ModusHoLogo } from "@/components/ui/modusho-logo";
 
 export default function LoginPage() {
   const router = useRouter();
@@ -37,7 +37,7 @@ export default function LoginPage() {
   return (
     <div className="min-h-screen flex flex-col items-center justify-center bg-ivory px-4">
       <div className="mb-10">
-        <DomusGoLogo size="lg" />
+        <ModusHoLogo size="lg" />
       </div>
 
       <div className="w-full max-w-[400px] bg-ivory-medium border border-ivory-dark rounded-xl p-10">

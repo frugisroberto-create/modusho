@@ -25,7 +25,8 @@ export default withAuth(
     if (pathname.startsWith("/dashboard") || pathname.startsWith("/approvals") ||
         pathname.startsWith("/properties") || pathname.startsWith("/users") ||
         pathname.startsWith("/reports") || pathname.startsWith("/hoo-sop") ||
-        pathname.startsWith("/library") || pathname.startsWith("/memo")) {
+        pathname.startsWith("/library") || pathname.startsWith("/memo") ||
+        pathname.startsWith("/content")) {
       if (ROLE_HIERARCHY[userRole] < ROLE_HIERARCHY.ADMIN) {
         return NextResponse.redirect(new URL("/unauthorized", req.url));
       }

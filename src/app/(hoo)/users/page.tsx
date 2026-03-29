@@ -7,23 +7,40 @@ interface UserItem {
   id: string; email: string; name: string; role: string; isActive: boolean;
   canView: boolean; canEdit: boolean; canApprove: boolean;
   propertyAssignments: { property: { name: string; code: string }; department: { name: string } | null }[];
+  contentPermissions: { contentType: string }[];
 }
 
-const ROLE_COLORS: Record<string, string> = {
-  SUPER_ADMIN: "bg-mauve text-white",
-  ADMIN: "bg-terracotta text-white",
-  HOTEL_MANAGER: "bg-sage text-white",
-  HOD: "bg-info-blue text-white",
-  OPERATOR: "bg-ivory-dark text-charcoal",
+interface Property { id: string; name: string; code: string }
+
+const ROLE_BADGE: Record<string, { label: string; cls: string }> = {
+  SUPER_ADMIN: { label: "Super Admin", cls: "bg-charcoal-dark text-white" },
+  ADMIN: { label: "Admin", cls: "bg-sage text-white" },
+  HOTEL_MANAGER: { label: "Hotel Manager", cls: "bg-terracotta text-white" },
+  HOD: { label: "HOD", cls: "bg-mauve text-white" },
+  OPERATOR: { label: "Operatore", cls: "bg-ivory-dark text-charcoal" },
 };
 
-const ROLE_LABELS: Record<string, string> = {
-  SUPER_ADMIN: "Super Admin",
-  ADMIN: "Admin",
-  HOTEL_MANAGER: "Hotel Manager",
-  HOD: "HOD",
-  OPERATOR: "Operatore",
-};
+const CT_LABELS: Record<string, string> = { SOP: "SOP", DOCUMENT: "Doc", MEMO: "Memo" };
+
+function PermIcon({ active, label, d }: { active: boolean; label: string; d: string }) {
+  return (
+    <svg className={`w-4 h-4 ${active ? "text-sage" : "text-ivory-dark"}`} fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-label={label}>
+      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d={d} />
+    </svg>
+  );
+}
+
+function TruncList({ items, max = 2 }: { items: string[]; max?: number }) {
+  if (items.length === 0) return <span className="text-sage-light">—</span>;
+  const visible = items.slice(0, max);
+  const rest = items.length - max;
+  return (
+    <span>
+      {visible.join(", ")}
+      {rest > 0 && <span className="text-sage-light ml-1">+{rest}</span>}
+    </span>
+  );
+}
 
 export default function UsersPage() {
   const [users, setUsers] = useState<UserItem[]>([]);
@@ -31,25 +48,36 @@ export default function UsersPage() {
   const [page, setPage] = useState(1);
   const [loading, setLoading] = useState(true);
   const [roleFilter, setRoleFilter] = useState("");
+  const [propertyFilter, setPropertyFilter] = useState("");
+  const [properties, setProperties] = useState<Property[]>([]);
   const pageSize = 20;
+
+  useEffect(() => {
+    async function fetchProps() {
+      const res = await fetch("/api/properties");
+      if (res.ok) { const json = await res.json(); setProperties(json.data); }
+    }
+    fetchProps();
+  }, []);
 
   const fetchUsers = useCallback(async () => {
     setLoading(true);
     const params = new URLSearchParams({ page: page.toString(), pageSize: pageSize.toString() });
     if (roleFilter) params.set("role", roleFilter);
+    if (propertyFilter) params.set("propertyId", propertyFilter);
     try {
       const res = await fetch(`/api/users?${params}`);
       if (res.ok) { const json = await res.json(); setUsers(json.data); setTotal(json.meta.total); }
     } finally { setLoading(false); }
-  }, [page, roleFilter]);
+  }, [page, roleFilter, propertyFilter]);
 
   useEffect(() => { fetchUsers(); }, [fetchUsers]);
-  useEffect(() => { setPage(1); }, [roleFilter]);
+  useEffect(() => { setPage(1); }, [roleFilter, propertyFilter]);
 
   const totalPages = Math.ceil(total / pageSize);
 
   return (
-    <div className="space-y-4">
+    <div className="space-y-5">
       <div className="flex items-center justify-between">
         <h1 className="text-xl font-heading font-semibold text-charcoal-dark">Utenti</h1>
         <Link href="/users/new" className="px-4 py-2 text-sm font-ui font-medium text-white bg-terracotta hover:bg-terracotta-light rounded-lg transition-colors">
@@ -57,48 +85,85 @@ export default function UsersPage() {
         </Link>
       </div>
 
-      <select value={roleFilter} onChange={(e) => setRoleFilter(e.target.value)}
-        className="text-sm font-ui">
-        <option value="">Tutti i ruoli</option>
-        {["OPERATOR", "HOD", "HOTEL_MANAGER", "ADMIN", "SUPER_ADMIN"].map(r => (
-          <option key={r} value={r}>{ROLE_LABELS[r] || r}</option>
-        ))}
-      </select>
+      {/* Filtri */}
+      <div className="flex flex-wrap gap-3">
+        <select value={roleFilter} onChange={(e) => setRoleFilter(e.target.value)} className="text-sm font-ui">
+          <option value="">Tutti i ruoli</option>
+          {["OPERATOR", "HOD", "HOTEL_MANAGER", "ADMIN", "SUPER_ADMIN"].map(r => (
+            <option key={r} value={r}>{ROLE_BADGE[r]?.label || r}</option>
+          ))}
+        </select>
+        <select value={propertyFilter} onChange={(e) => setPropertyFilter(e.target.value)} className="text-sm font-ui">
+          <option value="">Tutte le strutture</option>
+          {properties.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
+        </select>
+      </div>
 
+      {/* Tabella */}
       {loading ? (
-        <div className="space-y-2">{[1,2,3].map(i => <div key={i} className="h-16 skeleton" />)}</div>
+        <div className="space-y-2">{[1,2,3].map(i => <div key={i} className="h-14 skeleton" />)}</div>
+      ) : users.length === 0 ? (
+        <p className="text-sage-light font-ui text-sm text-center py-10">Nessun utente trovato</p>
       ) : (
-        <div className="bg-ivory-medium border border-ivory-dark rounded-lg overflow-hidden">
+        <div className="bg-ivory-medium border border-ivory-dark rounded-lg overflow-x-auto">
           <table className="w-full text-sm font-ui">
-            <thead><tr className="bg-ivory-dark text-left text-xs text-sage-light uppercase tracking-wide">
-              <th className="px-4 py-3">Nome</th><th className="px-4 py-3">Email</th>
-              <th className="px-4 py-3">Ruolo</th><th className="px-4 py-3">Permessi</th>
-              <th className="px-4 py-3">Assegnazioni</th><th className="px-4 py-3">Stato</th>
-            </tr></thead>
+            <thead>
+              <tr className="bg-ivory-dark text-left text-xs text-sage-light uppercase tracking-wide">
+                <th className="px-4 py-3">Nome</th>
+                <th className="px-4 py-3">Ruolo</th>
+                <th className="px-4 py-3">Permessi</th>
+                <th className="px-4 py-3">Strutture</th>
+                <th className="px-4 py-3">Reparti</th>
+                <th className="px-4 py-3">Contenuti</th>
+                <th className="px-4 py-3 w-8"></th>
+              </tr>
+            </thead>
             <tbody>
-              {users.map((u, i) => (
-                <tr key={u.id} className={`border-b border-ivory-dark hover:bg-ivory-dark/40 ${i % 2 === 0 ? "bg-ivory" : "bg-ivory-medium"}`}>
-                  <td className="px-4 py-3">
-                    <Link href={`/users/${u.id}`} className="font-medium text-terracotta hover:text-terracotta-light transition-colors">{u.name}</Link>
-                  </td>
-                  <td className="px-4 py-3 text-charcoal">{u.email}</td>
-                  <td className="px-4 py-3">
-                    <span className={`text-xs font-medium px-2 py-0.5 rounded ${ROLE_COLORS[u.role] || ""}`}>
-                      {ROLE_LABELS[u.role] || u.role}
-                    </span>
-                  </td>
-                  <td className="px-4 py-3 text-xs text-sage-light">
-                    {[u.canView && "V", u.canEdit && "E", u.canApprove && "A"].filter(Boolean).join(" ")}
-                  </td>
-                  <td className="px-4 py-3 text-xs text-sage-light">
-                    {u.propertyAssignments.length === 0 ? "—" :
-                      u.propertyAssignments.map(a => `${a.property.code}${a.department ? `/${a.department.name}` : ""}`).join(", ")}
-                  </td>
-                  <td className="px-4 py-3">
-                    <span className={`w-2 h-2 inline-block rounded-full ${u.isActive ? "bg-sage" : "bg-ivory-dark"}`} />
-                  </td>
-                </tr>
-              ))}
+              {users.map((u, i) => {
+                const badge = ROLE_BADGE[u.role] || { label: u.role, cls: "bg-ivory-dark text-charcoal" };
+                const propNames = [...new Set(u.propertyAssignments.map(a => a.property.code))];
+                const deptNames = [...new Set(u.propertyAssignments.filter(a => a.department).map(a => a.department!.name))];
+                const hasAllDepts = u.propertyAssignments.some(a => !a.department);
+                const ctLabels = u.contentPermissions.map(p => CT_LABELS[p.contentType] || p.contentType);
+
+                return (
+                  <tr key={u.id} className={`border-b border-ivory-dark/50 hover:bg-ivory-dark/30 ${i % 2 === 0 ? "bg-ivory" : "bg-ivory-medium"} ${!u.isActive ? "opacity-50" : ""}`}>
+                    <td className="px-4 py-3">
+                      <Link href={`/users/${u.id}`} className="font-medium text-charcoal-dark hover:text-terracotta transition-colors">
+                        {u.name}
+                      </Link>
+                      <p className="text-xs text-sage-light">{u.email}</p>
+                    </td>
+                    <td className="px-4 py-3">
+                      <span className={`text-xs font-medium px-2 py-0.5 rounded ${badge.cls}`}>{badge.label}</span>
+                    </td>
+                    <td className="px-4 py-3">
+                      <div className="flex gap-1.5">
+                        <PermIcon active={u.canView} label="Può vedere" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
+                        <PermIcon active={u.canEdit} label="Può modificare" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+                        <PermIcon active={u.canApprove} label="Può approvare" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                      </div>
+                    </td>
+                    <td className="px-4 py-3 text-xs text-charcoal">
+                      <TruncList items={propNames} />
+                    </td>
+                    <td className="px-4 py-3 text-xs text-charcoal">
+                      {hasAllDepts ? <span className="text-sage-light italic">Tutti</span> : <TruncList items={deptNames} />}
+                    </td>
+                    <td className="px-4 py-3">
+                      <div className="flex gap-1">
+                        {ctLabels.map(ct => (
+                          <span key={ct} className="text-[10px] font-medium px-1.5 py-0.5 rounded bg-ivory-dark text-charcoal">{ct}</span>
+                        ))}
+                        {ctLabels.length === 0 && <span className="text-sage-light text-xs">—</span>}
+                      </div>
+                    </td>
+                    <td className="px-4 py-3">
+                      {!u.isActive && <span className="w-2 h-2 inline-block rounded-full bg-alert-red" title="Disattivato" />}
+                    </td>
+                  </tr>
+                );
+              })}
             </tbody>
           </table>
         </div>
@@ -106,7 +171,7 @@ export default function UsersPage() {
 
       {totalPages > 1 && (
         <div className="flex items-center justify-between">
-          <p className="text-sm font-ui text-sage-light">Pagina {page} di {totalPages}</p>
+          <p className="text-sm font-ui text-sage-light">Pagina {page} di {totalPages} ({total} utenti)</p>
           <div className="flex gap-2">
             <button onClick={() => setPage(p => Math.max(1, p - 1))} disabled={page <= 1}
               className="px-3 py-1.5 text-sm font-ui border border-ivory-dark rounded-md hover:bg-ivory-dark disabled:opacity-50 transition-colors">Precedente</button>

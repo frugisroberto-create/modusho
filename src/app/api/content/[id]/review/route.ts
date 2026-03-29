@@ -20,8 +20,12 @@ export async function POST(
     return NextResponse.json({ error: "Non autenticato" }, { status: 401 });
   }
 
-  const { role } = session.user;
+  const { role, canApprove } = session.user;
   const userId = session.user.id;
+
+  if (!canApprove) {
+    return NextResponse.json({ error: "Non hai permessi di approvazione" }, { status: 403 });
+  }
 
   const { id: contentId } = await params;
 
@@ -46,7 +50,7 @@ export async function POST(
 
   // Carica il contenuto
   const content = await prisma.content.findUnique({
-    where: { id: contentId },
+    where: { id: contentId, isDeleted: false },
     select: { id: true, status: true, propertyId: true, departmentId: true, type: true },
   });
 

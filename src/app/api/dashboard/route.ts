@@ -49,7 +49,7 @@ export async function GET(request: NextRequest) {
   // --- SEZIONE 1: Header sintetico ---
   const [pendingApprovalCount, properties] = await Promise.all([
     prisma.content.count({
-      where: { ...propertyFilter, status: "REVIEW_ADMIN", type: "SOP" },
+      where: { ...propertyFilter, isDeleted: false, status: "REVIEW_ADMIN", type: "SOP" },
     }),
     prisma.property.findMany({
       where: { id: { in: filteredPropertyIds }, isActive: true },
@@ -59,7 +59,7 @@ export async function GET(request: NextRequest) {
 
   // --- SEZIONE 2: Coda approvazioni ---
   const pendingApprovals = await prisma.content.findMany({
-    where: { ...propertyFilter, status: "REVIEW_ADMIN", type: "SOP" },
+    where: { ...propertyFilter, isDeleted: false, status: "REVIEW_ADMIN", type: "SOP" },
     include: {
       property: { select: { id: true, name: true, code: true } },
       department: { select: { id: true, name: true, code: true } },
@@ -111,7 +111,7 @@ export async function GET(request: NextRequest) {
     JOIN "Property" p ON p.id = c."propertyId"
     LEFT JOIN "Department" d ON d.id = c."departmentId"
     JOIN "ContentStatusHistory" h ON h."contentId" = c.id
-    WHERE c.status = 'REVIEW_HM' AND c.type = 'SOP'
+    WHERE c.status = 'REVIEW_HM' AND c."isDeleted" = false AND c.type = 'SOP'
       AND c."propertyId" = ANY(${filteredPropertyIds})
       AND h.id = (SELECT h2.id FROM "ContentStatusHistory" h2 WHERE h2."contentId" = c.id ORDER BY h2."changedAt" DESC LIMIT 1)
       AND h."changedAt" < NOW() - INTERVAL '5 days'
@@ -127,7 +127,7 @@ export async function GET(request: NextRequest) {
     JOIN "Property" p ON p.id = c."propertyId"
     LEFT JOIN "Department" d ON d.id = c."departmentId"
     JOIN "ContentStatusHistory" h ON h."contentId" = c.id
-    WHERE c.status = 'REVIEW_ADMIN' AND c.type = 'SOP'
+    WHERE c.status = 'REVIEW_ADMIN' AND c."isDeleted" = false AND c.type = 'SOP'
       AND c."propertyId" = ANY(${filteredPropertyIds})
       AND h.id = (SELECT h2.id FROM "ContentStatusHistory" h2 WHERE h2."contentId" = c.id ORDER BY h2."changedAt" DESC LIMIT 1)
       AND h."changedAt" < NOW() - INTERVAL '3 days'
@@ -143,7 +143,7 @@ export async function GET(request: NextRequest) {
     JOIN "Property" p ON p.id = c."propertyId"
     LEFT JOIN "Department" d ON d.id = c."departmentId"
     JOIN "ContentStatusHistory" h ON h."contentId" = c.id
-    WHERE c.status = 'DRAFT' AND c.type = 'SOP'
+    WHERE c.status = 'DRAFT' AND c."isDeleted" = false AND c.type = 'SOP'
       AND c."propertyId" = ANY(${filteredPropertyIds})
       AND h.id = (SELECT h2.id FROM "ContentStatusHistory" h2 WHERE h2."contentId" = c.id ORDER BY h2."changedAt" DESC LIMIT 1)
       AND h."changedAt" < NOW() - INTERVAL '10 days'
@@ -259,7 +259,7 @@ export async function GET(request: NextRequest) {
 
   // --- SEZIONE 4: KPI ---
   const [sopTotal, sopPublished, sopReviewHm, sopReviewAdmin, sopReturned] = await Promise.all([
-    prisma.content.count({ where: { ...propertyFilter, type: "SOP" } }),
+    prisma.content.count({ where: { ...propertyFilter, isDeleted: false, type: "SOP" } }),
     prisma.content.count({ where: { ...propertyFilter, type: "SOP", status: "PUBLISHED" } }),
     prisma.content.count({ where: { ...propertyFilter, type: "SOP", status: "REVIEW_HM" } }),
     prisma.content.count({ where: { ...propertyFilter, type: "SOP", status: "REVIEW_ADMIN" } }),
@@ -270,7 +270,7 @@ export async function GET(request: NextRequest) {
     where: {
       toStatus: "PUBLISHED",
       changedAt: { gte: periodFrom, lte: periodTo },
-      content: { ...propertyFilter, type: "SOP" },
+      content: { ...propertyFilter, isDeleted: false, type: "SOP" },
     },
   });
 

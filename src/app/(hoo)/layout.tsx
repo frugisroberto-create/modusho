@@ -1,5 +1,6 @@
 import { redirect } from "next/navigation";
 import { getSessionUser } from "@/lib/session";
+import { prisma } from "@/lib/prisma";
 import { HooSidebar } from "@/components/hoo/hoo-sidebar";
 
 const ROLE_LABELS: Record<string, string> = {
@@ -14,6 +15,10 @@ export default async function HooLayout({
 }) {
   const user = await getSessionUser();
   if (!user) redirect("/login");
+
+  // Verifica che l'utente esista ancora nel DB
+  const dbUser = await prisma.user.findUnique({ where: { id: user.id }, select: { id: true } });
+  if (!dbUser) redirect("/api/auth/signout");
 
   // Solo ADMIN e SUPER_ADMIN
   if (user.role !== "ADMIN" && user.role !== "SUPER_ADMIN") {

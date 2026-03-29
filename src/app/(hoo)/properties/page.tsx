@@ -1,56 +1,83 @@
-import { redirect } from "next/navigation";
+"use client";
+
+import { useState, useEffect } from "react";
 import Link from "next/link";
-import { getSessionUser } from "@/lib/session";
-import { prisma } from "@/lib/prisma";
-import { getAccessiblePropertyIds } from "@/lib/rbac";
 
-export default async function PropertiesPage() {
-  const user = await getSessionUser();
-  if (!user) redirect("/login");
+interface PropertyItem {
+  id: string; name: string; code: string; tagline: string | null; city: string;
+  logoUrl: string | null; sopTotal: number; sopPublished: number; ackRate: number | null;
+}
 
-  const propertyIds = await getAccessiblePropertyIds(user.id);
+export default function PropertiesPage() {
+  const [properties, setProperties] = useState<PropertyItem[]>([]);
+  const [loading, setLoading] = useState(true);
 
-  const properties = await prisma.property.findMany({
-    where: { id: { in: propertyIds }, isActive: true },
-    include: {
-      _count: { select: { contents: true, departments: true } },
-    },
-  });
+  useEffect(() => {
+    async function fetch_() {
+      const res = await fetch("/api/properties");
+      if (res.ok) { const json = await res.json(); setProperties(json.data); }
+      setLoading(false);
+    }
+    fetch_();
+  }, []);
 
-  // Get stats per property
-  const stats = await Promise.all(
-    properties.map(async (p) => {
-      const [sopTotal, sopPublished, sopInReview, ackCount, publishedContentCount] = await Promise.all([
-        prisma.content.count({ where: { propertyId: p.id, type: "SOP" } }),
-        prisma.content.count({ where: { propertyId: p.id, type: "SOP", status: "PUBLISHED" } }),
-        prisma.content.count({ where: { propertyId: p.id, type: "SOP", status: { in: ["REVIEW_HM", "REVIEW_ADMIN"] } } }),
-        prisma.contentAcknowledgment.count({ where: { content: { propertyId: p.id } } }),
-        prisma.content.count({ where: { propertyId: p.id, status: "PUBLISHED" } }),
-      ]);
-      return {
-        ...p,
-        sopTotal,
-        sopPublished,
-        sopInReview,
-        ackRate: publishedContentCount > 0 ? Math.round((ackCount / publishedContentCount) * 100) : null,
-      };
-    })
-  );
+  if (loading) {
+    return (
+      <div className="space-y-4">
+        <h1 className="text-xl font-heading font-semibold text-charcoal-dark">Strutture</h1>
+        <div className="grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
+          {[1,2,3].map(i => <div key={i} className="h-52 skeleton" />)}
+        </div>
+      </div>
+    );
+  }
 
   return (
-    <div className="max-w-5xl space-y-4">
-      <h1 className="text-xl font-bold text-gray-900">Strutture</h1>
-      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-        {stats.map((p) => (
+    <div className="space-y-5">
+      <div className="flex items-center justify-between">
+        <h1 className="text-xl font-heading font-semibold text-charcoal-dark">Strutture</h1>
+        <Link href="/properties/new"
+          className="px-4 py-2 text-sm font-ui font-medium text-white bg-terracotta hover:bg-terracotta-light rounded-lg transition-colors">
+          Aggiungi struttura
+        </Link>
+      </div>
+
+      <div className="grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
+        {properties.map((p) => (
           <Link key={p.id} href={`/properties/${p.id}`}
-            className="bg-white rounded-lg border border-gray-200 p-5 hover:border-blue-300 hover:shadow-sm transition-all">
-            <h3 className="font-semibold text-gray-900 mb-1">{p.name}</h3>
-            <p className="text-xs text-gray-500 mb-3">{p.city} &middot; {p._count.departments} reparti</p>
-            <div className="grid grid-cols-2 gap-2 text-sm">
-              <div><span className="text-gray-500">SOP totali:</span> <span className="font-medium">{p.sopTotal}</span></div>
-              <div><span className="text-gray-500">Pubblicate:</span> <span className="font-medium text-green-600">{p.sopPublished}</span></div>
-              <div><span className="text-gray-500">In review:</span> <span className="font-medium text-orange-600">{p.sopInReview}</span></div>
-              <div><span className="text-gray-500">Presa visione:</span> <span className="font-medium">{p.ackRate != null ? `${p.ackRate}%` : "n/d"}</span></div>
+            className="group bg-ivory border border-sage/20 rounded-xl p-6 hover:border-terracotta/40 transition-all flex flex-col">
+            {/* Tagline + Nome stile hocollection.com */}
+            <div className="mb-4">
+              {p.tagline && (
+                <p className="text-[11px] font-ui font-medium uppercase tracking-[0.2em] text-sage mb-1.5">
+                  {p.tagline}
+                </p>
+              )}
+              <h2 className="text-2xl font-heading font-semibold text-terracotta leading-tight group-hover:text-terracotta-light transition-colors">
+                {p.name}
+              </h2>
+            </div>
+
+            {/* Città */}
+            <p className="text-sm font-ui text-sage-light mb-4">{p.city}</p>
+
+            {/* KPI */}
+            <div className="mt-auto pt-4 border-t border-ivory-dark space-y-2">
+              <div className="flex items-center justify-between text-sm font-ui">
+                <span className="text-sage-light">SOP</span>
+                <span className="text-charcoal-dark font-medium">{p.sopPublished}/{p.sopTotal}</span>
+              </div>
+              {p.ackRate !== null && (
+                <div className="space-y-1">
+                  <div className="flex items-center justify-between text-xs font-ui">
+                    <span className="text-sage-light">Presa visione</span>
+                    <span className="text-charcoal font-medium">{p.ackRate}%</span>
+                  </div>
+                  <div className="w-full h-1.5 bg-ivory-dark rounded-full overflow-hidden">
+                    <div className="h-full rounded-full bg-sage transition-all" style={{ width: `${p.ackRate}%` }} />
+                  </div>
+                </div>
+              )}
             </div>
           </Link>
         ))}

@@ -26,7 +26,7 @@ const cardo = Cardo({
 });
 
 export const metadata: Metadata = {
-  title: "DomusGO",
+  title: "ModusHO",
   description: "Sistema di governance operativa - HO Collection",
 };
 
