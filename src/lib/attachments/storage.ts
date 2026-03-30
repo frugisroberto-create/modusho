@@ -160,22 +160,29 @@ export async function getPresignedUploadUrl(
  *
  * @param storageKey - Full key in the bucket
  * @param expiresIn - URL validity in seconds (default 15 minutes)
- * @param downloadFileName - Optional filename for Content-Disposition header
+ * @param disposition - "inline" for images/PDF preview, "attachment" for forced download
+ * @param fileName - Optional filename for Content-Disposition header
  */
 export async function getPresignedDownloadUrl(
   storageKey: string,
   expiresIn: number = 900,
-  downloadFileName?: string
+  disposition: "inline" | "attachment" = "inline",
+  fileName?: string
 ): Promise<string> {
   const client = getS3Client();
   const bucket = getBucketName();
 
+  let contentDisposition: string | undefined;
+  if (disposition === "attachment" && fileName) {
+    contentDisposition = `attachment; filename="${fileName}"`;
+  } else if (disposition === "inline") {
+    contentDisposition = fileName ? `inline; filename="${fileName}"` : "inline";
+  }
+
   const command = new GetObjectCommand({
     Bucket: bucket,
     Key: storageKey,
-    ...(downloadFileName
-      ? { ResponseContentDisposition: `attachment; filename="${downloadFileName}"` }
-      : {}),
+    ...(contentDisposition ? { ResponseContentDisposition: contentDisposition } : {}),
   });
 
   return getSignedUrl(client, command, { expiresIn });
