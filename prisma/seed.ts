@@ -271,6 +271,7 @@ async function main() {
     finalStatus: ContentStatus;
     propertyCode: string;
     departmentCode?: string;
+    isFeatured?: boolean;
     statusPath: { status: ContentStatus; byUserId: string; note?: string; daysAgo: number }[];
   }) {
     const propertyId = properties[params.propertyCode];
@@ -294,6 +295,9 @@ async function main() {
         departmentId,
         createdById: adminUser!.id,
         updatedById: params.statusPath[params.statusPath.length - 1].byUserId,
+        isFeatured: params.isFeatured ?? false,
+        featuredAt: params.isFeatured ? new Date() : null,
+        featuredById: params.isFeatured ? adminUser!.id : null,
         publishedAt: params.finalStatus === "PUBLISHED"
           ? new Date(Date.now() - params.statusPath[params.statusPath.length - 1].daysAgo * 86400000)
           : null,
@@ -321,7 +325,7 @@ async function main() {
   await createContentWithHistory({
     type: "SOP", title: "Procedura Check-in Ospiti VIP",
     body: "<h2>Obiettivo</h2><p>Garantire un'accoglienza personalizzata e senza errori per gli ospiti VIP.</p><h2>Procedura</h2><ol><li>Verificare la prenotazione nel PMS almeno 2 ore prima</li><li>Preparare la welcome card personalizzata</li><li>Coordinare con F&B per il welcome amenity</li><li>Assegnare la camera verificando le preferenze</li><li>Informare il Duty Manager</li><li>Accogliere l'ospite per nome</li><li>Accompagnare in camera personalmente</li></ol>",
-    finalStatus: "PUBLISHED", propertyCode: "NCL", departmentCode: "FO",
+    finalStatus: "PUBLISHED", propertyCode: "NCL", departmentCode: "FO", isFeatured: true,
     statusPath: [
       { status: "DRAFT", byUserId: adminUser.id, daysAgo: 20 },
       { status: "REVIEW_HM", byUserId: adminUser.id, daysAgo: 18 },
@@ -379,7 +383,7 @@ async function main() {
   await createContentWithHistory({
     type: "DOCUMENT", title: "Policy Sicurezza Alimentare HACCP",
     body: "<h2>Ambito</h2><p>Si applica a tutti i reparti che gestiscono alimenti.</p><ul><li>Igiene personale</li><li>Temperatura: controllo 2 volte/giorno</li><li>Stoccaggio FIFO</li><li>Schede allergeni</li></ul>",
-    finalStatus: "PUBLISHED", propertyCode: "NCL",
+    finalStatus: "PUBLISHED", propertyCode: "NCL", isFeatured: true,
     statusPath: [
       { status: "DRAFT", byUserId: adminUser.id, daysAgo: 30 },
       { status: "REVIEW_HM", byUserId: adminUser.id, daysAgo: 28 },
@@ -391,7 +395,7 @@ async function main() {
   await createContentWithHistory({
     type: "SOP", title: "Servizio Colazione Buffet",
     body: "<h2>Orari</h2><p>Apertura: 07:00. Chiusura: 10:30 (feriali), 11:00 (weekend).</p><ol><li>Buffet pronto entro 06:45</li><li>Verificare scorte</li><li>Stazioni etichettate con allergeni</li><li>Tovagliato pulito</li></ol>",
-    finalStatus: "PUBLISHED", propertyCode: "HIB", departmentCode: "FB",
+    finalStatus: "PUBLISHED", propertyCode: "HIB", departmentCode: "FB", isFeatured: true,
     statusPath: [
       { status: "DRAFT", byUserId: adminUser.id, daysAgo: 15 },
       { status: "REVIEW_HM", byUserId: adminUser.id, daysAgo: 12 },
@@ -410,6 +414,67 @@ async function main() {
       { status: "REVIEW_ADMIN", byUserId: hmHi.id, note: "Procedura verificata, inoltro per approvazione", daysAgo: 2 },
     ],
   });
+
+  // Test flusso HM → REVIEW_ADMIN (salta REVIEW_HM)
+  await createContentWithHistory({
+    type: "SOP", title: "Standard accoglienza Patria Palace",
+    body: "<p>Procedura standard di accoglienza creata dall'Hotel Manager e inviata direttamente per approvazione finale.</p>",
+    finalStatus: "REVIEW_ADMIN", propertyCode: "PPL",
+    statusPath: [
+      { status: "DRAFT", byUserId: hmNicolaus.id, daysAgo: 4 },
+      { status: "REVIEW_ADMIN", byUserId: hmNicolaus.id, note: "Inviata per approvazione finale", daysAgo: 3 },
+    ],
+  });
+
+  // Test flusso ADMIN → PUBLISHED (pubblicazione diretta)
+  await createContentWithHistory({
+    type: "DOCUMENT", title: "Linee guida brand HO Collection 2026",
+    body: "<p>Documento di brand guidelines pubblicato direttamente dall'Admin senza passaggi intermedi.</p>",
+    finalStatus: "PUBLISHED", propertyCode: "NCL", isFeatured: true,
+    statusPath: [
+      { status: "DRAFT", byUserId: adminUser.id, daysAgo: 2 },
+      { status: "PUBLISHED", byUserId: adminUser.id, note: "Pubblicazione diretta da ADMIN", daysAgo: 1 },
+    ],
+  });
+
+  // ContentRevision examples
+  const sopVip = await prisma.content.findFirst({ where: { title: "Procedura Check-in Ospiti VIP", propertyId: properties["NCL"] } });
+  if (sopVip) {
+    const existingRevision = await prisma.contentRevision.findFirst({ where: { contentId: sopVip.id } });
+    if (!existingRevision) {
+      await prisma.contentRevision.create({
+        data: {
+          contentId: sopVip.id,
+          revisedById: hmNicolaus.id,
+          previousTitle: sopVip.title,
+          previousBody: sopVip.body,
+          newTitle: sopVip.title,
+          newBody: sopVip.body.replace("Verificare la prenotazione nel PMS almeno 2 ore prima", "Verificare la prenotazione nel PMS almeno 4 ore prima dell'arrivo previsto"),
+          note: "Corretto tempo di preavviso verifica prenotazione: da 2 a 4 ore",
+          status: "REVIEW_HM",
+        },
+      });
+    }
+  }
+
+  const sopReclami = await prisma.content.findFirst({ where: { title: "Gestione Reclami Front Office", propertyId: properties["NCL"] } });
+  if (sopReclami) {
+    const existingRevision = await prisma.contentRevision.findFirst({ where: { contentId: sopReclami.id } });
+    if (!existingRevision) {
+      await prisma.contentRevision.create({
+        data: {
+          contentId: sopReclami.id,
+          revisedById: adminUser.id,
+          previousTitle: "Gestione Reclami Front Office",
+          previousBody: sopReclami.body,
+          newTitle: "PAT-FO — Gestione Reclami Front Office",
+          newBody: sopReclami.body,
+          note: "Aggiunto codice reparto nel titolo per coerenza",
+          status: "REVIEW_ADMIN",
+        },
+      });
+    }
+  }
 
   // Memo
   const existingMemo = await prisma.content.findFirst({ where: { title: "Chiusura piscina per manutenzione", propertyId: properties["NCL"] } });

@@ -68,7 +68,7 @@ export function HighlightsSection() {
             <Link
               key={item.id}
               href={`/${item.type === "SOP" ? "sop" : "documents"}/${item.id}`}
-              className="bg-ivory-medium border border-ivory-dark rounded-lg p-5 hover:border-terracotta/40 transition-colors"
+              className="bg-ivory-medium border border-ivory-dark p-5 hover:border-terracotta/40 transition-colors"
             >
               <div className="flex items-center gap-2 mb-2.5">
                 <span className={`text-xs font-ui font-medium px-2 py-0.5 rounded ${badge.cls}`}>

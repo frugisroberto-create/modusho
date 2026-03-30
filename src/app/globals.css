@@ -3,7 +3,6 @@
 /* === Design System HO Collection === */
 
 @theme {
-  /* Colors */
   --color-terracotta: #964733;
   --color-terracotta-light: #B8614A;
   --color-terracotta-dark: #7A3828;
@@ -12,7 +11,7 @@
   --color-sage-dark: #323E2E;
   --color-mauve: #7E636B;
   --color-mauve-light: #9B8690;
-  --color-ivory: #FEFBF4;
+  --color-ivory: #FAF9F5;
   --color-ivory-medium: #F0EFE9;
   --color-ivory-dark: #E8E5DC;
   --color-charcoal: #333333;
@@ -20,82 +19,114 @@
   --color-alert-red: #C0392B;
   --color-alert-yellow: #D4A017;
   --color-info-blue: #5B7B8A;
-
-  /* Font families */
+  --color-badge-sop-bg: #EDE7F6;
+  --color-badge-sop-text: #5E35B1;
+  --color-badge-doc-bg: #E3F2FD;
+  --color-badge-doc-text: #1565C0;
+  --color-badge-memo-bg: #FFF3E0;
+  --color-badge-memo-text: #E65100;
   --font-heading: "Playfair Display", Georgia, serif;
   --font-body: "Cardo", Georgia, serif;
   --font-ui: "Inter", -apple-system, sans-serif;
 }
 
-/* === Base styles === */
+/* === Base styles (inside layer so Tailwind utilities win) === */
 
-body {
-  background-color: #FEFBF4;
-  color: #333333;
-  font-family: var(--font-ui);
-}
+@layer base {
+  body {
+    background-color: #F0EFE9;
+    color: #333333;
+    font-family: var(--font-ui);
+  }
 
-h1, h2, h3 {
-  font-family: var(--font-heading);
-  color: #141413;
-}
+  h1, h2, h3 {
+    font-family: var(--font-heading);
+    color: #141413;
+  }
 
-/* === Scrollbar === */
-::-webkit-scrollbar {
-  width: 6px;
-  height: 6px;
-}
-::-webkit-scrollbar-track {
-  background: #FEFBF4;
-}
-::-webkit-scrollbar-thumb {
-  background: #B8614A;
-  border-radius: 3px;
-}
-::-webkit-scrollbar-thumb:hover {
-  background: #964733;
-}
+  ::-webkit-scrollbar { width: 6px; height: 6px; }
+  ::-webkit-scrollbar-track { background: #F0EFE9; }
+  ::-webkit-scrollbar-thumb { background: #B8614A; }
+  ::-webkit-scrollbar-thumb:hover { background: #964733; }
 
-/* === Form inputs global === */
-input[type="text"],
-input[type="email"],
-input[type="password"],
-input[type="date"],
-input[type="number"],
-textarea,
-select {
-  border-color: #E8E5DC;
-  border-radius: 6px;
-  padding: 10px 14px;
-  font-family: var(--font-ui);
-  color: #333333;
-  background-color: #FEFBF4;
-}
+  input[type="text"],
+  input[type="email"],
+  input[type="password"],
+  input[type="date"],
+  input[type="number"],
+  textarea,
+  select {
+    border: 1px solid #E8E5DC;
+    border-radius: 0;
+    padding: 10px 14px;
+    font-family: var(--font-ui);
+    color: #333333;
+    background-color: #FAF9F5;
+  }
 
-input:focus,
-textarea:focus,
-select:focus {
-  border-color: #964733;
-  outline: none;
-  box-shadow: 0 0 0 2px rgba(150, 71, 51, 0.15);
+  input:focus,
+  textarea:focus,
+  select:focus {
+    border-color: #964733;
+    outline: none;
+    box-shadow: none;
+  }
+
+  ::placeholder { color: rgba(51,51,51,0.45); }
+
+  @media print {
+    body { background: white; }
+    .no-print { display: none !important; }
+  }
 }
 
-::placeholder {
-  color: #848B82;
+/* === Components === */
+
+@layer components {
+  .btn-primary {
+    background: #964733;
+    color: white;
+    border: none;
+    border-radius: 0;
+    font-family: var(--font-ui);
+    font-size: 12.6px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    padding: 13px 28px;
+    transition: background 0.2s;
+  }
+  .btn-primary:hover { background: #B8614A; }
+  .btn-primary:disabled { opacity: 0.5; cursor: not-allowed; }
+
+  .btn-outline {
+    background: transparent;
+    color: #964733;
+    border: 1px solid #964733;
+    border-radius: 0;
+    font-family: var(--font-ui);
+    font-size: 12.6px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    padding: 13px 28px;
+    transition: all 0.2s;
+  }
+  .btn-outline:hover { background: #964733; color: white; }
+
+  .badge-sop { background: #EDE7F6; color: #5E35B1; }
+  .badge-document { background: #E3F2FD; color: #1565C0; }
+  .badge-memo { background: #FFF3E0; color: #E65100; }
+  .badge-brand-book { background: #FCE4EC; color: #AD1457; }
+  .badge-standard-book { background: #E0F2F1; color: #00695C; }
+
+  .skeleton {
+    animation: skeleton-pulse 1.5s ease-in-out infinite;
+    border-radius: 0;
+  }
 }
 
-/* === Loading skeleton === */
 @keyframes skeleton-pulse {
   0%, 100% { background-color: #F0EFE9; }
   50% { background-color: #E8E5DC; }
-}
-.skeleton {
-  animation: skeleton-pulse 1.5s ease-in-out infinite;
-  border-radius: 6px;
-}
-
-/* === Print === */
-@media print {
-  body { background: white; }
-  .no-print { display: none !important; }
 }

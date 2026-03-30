@@ -1,12 +1,8 @@
 import { redirect } from "next/navigation";
 import { getSessionUser } from "@/lib/session";
 import { prisma } from "@/lib/prisma";
-import { HooSidebar } from "@/components/hoo/hoo-sidebar";
-
-const ROLE_LABELS: Record<string, string> = {
-  SUPER_ADMIN: "Super Admin",
-  ADMIN: "Admin",
-};
+import { HooHeader } from "@/components/hoo/hoo-header";
+import { HooSubNav } from "@/components/hoo/hoo-sub-nav";
 
 export default async function HooLayout({
   children,
@@ -16,22 +12,20 @@ export default async function HooLayout({
   const user = await getSessionUser();
   if (!user) redirect("/login");
 
-  // Verifica che l'utente esista ancora nel DB
   const dbUser = await prisma.user.findUnique({ where: { id: user.id }, select: { id: true } });
   if (!dbUser) redirect("/api/auth/signout");
 
-  // Solo ADMIN e SUPER_ADMIN
-  if (user.role !== "ADMIN" && user.role !== "SUPER_ADMIN") {
+  if (user.role !== "HOTEL_MANAGER" && user.role !== "ADMIN" && user.role !== "SUPER_ADMIN") {
     redirect("/");
   }
 
   return (
-    <div className="min-h-screen bg-ivory">
-      <HooSidebar
-        userName={user.name}
-        userRole={ROLE_LABELS[user.role] || user.role}
-      />
-      <main className="lg:ml-[260px] p-6 lg:p-8 max-w-[1200px]">{children}</main>
+    <div className="min-h-screen bg-ivory-medium">
+      <HooHeader userName={user.name} userRole={user.role} />
+      <HooSubNav userRole={user.role} />
+      <main className="max-w-[1200px] mx-auto px-6 lg:px-10 py-8">
+        {children}
+      </main>
     </div>
   );
 }

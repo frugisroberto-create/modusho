@@ -49,7 +49,7 @@ export function BookList({ contentType, basePath, title }: BookListProps) {
         <div className="space-y-2">
           {items.map((item) => (
             <Link key={item.id} href={`/${basePath}/${item.id}`}
-              className="block bg-ivory-medium border border-ivory-dark rounded-lg p-5 hover:border-terracotta/40 transition-colors">
+              className="block bg-ivory-medium border border-ivory-dark p-5 hover:border-terracotta/40 transition-colors">
               <div className="flex items-start justify-between gap-3">
                 <div>
                   <div className="flex items-center gap-2 mb-1">

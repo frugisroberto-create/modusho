@@ -40,7 +40,7 @@ export default function LoginPage() {
         <ModusHoLogo size="lg" />
       </div>
 
-      <div className="w-full max-w-[400px] bg-ivory-medium border border-ivory-dark rounded-xl p-10">
+      <div className="w-full max-w-[400px] bg-ivory-medium border border-ivory-dark p-10">
         <form onSubmit={handleSubmit} className="space-y-5">
           <div>
             <label htmlFor="email" className="block text-sm font-ui font-medium text-charcoal mb-1.5">
@@ -74,7 +74,7 @@ export default function LoginPage() {
           <button
             type="submit"
             disabled={loading}
-            className="w-full py-3.5 bg-terracotta text-white rounded-md hover:bg-terracotta-light font-ui font-semibold text-sm tracking-wide disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+            className="btn-primary w-full disabled:opacity-50 disabled:cursor-not-allowed"
           >
             {loading ? "Accesso in corso..." : "Accedi"}
           </button>

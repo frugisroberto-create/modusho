@@ -41,7 +41,7 @@ export default async function StandardBookDetailPage({ params }: Props) {
         <span className="text-xs font-ui font-medium px-2 py-0.5 rounded bg-info-blue text-white mb-2 inline-block">Standard Book</span>
         <h1 className="text-2xl font-heading font-semibold text-charcoal-dark mt-2">{content.title}</h1>
         <div className="flex items-center gap-3 mt-2 text-sm font-ui text-sage-light">
-          <span>{content.property.name}</span>
+          <span className="text-terracotta font-medium">{content.property.name}</span>
           {content.publishedAt && <span>Pubblicato il {new Date(content.publishedAt).toLocaleDateString("it-IT")}</span>}
         </div>
       </div>

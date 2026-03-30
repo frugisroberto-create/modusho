@@ -21,18 +21,38 @@ export default withAuth(
 
     const userRole = token.role as Role;
 
-    // Route HOO: richiedono almeno ADMIN
-    if (pathname.startsWith("/dashboard") || pathname.startsWith("/approvals") ||
-        pathname.startsWith("/properties") || pathname.startsWith("/users") ||
-        pathname.startsWith("/reports") || pathname.startsWith("/hoo-sop") ||
-        pathname.startsWith("/library") || pathname.startsWith("/memo") ||
-        pathname.startsWith("/content")) {
+    // 1. Cestino: solo SUPER_ADMIN
+    if (pathname.startsWith("/content/deleted")) {
+      if (ROLE_HIERARCHY[userRole] < ROLE_HIERARCHY.SUPER_ADMIN) {
+        return NextResponse.redirect(new URL("/unauthorized", req.url));
+      }
+    }
+
+    // 2. Analytics: solo ADMIN+
+    if (pathname.startsWith("/analytics")) {
       if (ROLE_HIERARCHY[userRole] < ROLE_HIERARCHY.ADMIN) {
         return NextResponse.redirect(new URL("/unauthorized", req.url));
       }
     }
 
-    // Route operatore: accessibili a tutti i ruoli autenticati
+    // 3. Utenti e Strutture: solo ADMIN+
+    if (pathname.startsWith("/users") || pathname.startsWith("/properties")) {
+      if (ROLE_HIERARCHY[userRole] < ROLE_HIERARCHY.ADMIN) {
+        return NextResponse.redirect(new URL("/unauthorized", req.url));
+      }
+    }
+
+    // 4. Route HOO generiche: almeno HOTEL_MANAGER
+    if (pathname.startsWith("/dashboard") || pathname.startsWith("/approvals") ||
+        pathname.startsWith("/reports") || pathname.startsWith("/hoo-sop") ||
+        pathname.startsWith("/library") || pathname.startsWith("/memo") ||
+        pathname.startsWith("/content") || pathname.startsWith("/hoo-brand-book") ||
+        pathname.startsWith("/hoo-standard-book")) {
+      if (ROLE_HIERARCHY[userRole] < ROLE_HIERARCHY.HOTEL_MANAGER) {
+        return NextResponse.redirect(new URL("/unauthorized", req.url));
+      }
+    }
+
     return NextResponse.next();
   },
   {

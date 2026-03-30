@@ -7,18 +7,29 @@ interface ContentActionsProps {
   contentId: string;
   contentStatus: string;
   userRole: string;
+  isFeatured?: boolean;
 }
 
-export function ContentActions({ contentId, contentStatus, userRole }: ContentActionsProps) {
+export function ContentActions({ contentId, contentStatus, userRole, isFeatured = false }: ContentActionsProps) {
   const router = useRouter();
   const [open, setOpen] = useState(false);
   const [archiveModal, setArchiveModal] = useState(false);
+  const [featured, setFeatured] = useState(isFeatured);
   const [deleteModal, setDeleteModal] = useState(false);
   const [archiveNote, setArchiveNote] = useState("");
   const [loading, setLoading] = useState(false);
 
   const canAct = userRole === "HOTEL_MANAGER" || userRole === "ADMIN" || userRole === "SUPER_ADMIN";
   if (!canAct) return null;
+
+  const handleToggleFeature = async () => {
+    setOpen(false);
+    try {
+      const method = featured ? "DELETE" : "POST";
+      const res = await fetch(`/api/content/${contentId}/feature`, { method });
+      if (res.ok) { setFeatured(!featured); router.refresh(); }
+    } catch {}
+  };
 
   const handleArchive = async () => {
     if (archiveNote.length < 5) return;
@@ -64,6 +75,10 @@ export function ContentActions({ contentId, contentStatus, userRole }: ContentAc
                 <button onClick={() => { setOpen(false); router.push(`/hoo-sop/${contentId}/edit`); }}
                   className="w-full text-left px-4 py-2 text-sm font-ui text-charcoal hover:bg-ivory-dark transition-colors">
                   Modifica
+                </button>
+                <button onClick={handleToggleFeature}
+                  className="w-full text-left px-4 py-2 text-sm font-ui text-terracotta hover:bg-ivory-dark transition-colors">
+                  {featured ? "Rimuovi da evidenza" : "Metti in evidenza"}
                 </button>
                 <button onClick={() => { setOpen(false); setArchiveModal(true); }}
                   className="w-full text-left px-4 py-2 text-sm font-ui text-sage hover:bg-ivory-dark transition-colors">

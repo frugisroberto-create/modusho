@@ -29,12 +29,12 @@ export async function GET(request: NextRequest) {
   // KPI globali
   const [sopTotal, sopPublished, sopDraft, sopReviewHm, sopReviewAdmin, sopReturned, sopArchived] = await Promise.all([
     prisma.content.count({ where: { ...pFilter, isDeleted: false, type: "SOP" } }),
-    prisma.content.count({ where: { ...pFilter, type: "SOP", status: "PUBLISHED" } }),
-    prisma.content.count({ where: { ...pFilter, type: "SOP", status: "DRAFT" } }),
-    prisma.content.count({ where: { ...pFilter, type: "SOP", status: "REVIEW_HM" } }),
-    prisma.content.count({ where: { ...pFilter, type: "SOP", status: "REVIEW_ADMIN" } }),
-    prisma.content.count({ where: { ...pFilter, type: "SOP", status: "RETURNED" } }),
-    prisma.content.count({ where: { ...pFilter, type: "SOP", status: "ARCHIVED" } }),
+    prisma.content.count({ where: { ...pFilter, isDeleted: false, type: "SOP", status: "PUBLISHED" } }),
+    prisma.content.count({ where: { ...pFilter, isDeleted: false, type: "SOP", status: "DRAFT" } }),
+    prisma.content.count({ where: { ...pFilter, isDeleted: false, type: "SOP", status: "REVIEW_HM" } }),
+    prisma.content.count({ where: { ...pFilter, isDeleted: false, type: "SOP", status: "REVIEW_ADMIN" } }),
+    prisma.content.count({ where: { ...pFilter, isDeleted: false, type: "SOP", status: "RETURNED" } }),
+    prisma.content.count({ where: { ...pFilter, isDeleted: false, type: "SOP", status: "ARCHIVED" } }),
   ]);
 
   const sopApprovedInPeriod = await prisma.contentStatusHistory.count({
@@ -72,11 +72,11 @@ export async function GET(request: NextRequest) {
     properties.map(async (p) => {
       const hFilter = { propertyId: p.id, type: "SOP" as const };
       const [total, published, inReview, returned, draft] = await Promise.all([
-        prisma.content.count({ where: hFilter }),
-        prisma.content.count({ where: { ...hFilter, status: "PUBLISHED" } }),
-        prisma.content.count({ where: { ...hFilter, status: { in: ["REVIEW_HM", "REVIEW_ADMIN"] } } }),
+        prisma.content.count({ where: { ...hFilter, isDeleted: false } }),
+        prisma.content.count({ where: { ...hFilter, isDeleted: false, status: "PUBLISHED" } }),
+        prisma.content.count({ where: { ...hFilter, isDeleted: false, status: { in: ["REVIEW_HM", "REVIEW_ADMIN"] } } }),
         prisma.contentStatusHistory.count({ where: { toStatus: "RETURNED", changedAt: { gte: periodFrom, lte: periodTo }, content: hFilter } }),
-        prisma.content.count({ where: { ...hFilter, status: "DRAFT" } }),
+        prisma.content.count({ where: { ...hFilter, isDeleted: false, status: "DRAFT" } }),
       ]);
       const approved = await prisma.contentStatusHistory.count({
         where: { toStatus: "PUBLISHED", changedAt: { gte: periodFrom, lte: periodTo }, content: hFilter },

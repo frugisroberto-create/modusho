@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
+import { getAccessiblePropertyIds } from "@/lib/rbac";
 import { z } from "zod/v4";
 
 export async function GET(
@@ -12,6 +13,13 @@ export async function GET(
   if (!session?.user) return NextResponse.json({ error: "Non autenticato" }, { status: 401 });
 
   const { id } = await params;
+
+  // RBAC: verifica accesso alla property
+  const accessibleIds = await getAccessiblePropertyIds(session.user.id);
+  if (!accessibleIds.includes(id)) {
+    return NextResponse.json({ error: "Accesso negato" }, { status: 403 });
+  }
+
   const depts = await prisma.department.findMany({
     where: { propertyId: id },
     orderBy: { name: "asc" },

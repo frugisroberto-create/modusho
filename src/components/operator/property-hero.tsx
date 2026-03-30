@@ -10,14 +10,14 @@ export function PropertyHero() {
 
   return (
     <div className="flex flex-col items-center">
-      <h1 className="text-3xl sm:text-4xl font-heading font-semibold text-terracotta text-center leading-tight">
-        {property.name}
-      </h1>
       {property.tagline && (
-        <p className="text-sm font-ui font-medium uppercase tracking-[0.2em] text-terracotta mt-2">
+        <p className="text-xs font-ui uppercase tracking-[0.08em] text-charcoal/50 mb-3">
           {property.tagline}
         </p>
       )}
+      <h1 className="text-[50px] font-heading font-medium text-terracotta text-center leading-[1.1]">
+        {property.name}
+      </h1>
     </div>
   );
 }

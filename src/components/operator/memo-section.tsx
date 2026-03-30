@@ -43,7 +43,7 @@ export function MemoSection() {
         {memos.map((memo) => (
           <div
             key={memo.id}
-            className={`bg-ivory-medium border border-ivory-dark rounded-lg p-5 ${
+            className={`bg-ivory-medium border border-ivory-dark p-5 ${
               memo.isPinned ? "border-l-[3px] border-l-terracotta" : ""
             }`}
           >

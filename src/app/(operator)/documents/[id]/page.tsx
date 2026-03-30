@@ -3,6 +3,7 @@ import { getSessionUser } from "@/lib/session";
 import { prisma } from "@/lib/prisma";
 import { checkAccess } from "@/lib/rbac";
 import { AcknowledgeButton } from "@/components/operator/acknowledge-button";
+import { ContentTimeline } from "@/components/shared/content-timeline";
 import Link from "next/link";
 
 interface Props { params: Promise<{ id: string }> }
@@ -48,7 +49,7 @@ export default async function DocumentDetailPage({ params }: Props) {
         </div>
         <h1 className="text-2xl font-heading font-semibold text-charcoal-dark">{content.title}</h1>
         <div className="flex items-center gap-3 mt-2 text-sm font-ui text-sage-light">
-          <span>{content.property.name}</span>
+          <span className="text-terracotta font-medium">{content.property.name}</span>
           <span>Autore: {content.createdBy.name}</span>
           {content.publishedAt && (
             <span>Pubblicato il {new Date(content.publishedAt).toLocaleDateString("it-IT")}</span>
@@ -61,9 +62,13 @@ export default async function DocumentDetailPage({ params }: Props) {
         dangerouslySetInnerHTML={{ __html: content.body }}
       />
 
-      <div className="border-t border-ivory-dark pt-6">
-        <AcknowledgeButton contentId={content.id} acknowledged={acknowledged} acknowledgedAt={acknowledgedAt} />
-      </div>
+      {(user.role === "OPERATOR" || user.role === "HOD") && (
+        <div className="border-t border-ivory-dark pt-6">
+          <AcknowledgeButton contentId={content.id} acknowledged={acknowledged} acknowledgedAt={acknowledgedAt} />
+        </div>
+      )}
+
+      {user.role !== "OPERATOR" && <ContentTimeline contentId={content.id} />}
     </div>
   );
 }

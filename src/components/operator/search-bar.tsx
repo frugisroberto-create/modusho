@@ -75,33 +75,28 @@ export function SearchBar() {
   }, []);
 
   return (
-    <div ref={containerRef} className="relative w-full max-w-[600px] mx-auto">
-      <div className="relative">
-        <svg
-          className="absolute left-6 top-1/2 -translate-y-1/2 w-5 h-5 text-sage-light"
-          fill="none" stroke="currentColor" viewBox="0 0 24 24"
-        >
-          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5}
-            d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
-        </svg>
+    <div ref={containerRef} className="relative w-full max-w-[520px] mx-auto">
+      <div className="flex border border-ivory-dark bg-white overflow-hidden">
         <input
           type="text"
           value={query}
           onChange={handleChange}
           onFocus={() => results.length > 0 && setOpen(true)}
-          placeholder="Cerca procedure, documenti, memo..."
-          style={{ paddingLeft: 56 }}
-          className="w-full h-[52px] pr-6 text-base font-body border border-ivory-dark rounded-full bg-ivory focus:border-terracotta focus:shadow-none"
+          placeholder="Cerca SOP, documenti, memo..."
+          className="flex-1 px-5 py-3.5 text-sm font-ui text-charcoal bg-transparent"
+          style={{ border: "none", boxShadow: "none" }}
         />
-        {loading && (
-          <div className="absolute right-6 top-1/2 -translate-y-1/2">
-            <div className="w-5 h-5 border-2 border-ivory-dark border-t-terracotta rounded-full animate-spin" />
-          </div>
-        )}
+        <button
+          type="button"
+          onClick={() => search(query)}
+          className="shrink-0 bg-terracotta text-white px-6 py-3.5 text-[12.6px] font-ui font-semibold uppercase tracking-wider hover:bg-terracotta-dark transition-colors"
+        >
+          {loading ? "..." : "Cerca"}
+        </button>
       </div>
 
       {open && results.length > 0 && (
-        <div className="absolute top-full left-0 right-0 mt-2 bg-ivory-medium rounded-xl border border-ivory-dark overflow-hidden z-50 max-h-[70vh] overflow-y-auto">
+        <div className="absolute top-full left-0 right-0 mt-2 bg-ivory-medium border border-ivory-dark overflow-hidden z-50 max-h-[70vh] overflow-y-auto">
           {results.map((r) => {
             const badge = TYPE_BADGE[r.type] || { label: r.type, cls: "bg-ivory-dark text-charcoal" };
             return (
@@ -133,7 +128,7 @@ export function SearchBar() {
       )}
 
       {open && query.trim().length >= 2 && results.length === 0 && !loading && (
-        <div className="absolute top-full left-0 right-0 mt-2 bg-ivory-medium rounded-xl border border-ivory-dark p-8 text-center text-sage-light font-ui z-50">
+        <div className="absolute top-full left-0 right-0 mt-2 bg-ivory-medium border border-ivory-dark p-8 text-center text-sage-light font-ui z-50">
           Nessun risultato per &ldquo;{query}&rdquo;
         </div>
       )}

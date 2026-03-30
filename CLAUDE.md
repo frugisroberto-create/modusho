@@ -31,9 +31,10 @@ L'operatore deve trovare subito quello che gli serve. Non naviga, non esplora. C
 
 Funzioni:
 - Ricerca full-text in home page (barra centrale, cerca nel contenuto non solo nei titoli)
-- Memo dell'Hotel Manager (comunicazioni operative attive)
-- Contenuti in evidenza (nuove SOP, documenti sicurezza, prioritari)
-- Contenuti da visionare (presa visione obbligatoria)
+- Contenuti da prendere visione (presa visione obbligatoria) — scompare se non ci sono elementi
+- Contenuti in evidenza (flag isFeatured, curati da HM/Admin) — stessa grafica di "Da prendere visione", scompare se vuoto
+- Stat box linkate (contatori SOP/Documenti/Memo del reparto, cliccabili verso le rispettive sezioni)
+- Ultime 3 per categoria (SOP/Documenti/Memo — feed automatico degli ultimi caricati, uguale per tutti i ruoli)
 
 **La home è il centro dell'esperienza, non i menu o le liste.**
 
@@ -161,6 +162,9 @@ Content {
   isDeleted         // SOFT DELETE — default false. Se true, il contenuto è eliminato.
   deletedAt         // timestamp eliminazione
   deletedById       // chi ha eliminato
+  isFeatured        // Boolean, default false — flag "In evidenza" gestito da HM/ADMIN/SUPER_ADMIN
+  featuredAt        // timestamp di quando è stato messo in evidenza
+  featuredById      // chi ha messo in evidenza
   createdAt
   updatedAt
 
@@ -194,7 +198,7 @@ ContentReview {
   contentId
   reviewerId
   action: APPROVED | RETURNED | FORWARDED
-  note              // obbligatoria se RETURNED
+  note: String?     // obbligatoria se RETURNED — motivazione della restituzione
   createdAt
 }
 
@@ -205,7 +209,16 @@ ContentStatusHistory {
   toStatus          // nuovo stato
   changedById       // chi ha cambiato lo stato
   changedAt         // timestamp del cambio
-  note              // opzionale, contesto del cambio
+  note: String?     // opzionale, contesto del cambio di stato
+}
+
+ContentNote {
+  id
+  contentId         // a quale contenuto si riferisce
+  authorId          // chi ha scritto (relazione con User)
+  body              // testo della nota (rich text semplice)
+  createdAt         // timestamp creazione
+  // IMMUTABILE: una volta creata, non si modifica né elimina
 }
 ```
 
@@ -214,6 +227,45 @@ Questo è necessario per calcolare:
 - tempo di permanenza in ogni stato
 - tempo totale di attraversamento del workflow
 - identificazione dei colli di bottiglia temporali
+
+### Note sui contenuti (ContentNote) — Diario di bordo
+
+Le note sono un **registro cronologico libero** associato a ogni contenuto. NON fanno parte del processo di invio/approvazione. NON sono un gate del workflow. Sono un diario dove chi lavora sul contenuto lascia osservazioni, contesto, motivazioni.
+
+**Regole:**
+1. Chiunque con accesso al contenuto (HOD+ per i contenuti del proprio reparto, HM+ per la struttura, ADMIN/SUPER_ADMIN per tutto) può aggiungere una nota in qualsiasi momento, indipendentemente dallo stato del contenuto
+2. Una nota è **immutabile**: una volta creata, non si modifica né si elimina (record di audit)
+3. Le note sono ordinate cronologicamente (la più recente in alto)
+4. Ogni nota mostra: nome autore + ruolo + timestamp + testo
+5. Non c'è limite al numero di note su un contenuto
+6. Le note sono visibili a tutti i ruoli da HOD in su che hanno accesso al contenuto
+
+**API:**
+- GET `/api/content/[id]/notes` — lista note del contenuto (paginata, ordinata per createdAt desc)
+- POST `/api/content/[id]/notes` — crea nuova nota (body: `{ body: string }`)
+
+### Cronologia e audit trail — Specifica UI
+
+La pagina di dettaglio di ogni contenuto include una sezione **"Cronologia"** che unisce in un unico flusso temporale:
+1. **Cambi di stato** (da ContentStatusHistory) — es. "DRAFT → REVIEW_HM — Roberto F. — 25 mar 2026"
+2. **Revisioni inline** (da ContentRevision) — es. "Contenuto modificato da Roberto F. durante REVIEW_ADMIN" + link al diff visuale
+3. **Note** (da ContentNote) — es. nota libera con testo completo
+
+**Rendering nella UI:**
+- La cronologia è una **timeline verticale** nella pagina di dettaglio, sotto il corpo del contenuto
+- Ogni evento ha un'**icona** diversa per tipo: cerchio per cambio stato, matita per revisione, fumetto per nota
+- **Colore indicatore**: terracotta per cambi di stato, blu per revisioni, grigio per note
+- Ogni evento mostra: tipo + autore (nome + ruolo) + timestamp relativo ("3 giorni fa") + dettaglio
+- Per le revisioni, un bottone "Vedi modifiche" apre il diff visuale (testo rimosso rosso, aggiunto verde)
+- Per le note, il testo è visibile direttamente nella timeline
+- In fondo alla timeline: **campo di input** per aggiungere una nuova nota (textarea + bottone "Aggiungi nota")
+
+**Visibilità per ruolo:**
+- OPERATOR: NON vede la cronologia (vede solo il contenuto pubblicato)
+- HOD: vede cronologia dei propri contenuti
+- HM: vede cronologia di tutti i contenuti della propria struttura
+- ADMIN: vede cronologia di tutti i contenuti delle strutture assegnate
+- SUPER_ADMIN: vede tutto
 
 ```
 Memo {
@@ -251,10 +303,11 @@ Content {
 - Presa visione obbligatoria configurabile (come per le SOP)
 
 **Navigazione operatore:**
-La barra di navigazione deve avere 4 tab:
+La header nav dell'operatore ha 4 tab (Brand Book e Standard Book NON sono nella header operatore — li accede dalla home):
 ```
-Home | SOP | Documenti | Brand Book | Standard Book
+Home | SOP | Documenti | Memo
 ```
+L'operatore NON vede la sub-nav (nessuna funzione di gestione).
 
 ## Workflow SOP — REGOLE NON NEGOZIABILI
 
@@ -270,10 +323,11 @@ PUBLISHED → ARCHIVED (quando sostituita da nuova versione)
 
 | Azione | Chi può farla |
 |--------|---------------|
-| Creare bozza (DRAFT) | ADMIN, SUPER_ADMIN |
-| Modificare bozza | Autore, ADMIN, SUPER_ADMIN |
-| Inviare a REVIEW_HM | Autore, ADMIN |
-| Approvare/restituire da HM | HOTEL_MANAGER della property |
+| Creare bozza (DRAFT) | HOD, HOTEL_MANAGER, ADMIN, SUPER_ADMIN |
+| Modificare bozza | Autore, HOTEL_MANAGER della property, ADMIN, SUPER_ADMIN |
+| Inviare a review | Autore (stato target dipende dal ruolo — vedi flusso RACI sotto) |
+| Pubblicare direttamente | ADMIN, SUPER_ADMIN |
+| Approvare/restituire da HM | HOTEL_MANAGER della property, ADMIN, SUPER_ADMIN |
 | Inoltrare a REVIEW_ADMIN | HOTEL_MANAGER della property |
 | Approvare/pubblicare | ADMIN, SUPER_ADMIN |
 | Restituire | HOTEL_MANAGER, ADMIN, SUPER_ADMIN |
@@ -281,10 +335,62 @@ PUBLISHED → ARCHIVED (quando sostituita da nuova versione)
 | **Modificare dopo pubblicazione** | **HOTEL_MANAGER, ADMIN, SUPER_ADMIN** |
 | **Eliminare (soft delete)** | **HOTEL_MANAGER, ADMIN, SUPER_ADMIN** |
 
+### Flusso di invio per ruolo (matrice RACI)
+
+Il sistema instrada i contenuti in modo diverso in base al ruolo del creatore. La logica è centralizzata in `src/lib/content-workflow.ts` (funzione `getSubmitTargetStatus`).
+
+**Matrice RACI:**
+- OPERATOR = I (Informed) — riceve, legge, conferma presa visione
+- HOD = R (Responsible) — crea contenuti per il proprio reparto
+- HOTEL_MANAGER = R + C (Responsible + Consulted) — crea contenuti per la struttura E viene consultato su quelli creati da HOD o ADMIN
+- ADMIN = A + R (Accountable + Responsible) — approvazione finale E può creare/pubblicare in autonomia
+- SUPER_ADMIN = A + R (Accountable + Responsible) — come ADMIN, bypassa tutto
+
+| Ruolo creatore | "Invia a review" → stato | "Pubblica direttamente" | Label bottone review |
+|---------------|--------------------------|------------------------|---------------------|
+| HOD | REVIEW_HM | ❌ Non disponibile | "Invia a Hotel Manager" |
+| HOTEL_MANAGER | REVIEW_ADMIN (salta REVIEW_HM) | ❌ Non disponibile | "Invia per approvazione finale" |
+| ADMIN | REVIEW_HM (consultazione HM) | ✅ → PUBLISHED | "Invia a Hotel Manager" |
+| SUPER_ADMIN | REVIEW_HM (consultazione HM) | ✅ → PUBLISHED | "Invia a Hotel Manager" |
+
+**Regole:**
+- Ogni ruolo salta i livelli di approvazione ≤ al proprio (l'HM non invia a se stesso)
+- ADMIN/SUPER_ADMIN hanno doppia opzione: consultare l'HM oppure pubblicare in autonomia
+- La validazione è server-side: se un HOD tenta `publishDirectly=true`, l'API restituisce 403
+- Il flusso di review/approvazione (REVIEW_HM → REVIEW_ADMIN → PUBLISHED) NON cambia
+
+### Revisione diretta durante il review (ContentRevision)
+
+I reviewer (HM, ADMIN, SUPER_ADMIN) possono modificare direttamente il contenuto durante il review senza restituirlo all'autore. Ogni modifica è tracciata in modo immutabile.
+
+**Modello `ContentRevision`:**
+- `previousTitle` + `previousBody`: snapshot prima della modifica
+- `newTitle` + `newBody`: snapshot dopo la modifica
+- `revisedById`: chi ha modificato
+- `note`: descrizione opzionale della modifica
+- `status`: stato del contenuto al momento della revisione (REVIEW_HM, REVIEW_ADMIN, PUBLISHED)
+- `createdAt`: timestamp
+
+**Regole:**
+1. La revisione viene creata automaticamente quando un reviewer modifica title o body di un contenuto in REVIEW_HM, REVIEW_ADMIN o PUBLISHED
+2. Il contenuto resta nello stesso stato — la modifica NON cambia lo stato. Il reviewer può modificare e poi approvare, o modificare e lasciare in review
+3. Ogni revisione incrementa il campo `version` del Content
+4. ContentRevision è **immutabile**: una volta creato, non può essere modificato né eliminato (record di audit)
+5. La cronologia revisioni è visibile a tutti i ruoli ≥ HOD nella pagina di dettaglio
+6. Il diff visuale mostra testo rimosso (rosso) e aggiunto (verde) a livello di paragrafo
+7. Nella lista approvazioni, un badge "Revisionato dall'HM/Admin" indica che il contenuto è stato modificato durante il review
+
+**Chi può modificare durante il review:**
+- In REVIEW_HM: HOTEL_MANAGER della property, ADMIN, SUPER_ADMIN
+- In REVIEW_ADMIN: ADMIN, SUPER_ADMIN
+- RETURN resta disponibile per problemi strutturali gravi
+
+**Logica centralizzata in:** `src/lib/text-diff.ts` (algoritmo diff a livello di paragrafo)
+
 ### Regole RETURNED
-- La nota è OBBLIGATORIA. Se manca, il sistema blocca.
-- Deve tracciare: chi ha restituito, quando, perché.
 - Una SOP restituita torna a DRAFT.
+- Il sistema traccia chi ha restituito e quando (ContentReview + ContentStatusHistory).
+- La nota NON è obbligatoria come gate del workflow — chi restituisce può (e dovrebbe) aggiungere una ContentNote per spiegare il motivo, ma il sistema non blocca l'azione se manca.
 
 ### Regole ARCHIVED
 - Una SOP pubblicata può essere archiviata da HOTEL_MANAGER, ADMIN o SUPER_ADMIN.
@@ -315,6 +421,23 @@ Dopo la pubblicazione, i ruoli HOTEL_MANAGER, ADMIN e SUPER_ADMIN possono:
 - L'eliminazione è reversibile solo da SUPER_ADMIN
 
 **Queste regole valgono per TUTTI i tipi di contenuto**: SOP, DOCUMENT, MEMO.
+
+## Contenuti in evidenza (isFeatured)
+
+Il sistema supporta contenuti "in evidenza" selezionati manualmente da HOTEL_MANAGER, ADMIN o SUPER_ADMIN.
+
+**Campi nel modello Content:**
+- `isFeatured: Boolean` (default false) — flag per contenuti in evidenza
+- `featuredAt: DateTime?` — timestamp di quando è stato messo in evidenza
+- `featuredById: String?` — relazione con User che ha messo in evidenza
+
+**Regole:**
+1. Solo contenuti con status PUBLISHED possono essere messi in evidenza
+2. Solo HOTEL_MANAGER (della struttura), ADMIN e SUPER_ADMIN possono attivare/disattivare il flag
+3. API: POST `/api/content/[id]/feature` (attiva) e DELETE `/api/content/[id]/feature` (disattiva)
+4. Nella home operatore, la sezione "In evidenza" mostra i contenuti con `isFeatured=true` ordinati per `featuredAt desc`
+5. Se non ci sono contenuti in evidenza, la sezione scompare dal DOM (return null)
+6. La sezione "In evidenza" ha la stessa identica grafica di "Da prendere visione" (lista verticale, righe orizzontali)
 
 ## Archiviazione automatica SOP — REGOLE
 
@@ -412,9 +535,115 @@ Eccezione unica: `SUPER_ADMIN` bypassa tutto.
 - Un HOTEL_MANAGER assegnato a "Nicolaus Hotel" (senza departmentId) vede TUTTI i reparti del Nicolaus.
 - Un ADMIN senza property assignment NON vede nulla (deve avere almeno un'assegnazione, a meno che non sia SUPER_ADMIN).
 
-## Dashboard HOO — Layout e priorità
+## Home HOO — Layout approvato (HM / Admin / Super Admin)
 
-La dashboard è lo strumento di governo del HOO. In pochi secondi deve rispondere a:
+La home HOO è la prima pagina che vedono HOTEL_MANAGER, ADMIN e SUPER_ADMIN dopo il login. NON è la dashboard analytics: è un punto di partenza operativo con visibilità immediata su cosa richiede attenzione.
+
+**Route:** `/dashboard` (la dashboard analytics si sposta a `/analytics`)
+
+**Riferimento visivo:** `modusho-home-preview.html` (file preview approvato)
+
+### Header (barra primaria — navigazione contenuti)
+
+- Sfondo `#964733` (terracotta), altezza `56px` (`h-14`)
+- **Riga unica**: logo "HO COLLECTION" (Playfair Display 16px, letter-spacing 4px, bianco) + nav sulla STESSA riga a sinistra
+- Nav links: Playfair Display 14px, `rgba(255,255,255,0.75)`, link attivo bianco con underline 2px bianco
+- A destra: nome utente + badge ruolo + avatar + "Esci"
+
+**Voci header per ruolo (visibilità role-based):**
+
+| Voce | OPERATOR | HOD | HM | ADMIN | SUPER_ADMIN |
+|------|----------|-----|----|-------|-------------|
+| Home | ✅ | ✅ | ✅ | ✅ | ✅ |
+| SOP | ✅ | ✅ | ✅ | ✅ | ✅ |
+| Documenti | ✅ | ✅ | ✅ | ✅ | ✅ |
+| Memo | ✅ | ✅ | ✅ | ✅ | ✅ |
+| Brand Book | — | — | ✅ | ✅ | ✅ |
+| Standard Book | — | — | ✅ | ✅ | ✅ |
+| Analytics | — | — | — | ✅ | ✅ |
+
+**Nota**: OPERATOR e HOD vedono Brand Book e Standard Book dalla home (sezioni in evidenza / ultime per tipo), non dalla header nav. HM+ li vede come voci di navigazione diretta.
+
+### Sub-nav (barra secondaria — funzioni di gestione)
+
+- Sfondo `#FAF9F5`, border-bottom 1px `#E8E5DC`
+- Font Inter 13px, weight 500
+- Link attivo: colore `#964733` con underline 2px terracotta
+- **NON visibile per OPERATOR** (non ha funzioni di gestione)
+
+**Voci sub-nav per ruolo (visibilità role-based):**
+
+| Voce | OPERATOR | HOD | HM | ADMIN | SUPER_ADMIN |
+|------|----------|-----|----|-------|-------------|
+| Overview | — | ✅ | ✅ | ✅ | ✅ |
+| Approvazioni (con badge count) | — | ✅ | ✅ | ✅ | ✅ |
+| Report | — | ✅ | ✅ | ✅ | ✅ |
+| Gestione utenti | — | — | — | ✅ | ✅ |
+| Strutture | — | — | — | ✅ | ✅ |
+| Cestino | — | — | — | — | ✅ |
+
+**Riferimento visivo:** `modusho-nav-preview.html` (preview interattiva con switch ruoli)
+
+**Principio architetturale:** la header contiene la navigazione verso i CONTENUTI (SOP, Memo, Documenti, ecc.), la sub-nav contiene le funzioni di GESTIONE e GOVERNANCE (approvazioni, report, utenti, strutture). Le voci admin-only appaiono solo se il ruolo lo consente — stesso meccanismo `minRole` applicato ai due livelli di navigazione.
+
+**NON esiste sidebar.** Il layout HOO usa header + sub-nav orizzontali, coerente con la vista operatore. Questo consente larghezza piena per i contenuti e responsive mobile naturale.
+
+### Hero
+
+- Sfondo `#FAF9F5`, padding generoso (56px sopra, 48px sotto)
+- Tagline SOPRA: Inter 12px uppercase, letter-spacing 1px, `rgba(51,51,51,0.5)`
+- Nome hotel SOTTO: Playfair Display 50px, weight 500, `#964733`
+- Descrizione: Cardo 16px, line-height 27px, `#333`, max-width 560px, centrata
+- Barra ricerca: max-width `520px`, bordo `#C8C5BC`, sfondo bianco, **bottone "CERCA"** terracotta a destra (Inter 12.6px, 600, uppercase)
+
+### Gerarchia sezioni (dall'alto verso il basso)
+
+**1. Stat box** — 4 box orizzontali (NON 3 come operatore)
+- SOP pubblicate → link a /sop
+- Documenti → link a /documents
+- Memo attivi → link a /memo
+- **In attesa di approvazione** → link a /approvals (box con numero arancione `#E65100`)
+- Sfondo `white` (NON ivory-medium), bordo `#E8E5DC`, border-radius 0
+- Numero: Playfair Display 36px, weight 500, colore `#964733` (tranne "In attesa": `#E65100`)
+- Label: Inter 11px, uppercase, letter-spacing 1.5px, `rgba(51,51,51,0.5)`
+
+**2. In evidenza** — rendering condizionale (scompare se vuoto)
+- Header: titolo Playfair Display 22px + link "GESTISCI" terracotta uppercase
+- Lista verticale, sfondo `white`, bordo `#E8E5DC`
+- Ogni riga: barra verticale 4px terracotta + badge tipo (SOP viola `#EDE7F6`/`#5E35B1`, Documento blu `#E3F2FD`/`#1565C0`, Memo arancio `#FFF3E0`/`#E65100`) + titolo + meta + data "in evidenza da"
+- Hover: sfondo `#FAFAF7`
+
+**3. Tre colonne affiancate** — Ultime SOP / Ultimi Documenti / Ultimi Memo
+- Grid 3 colonne, gap 24px
+- Ogni pannello: sfondo `white`, bordo `#E8E5DC`
+- **Header pannello**: sfondo `#FAF9F5`, border-bottom `#E8E5DC`, titolo Playfair Display 16px + link "VEDI TUTTE" terracotta uppercase
+- Ogni item: titolo Inter 13px + codice terracotta (solo SOP) + meta con badge stato + reparto + data
+- Badge stato: DRAFT grigio, REVIEW_HM malva, REVIEW_ADMIN terracotta, PUBLISHED verde, RETURNED rosso
+
+**4. Tabella ultime SOP** (opzionale, sotto le 3 colonne)
+- Tabella con header `#FAF9F5`, colonne: Codice, Titolo, Reparto, Stato, Autore, Data
+- Hover righe: sfondo `#FAFAF7`
+
+### Differenze chiave tra Home Operatore e Home HOO
+
+| Aspetto | OPERATOR | HOD | HM | ADMIN | SUPER_ADMIN |
+|---------|----------|-----|----|-------|-------------|
+| Header nav voci | 4 | 4 | 6 | 7 | 7 |
+| Sub-nav | No | 3 voci | 3 voci | 5 voci | 6 voci (+ Cestino) |
+| Stat box | 3 | 4 | 4 | 4 | 4 |
+| "Da prendere visione" | Sì | No | No | No | No |
+| "In evidenza" | No | Sì (senza "Gestisci") | Sì (senza "Gestisci") | Sì (con "Gestisci") | Sì (con "Gestisci") |
+| Badge stato nelle colonne | No | Sì | Sì | Sì | Sì |
+| Analytics nell'header | No | No | No | Sì | Sì |
+| Gestione utenti in sub-nav | No | No | No | Sì | Sì |
+| Strutture in sub-nav | No | No | No | Sì | Sì |
+| Cestino in sub-nav | No | No | No | No | Sì |
+
+---
+
+## Analytics HOO — Layout e priorità
+
+La pagina analytics (`/analytics`) è lo strumento di governo avanzato del HOO. In pochi secondi deve rispondere a:
 1. Cosa richiede la mia azione immediata?
 2. Dove si sta fermando il sistema?
 3. Come stanno avanzando gli hotel?
@@ -496,7 +725,7 @@ Il sistema usa il logo ModusHO (simbolo HO Collection con check di governance al
 
 **File disponibili in `public/`:**
 - `modusho-logo-final.svg` — logo verticale completo: simbolo + "MODUSHO" + "GOVERNANCE OPERATIVA"
-- `modusho-simbolo.svg` — solo simbolo (cerchio HO + check). Per sidebar, header, favicon.
+- `modusho-simbolo.svg` — solo simbolo (cerchio HO + check). Per header, favicon.
 
 **File originali HO Collection (per contesti dove serve il brand madre):**
 - `images/ho-logo-verticale.png` — logo verticale HO Collection
@@ -516,43 +745,51 @@ Il sistema usa il logo ModusHO (simbolo HO Collection con check di governance al
 | Header operatore (barra terracotta) | `modusho-simbolo.svg` + testo "MODUSHO" | Bianco (filter invert), simbolo 28px, testo Inter 14px uppercase letter-spacing 3px. A sinistra. |
 | Home operatore (hero, SOPRA barra ricerca) | Nessun logo grande | Al posto del logo: tagline piccola + nome hotel grande (come sito HO) |
 | Login | `modusho-logo-final.svg` | Centrato, max-width 280px |
-| Sidebar HOO (in alto) | `modusho-simbolo.svg` | Bianco, 32px, + testo "ModusHO" bianco accanto |
+| Header HOO (a sinistra, accanto a "HO COLLECTION") | Nessun logo separato | Il testo "HO COLLECTION" funge da identità brand nella header terracotta |
 | Favicon | `modusho-simbolo.svg` | Ridotto a 32×32 |
 | Report PDF export | `modusho-logo-final.svg` | In header del documento |
 
 ### Layout home operatore — RICALCA hocollection.com/hotels/[hotel]
 
-La home operatore deve avere ESATTAMENTE questa struttura (come la pagina hotel su hocollection.com):
+La home operatore deve avere ESATTAMENTE questa struttura.
 
-```
-┌─────────────────────────────────────────────────────────────┐
-│  [ModusHO simbolo] MODUSHO     Home SOP Doc BB SB    [Hotel ▼] [Nome] [Esci]  │  ← header terracotta
-├─────────────────────────────────────────────────────────────┤
-│                                                             │
-│              YOUR BUSINESS DESTINATION                      │  ← tagline: Inter 12px uppercase grigio 50%
-│                                                             │
-│              The Nicolaus Hotel                             │  ← nome: Playfair Display 50px terracotta
-│                                                             │
-│         ┌──────────────────────────────────┐                │
-│         │  🔍 Cerca procedure, documenti…  │                │  ← barra ricerca (sostituisce i bottoni CTA)
-│         └──────────────────────────────────┘                │
-│                                                             │
-│  Da leggere (6)                                             │  ← sezione contenuti
-│  ┌───────────────┐  ┌───────────────┐                       │
-│  │ MEMO          │  │ SOP           │                       │
-│  │ Titolo...     │  │ Titolo...     │                       │
-│  └───────────────┘  └───────────────┘                       │
-└─────────────────────────────────────────────────────────────┘
-```
+**Hero (sfondo #FAF9F5):**
+- Tagline SOPRA: Inter 12px, uppercase, letter-spacing 1px, colore rgba(51,51,51,0.5)
+- Nome hotel SOTTO: Playfair Display 50px, weight 500, colore #964733
+- Barra ricerca: bordo 1px #E8E5DC, sfondo bianco, border-radius 0, bottone "Cerca" terracotta
+
+**Gerarchia sezioni (dall'alto verso il basso):**
+
+1. **Da prendere visione (N)** — rendering condizionale: scompare se zero elementi
+   - Lista verticale con righe orizzontali
+   - Ogni riga: pallino terracotta + badge tipo (SOP/Documento/Memo) + titolo + meta (codice, reparto, data) + bottone "Leggi"
+   - Counter badge rosso nel titolo sezione
+
+2. **In evidenza** — rendering condizionale: scompare se zero contenuti con isFeatured=true
+   - Stessa identica grafica di "Da prendere visione" (lista verticale, righe orizzontali)
+   - Ogni riga: pallino terracotta + badge tipo + titolo + meta + bottone "Leggi"
+   - NO counter badge nel titolo
+
+3. **Stat box linkate** — sempre visibili, 3 box orizzontali
+   - SOP del reparto → link a /sop
+   - Documenti → link a /documents
+   - Memo attivi → link a /memo (nota: nella vista HM/Admin c'è anche "In attesa di approvazione")
+   - Numero grande (font-heading terracotta) + label sotto (font-ui uppercase)
+
+4. **Ultime 3 per categoria** — sempre visibili, 3 colonne affiancate
+   - "Ultime SOP" / "Ultimi Documenti" / "Ultimi Memo"
+   - Header con titolo + link "Vedi tutte/tutti"
+   - Ogni colonna mostra gli ultimi 3 contenuti PUBLISHED
+   - Uguale per TUTTI i ruoli
 
 **Regole precise:**
 1. Tagline SOPRA il nome hotel — MAI sotto
-2. Tagline: font Inter/sans-serif, 12px, uppercase, letter-spacing 1px, colore `rgba(51,51,51,0.5)`
-3. Nome hotel: font Playfair Display/serif, 50px, weight 500, colore `#964733` (terracotta)
-4. Sfondo hero: `#F0EFE9`
-5. Spaziatura generosa: almeno 30px sopra la tagline, 15px tra tagline e nome, 40px tra nome e barra ricerca
-6. Tutto centrato orizzontalmente
-7. Barra ricerca: bordo 1px `#E8E5DC`, padding generoso, sfondo bianco, border-radius 0 (squadrato come i bottoni del sito HO)
+2. Sfondo hero: `#FAF9F5`, sfondo pagina: `#F0EFE9`
+3. Spaziatura generosa: almeno 30px sopra la tagline, 15px tra tagline e nome, 40px tra nome e barra ricerca
+4. Tutto centrato orizzontalmente nel hero
+5. Sezioni "Da prendere visione" e "In evidenza" scompaiono dal DOM se vuote (return null)
+6. Le stat box nella vista HM/Admin/Super Admin includono anche "In attesa di approvazione" (arancione)
+
 
 ### Palette colori
 
@@ -561,7 +798,7 @@ La home operatore deve avere ESATTAMENTE questa struttura (come la pagina hotel 
 - Terracotta chiaro: `#B8614A` — hover su bottoni primari
 
 **Accenti**
-- Verde salvia scuro: `#4E564F` — sidebar, navigazione, sfondi secondari
+- Verde salvia scuro: `#4E564F` — navigazione, sfondi secondari
 - Malva/Rosa antico: `#7E636B` — badge, tag, accenti soft
 - Verde salvia chiaro: `#848B82` — testo secondario, placeholder, icone
 
@@ -594,8 +831,9 @@ La home operatore deve avere ESATTAMENTE questa struttura (come la pagina hotel 
 - **Bottoni primari**: sfondo `#964733`, testo bianco, **border-radius 0** (squadrati, come sul sito HO), padding 10px 52px 16px, font Inter 600 12.6px uppercase letter-spacing 1px, nessuna ombra
 - **Bottoni secondari**: sfondo trasparente, bordo 1px `#964733`, testo `#964733`
 - **Card**: sfondo `#F0EFE9`, bordo 1px `#E8E5DC`, border-radius 8px, nessuna box-shadow
-- **Sidebar HOO**: sfondo `#4E564F`, testo bianco, link attivo con accento `#964733`
-- **Header operatore**: sfondo `#964733`, testo bianco
+- **Header (tutti i ruoli)**: sfondo `#964733`, testo bianco, altezza `56px` (`h-14`), logo + nav sulla STESSA riga (no seconda riga separata). Voci visibili in base a `minRole` (vedi sezione Header HOO)
+- **Sub-nav (HOD+)**: sfondo `#FAF9F5`, border-bottom 1px `#E8E5DC`, Inter 13px weight 500. Voci visibili in base a `minRole`. NON visibile per OPERATOR.
+- **NON esiste sidebar** — il layout usa header + sub-nav orizzontali per tutti i ruoli
 - **Tabelle**: header sfondo `#E8E5DC`, righe alternate `#FEFBF4` / `#F0EFE9`, nessun bordo verticale
 - **Badge stato SOP**: DRAFT grigio, REVIEW_HM malva `#7E636B`, REVIEW_ADMIN terracotta `#964733`, PUBLISHED verde `#4E564F`, RETURNED rosso `#C0392B`
 - **Alert critici**: bordo sinistro 4px colorato (rosso/giallo/grigio), sfondo avorio
@@ -625,23 +863,25 @@ Ogni SOP deve mostrare CHIARAMENTE due informazioni:
 
 Ogni SOP ha uno o più destinatari definiti nel modello `ContentTarget`:
 
-- **Per reparto** (caso più comune): "Rivolta a: Operatori Front Office" → tutti gli operatori assegnati a quel reparto vedono la SOP e devono fare presa visione
-- **Per ruolo**: "Rivolta a: Tutti gli Operator" → tutti gli operator della property
+- **Per uno o più reparti** (caso più comune): una SOP può essere rivolta a uno, due o più reparti specifici. Per ogni reparto destinatario viene creato un record `ContentTarget` di tipo DEPARTMENT. Esempio: una procedura antincendio rivolta a Front Office + Manutenzione genera 2 record ContentTarget.
+- **Per tutti i reparti** (trasversale): se nella UI si seleziona "Tutti i reparti", viene creato un record ContentTarget di tipo ROLE con `targetRole = OPERATOR` (senza specificare departmentId). Tutti gli operatori della property vedono la SOP.
+- **Per ruolo**: targeting per ruolo specifico (es. tutti gli HOD della property)
 - **Per utente specifico**: targeting individuale (raro, per casi eccezionali)
-- **Trasversale** (departmentId = null, target ROLE = OPERATOR): rivolta a tutti gli operatori della struttura
 
 **Nella UI:**
-- **Card/lista SOP**: "Rivolta a: Front Office" o "Rivolta a: Tutti i reparti"
+- **Card/lista SOP**: "Rivolta a: Front Office, Manutenzione" oppure "Rivolta a: Tutti i reparti"
 - **Dettaglio SOP**: lista completa dei destinatari con stato presa visione (chi ha letto, chi no)
 - **Coda approvazioni**: colonna "Destinatari" con indicazione sintetica
 - **Dashboard KPI**: % presa visione calcolata sul numero di destinatari che hanno confermato
 
 ### Regole di targeting
 
-1. Quando un HOD crea una SOP per il proprio reparto: il target di default è DEPARTMENT = suo reparto
-2. Quando un ADMIN crea una SOP trasversale (departmentId = null): deve specificare i destinatari manualmente
-3. I destinatari vengono definiti in fase di creazione e possono essere modificati fino alla pubblicazione
-4. Dopo la pubblicazione, i destinatari sono FISSI — il sistema genera automaticamente i ContentAcknowledgment obbligatori per tutti i destinatari
+1. Quando un **HOD** crea una SOP: il target di default è DEPARTMENT = suo reparto. Non può selezionare altri reparti (crea solo per il proprio).
+2. Quando un **HM** crea una SOP: può selezionare uno o più reparti della propria struttura (multi-select con checkbox). Può anche selezionare "Tutti i reparti".
+3. Quando un **ADMIN/SUPER_ADMIN** crea una SOP: multi-select libero su tutti i reparti della property selezionata + opzione "Tutti i reparti".
+4. I destinatari vengono definiti in fase di creazione e possono essere modificati fino alla pubblicazione.
+5. Dopo la pubblicazione, i destinatari sono FISSI — il sistema genera automaticamente i ContentAcknowledgment obbligatori per tutti i destinatari.
+6. Il modello dati NON cambia: `ContentTarget` supporta già target multipli (relazione uno-a-molti con Content). La modifica è nella UI del form di creazione/modifica.
 
 ## Ricerca
 
@@ -681,7 +921,8 @@ ModusHO/
 │   │   │   ├── documents/
 │   │   │   └── memo/
 │   │   ├── (hoo)/            # interfaccia HOO/admin
-│   │   │   ├── dashboard/    # KPI e monitoraggio
+│   │   │   ├── dashboard/    # home HOO (hero, stats, in evidenza, 3 colonne — vedi sezione dedicata)
+│   │   │   ├── analytics/    # KPI avanzati, monitoraggio, confronto hotel/reparti
 │   │   │   ├── approvals/    # approvazione SOP
 │   │   │   ├── properties/   # gestione strutture
 │   │   │   ├── users/        # gestione utenti
@@ -689,6 +930,12 @@ ModusHO/
 │   │   ├── api/
 │   │   │   ├── auth/
 │   │   │   ├── content/
+│   │   │   │   ├── route.ts           # CRUD contenuti (POST con publishDirectly, routing per ruolo)
+│   │   │   │   ├── [id]/route.ts      # GET/PUT/DELETE singolo contenuto
+│   │   │   │   ├── [id]/revisions/    # GET cronologia revisioni (ContentRevision)
+│   │   │   │   ├── [id]/notes/        # GET/POST note sul contenuto (ContentNote)
+│   │   │   │   ├── [id]/feature/      # POST/DELETE toggle isFeatured
+│   │   │   │   └── submit-actions/    # GET azioni disponibili per ruolo corrente
 │   │   │   ├── search/
 │   │   │   ├── users/
 │   │   │   ├── properties/
@@ -702,7 +949,9 @@ ModusHO/
 │   │   ├── prisma.ts         # client Prisma
 │   │   ├── auth.ts           # config NextAuth
 │   │   ├── rbac.ts           # logica autorizzazione
-│   │   └── search.ts         # logica ricerca
+│   │   ├── search.ts         # logica ricerca
+│   │   ├── content-workflow.ts # routing invio per ruolo (getSubmitTargetStatus, getAvailableSubmitActions)
+│   │   └── text-diff.ts      # algoritmo diff paragrafo per revisioni tracciate
 │   ├── types/
 │   │   └── index.ts          # tipi TypeScript condivisi
 │   └── middleware.ts          # auth + RBAC middleware
@@ -745,7 +994,7 @@ ModusHO/
 6. **Paginazione obbligatoria** su tutte le liste. Nessuna eccezione.
 7. **Ogni API deve validare** input (Zod) e autorizzazione (RBAC) prima di fare qualsiasi cosa.
 8. **I test devono coprire** RBAC: verificare che un utente non autorizzato NON accede ai dati fuori perimetro.
-9. **Brand Book e Standard Book** sono PDF statici. NON fanno parte del workflow operativo. Non hanno stati, non hanno approvazione.
+9. **Brand Book e Standard Book** sono contenuti testuali (tipo BRAND_BOOK / STANDARD_BOOK), gestiti con titolo + corpo rich text, creabili e modificabili da ADMIN e SUPER_ADMIN. NON fanno parte del workflow di approvazione. Non hanno stati multipli.
 10. **La ricerca deve rispettare i permessi.** Un operatore non deve MAI vedere nei risultati contenuti fuori dal suo perimetro.
 
 ## Permessi vincolanti — REGOLE ESPLICITE
@@ -799,7 +1048,7 @@ Le azioni disponibili dipendono SEMPRE da quattro fattori verificati esplicitame
 ### Fase 4 — Completamento
 14. Report per MD
 15. Gestione Memo
-16. Brand Book / Standard Book (PDF viewer)
+16. Brand Book / Standard Book (contenuti testuali con editor rich text)
 17. Ottimizzazione e performance
 
 ## Properties di riferimento (seed data)

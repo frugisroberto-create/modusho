@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect, useCallback } from "react";
+import { useSession } from "next-auth/react";
 import Link from "next/link";
 
 interface SopItem {
@@ -20,6 +21,9 @@ const STATUS_COLORS: Record<string, string> = {
 };
 
 export default function HooSopListPage() {
+  const { data: session } = useSession();
+  const userRole = session?.user?.role || "";
+  const canEditPublished = ["HOTEL_MANAGER", "ADMIN", "SUPER_ADMIN"].includes(userRole);
   const [items, setItems] = useState<SopItem[]>([]);
   const [total, setTotal] = useState(0);
   const [page, setPage] = useState(1);
@@ -45,8 +49,8 @@ export default function HooSopListPage() {
   return (
     <div className="max-w-5xl space-y-4">
       <div className="flex items-center justify-between">
-        <h1 className="text-xl font-bold text-gray-900">SOP</h1>
-        <Link href="/hoo-sop/new" className="px-4 py-2 text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 rounded-lg">
+        <h1 className="text-xl font-heading font-medium text-charcoal-dark">SOP</h1>
+        <Link href="/hoo-sop/new" className="btn-primary">
           Nuova SOP
         </Link>
       </div>
@@ -77,8 +81,8 @@ export default function HooSopListPage() {
                 <p className="text-xs text-gray-400 mt-1">{new Date(item.createdAt).toLocaleDateString("it-IT")}</p>
               </div>
               <div className="flex gap-2">
-                {item.status !== "PUBLISHED" && item.status !== "ARCHIVED" && (
-                  <Link href={`/hoo-sop/${item.id}/edit`} className="px-3 py-1.5 text-xs font-ui text-terracotta hover:bg-terracotta/10 rounded-md border border-terracotta/30">
+                {(item.status !== "ARCHIVED" && (item.status !== "PUBLISHED" || canEditPublished)) && (
+                  <Link href={`/hoo-sop/${item.id}/edit`} className="px-3 py-1.5 text-xs font-ui text-terracotta hover:bg-terracotta/10 border border-terracotta/30">
                     Modifica
                   </Link>
                 )}

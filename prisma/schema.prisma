@@ -68,9 +68,12 @@ model User {
   updatedContents      Content[]              @relation("ContentUpdatedBy")
   submittedContents    Content[]              @relation("ContentSubmittedBy")
   deletedContents      Content[]              @relation("ContentDeletedBy")
+  featuredContents     Content[]              @relation("ContentFeaturedBy")
   acknowledgments      ContentAcknowledgment[]
   reviews              ContentReview[]
   statusChanges        ContentStatusHistory[] @relation("StatusChangedBy")
+  contentRevisions     ContentRevision[]      @relation("ContentRevisedBy")
+  contentNotes         ContentNote[]          @relation("ContentNoteAuthor")
   targetedContents     ContentTarget[]        @relation("ContentTargetUser")
 
   @@index([role])
@@ -156,6 +159,9 @@ model Content {
   createdById   String
   updatedById   String
   submittedById String?
+  isFeatured    Boolean       @default(false)
+  featuredAt    DateTime?
+  featuredById  String?
   isDeleted     Boolean       @default(false)
   deletedAt     DateTime?
   deletedById   String?
@@ -168,12 +174,15 @@ model Content {
   createdBy   User        @relation("ContentCreatedBy", fields: [createdById], references: [id])
   updatedBy   User        @relation("ContentUpdatedBy", fields: [updatedById], references: [id])
   submittedBy User?       @relation("ContentSubmittedBy", fields: [submittedById], references: [id])
+  featuredBy  User?       @relation("ContentFeaturedBy", fields: [featuredById], references: [id])
   deletedBy   User?       @relation("ContentDeletedBy", fields: [deletedById], references: [id])
 
   acknowledgments  ContentAcknowledgment[]
   reviews          ContentReview[]
   statusHistory    ContentStatusHistory[]
   targetAudience   ContentTarget[]
+  revisions        ContentRevision[]
+  notes            ContentNote[]
   memo             Memo?
 
   @@index([propertyId])
@@ -232,6 +241,38 @@ model ContentStatusHistory {
   @@index([contentId])
   @@index([changedById])
   @@index([changedAt])
+}
+
+model ContentRevision {
+  id             String        @id @default(cuid())
+  contentId      String
+  revisedById    String
+  previousTitle  String
+  previousBody   String        @db.Text
+  newTitle       String
+  newBody        String        @db.Text
+  note           String?
+  status         ContentStatus
+  createdAt      DateTime      @default(now())
+
+  content   Content @relation(fields: [contentId], references: [id], onDelete: Cascade)
+  revisedBy User    @relation("ContentRevisedBy", fields: [revisedById], references: [id])
+
+  @@index([contentId, createdAt])
+}
+
+model ContentNote {
+  id        String   @id @default(cuid())
+  contentId String
+  authorId  String
+  body      String   @db.Text
+  createdAt DateTime @default(now())
+
+  content Content @relation(fields: [contentId], references: [id], onDelete: Cascade)
+  author  User    @relation("ContentNoteAuthor", fields: [authorId], references: [id])
+
+  @@index([contentId, createdAt])
+  @@index([authorId])
 }
 
 model ContentTarget {

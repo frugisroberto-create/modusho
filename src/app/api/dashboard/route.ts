@@ -164,7 +164,7 @@ export async function GET(request: NextRequest) {
   const deptsWithPublished = await prisma.$queryRaw<{ departmentId: string }[]>`
     SELECT DISTINCT c."departmentId"
     FROM "Content" c
-    WHERE c.type = 'SOP' AND c.status = 'PUBLISHED'
+    WHERE c.type = 'SOP' AND c.status = 'PUBLISHED' AND c."isDeleted" = false
       AND c."propertyId" = ANY(${filteredPropertyIds})
       AND c."departmentId" IS NOT NULL
   `;
@@ -212,7 +212,7 @@ export async function GET(request: NextRequest) {
         AND u."isActive" = true
         AND (c."departmentId" IS NULL OR pa."departmentId" IS NULL OR pa."departmentId" = c."departmentId")
     ) total_ops ON true
-    WHERE c.status = 'PUBLISHED' AND c.type IN ('SOP', 'DOCUMENT')
+    WHERE c.status = 'PUBLISHED' AND c."isDeleted" = false AND c.type IN ('SOP', 'DOCUMENT')
       AND c."propertyId" = ANY(${filteredPropertyIds})
       AND total_ops.cnt > 0
       AND (ack.cnt::numeric / total_ops.cnt) < 0.5
@@ -260,10 +260,10 @@ export async function GET(request: NextRequest) {
   // --- SEZIONE 4: KPI ---
   const [sopTotal, sopPublished, sopReviewHm, sopReviewAdmin, sopReturned] = await Promise.all([
     prisma.content.count({ where: { ...propertyFilter, isDeleted: false, type: "SOP" } }),
-    prisma.content.count({ where: { ...propertyFilter, type: "SOP", status: "PUBLISHED" } }),
-    prisma.content.count({ where: { ...propertyFilter, type: "SOP", status: "REVIEW_HM" } }),
-    prisma.content.count({ where: { ...propertyFilter, type: "SOP", status: "REVIEW_ADMIN" } }),
-    prisma.content.count({ where: { ...propertyFilter, type: "SOP", status: "RETURNED" } }),
+    prisma.content.count({ where: { ...propertyFilter, isDeleted: false, type: "SOP", status: "PUBLISHED" } }),
+    prisma.content.count({ where: { ...propertyFilter, isDeleted: false, type: "SOP", status: "REVIEW_HM" } }),
+    prisma.content.count({ where: { ...propertyFilter, isDeleted: false, type: "SOP", status: "REVIEW_ADMIN" } }),
+    prisma.content.count({ where: { ...propertyFilter, isDeleted: false, type: "SOP", status: "RETURNED" } }),
   ]);
 
   const sopApprovedInPeriod = await prisma.contentStatusHistory.count({
@@ -305,8 +305,8 @@ export async function GET(request: NextRequest) {
   // Tasso presa visione globale
   const ackStats = await prisma.$queryRaw<{ total_required: number; total_acked: number }[]>`
     SELECT
-      (SELECT COUNT(*)::int FROM "Content" c WHERE c.status = 'PUBLISHED' AND c.type IN ('SOP', 'DOCUMENT') AND c."propertyId" = ANY(${filteredPropertyIds})) as total_required,
-      (SELECT COUNT(DISTINCT ca."contentId" || '-' || ca."userId")::int FROM "ContentAcknowledgment" ca JOIN "Content" c ON c.id = ca."contentId" WHERE c."propertyId" = ANY(${filteredPropertyIds})) as total_acked
+      (SELECT COUNT(*)::int FROM "Content" c WHERE c.status = 'PUBLISHED' AND c."isDeleted" = false AND c.type IN ('SOP', 'DOCUMENT') AND c."propertyId" = ANY(${filteredPropertyIds})) as total_required,
+      (SELECT COUNT(DISTINCT ca."contentId" || '-' || ca."userId")::int FROM "ContentAcknowledgment" ca JOIN "Content" c ON c.id = ca."contentId" WHERE c."isDeleted" = false AND c."propertyId" = ANY(${filteredPropertyIds})) as total_acked
   `;
 
   const kpi = {
@@ -330,9 +330,9 @@ export async function GET(request: NextRequest) {
     properties.map(async (prop) => {
       const pFilter = { propertyId: prop.id, type: "SOP" as const };
       const [total, published, inReview, returned] = await Promise.all([
-        prisma.content.count({ where: pFilter }),
-        prisma.content.count({ where: { ...pFilter, status: "PUBLISHED" } }),
-        prisma.content.count({ where: { ...pFilter, status: { in: ["REVIEW_HM", "REVIEW_ADMIN"] } } }),
+        prisma.content.count({ where: { ...pFilter, isDeleted: false } }),
+        prisma.content.count({ where: { ...pFilter, isDeleted: false, status: "PUBLISHED" } }),
+        prisma.content.count({ where: { ...pFilter, isDeleted: false, status: { in: ["REVIEW_HM", "REVIEW_ADMIN"] } } }),
         prisma.contentStatusHistory.count({
           where: { toStatus: "RETURNED", content: pFilter, changedAt: { gte: periodFrom, lte: periodTo } },
         }),
@@ -367,9 +367,9 @@ export async function GET(request: NextRequest) {
         depts.map(async (dept) => {
           const dFilter = { propertyId: prop.id, departmentId: dept.id, type: "SOP" as const };
           const [total, published, inReview, returned] = await Promise.all([
-            prisma.content.count({ where: dFilter }),
-            prisma.content.count({ where: { ...dFilter, status: "PUBLISHED" } }),
-            prisma.content.count({ where: { ...dFilter, status: { in: ["REVIEW_HM", "REVIEW_ADMIN"] } } }),
+            prisma.content.count({ where: { ...dFilter, isDeleted: false } }),
+            prisma.content.count({ where: { ...dFilter, isDeleted: false, status: "PUBLISHED" } }),
+            prisma.content.count({ where: { ...dFilter, isDeleted: false, status: { in: ["REVIEW_HM", "REVIEW_ADMIN"] } } }),
             prisma.contentStatusHistory.count({
               where: { toStatus: "RETURNED", content: dFilter, changedAt: { gte: periodFrom, lte: periodTo } },
             }),
@@ -382,6 +382,7 @@ export async function GET(request: NextRequest) {
             WHERE c."propertyId" = ${prop.id}
               AND c."departmentId" = ${dept.id}
               AND c.type = 'SOP'
+              AND c."isDeleted" = false
               AND c.status NOT IN ('PUBLISHED', 'ARCHIVED')
               AND h.id = (SELECT h2.id FROM "ContentStatusHistory" h2 WHERE h2."contentId" = c.id ORDER BY h2."changedAt" DESC LIMIT 1)
           `;

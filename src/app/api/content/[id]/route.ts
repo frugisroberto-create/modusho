@@ -4,6 +4,7 @@ import { authOptions } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { checkAccess, canUserManageContentType } from "@/lib/rbac";
 import { changeContentStatus } from "@/lib/content-status";
+import { getSubmitTargetStatus } from "@/lib/content-workflow";
 import { z } from "zod/v4";
 
 export async function GET(
@@ -19,15 +20,18 @@ export async function GET(
   const userId = session.user.id;
 
   const content = await prisma.content.findUnique({
-    where: { id },
+    where: { id, isDeleted: false },
     include: {
       property: { select: { id: true, name: true, code: true } },
       department: { select: { id: true, name: true, code: true } },
-      createdBy: { select: { name: true } },
+      createdBy: { select: { id: true, name: true } },
       acknowledgments: {
         where: { userId },
         select: { acknowledgedAt: true },
         take: 1,
+      },
+      targetAudience: {
+        select: { targetType: true, targetRole: true, targetDepartmentId: true, targetDepartment: { select: { name: true } } },
       },
     },
   });
@@ -45,7 +49,18 @@ export async function GET(
   );
 
   if (!hasAccess) {
-    return NextResponse.json({ error: "Accesso negato" }, { status: 403 });
+    return NextResponse.json({ error: "Contenuto non trovato" }, { status: 404 });
+  }
+
+  // Visibilità basata su status + ruolo
+  const userRole = session.user.role;
+  if (content.status !== "PUBLISHED") {
+    if (userRole === "OPERATOR") {
+      return NextResponse.json({ error: "Contenuto non trovato" }, { status: 404 });
+    }
+    if (userRole === "HOD" && content.createdBy.id !== userId) {
+      return NextResponse.json({ error: "Contenuto non trovato" }, { status: 404 });
+    }
   }
 
   return NextResponse.json({
@@ -63,6 +78,7 @@ export async function GET(
       createdBy: content.createdBy.name,
       acknowledged: content.acknowledgments.length > 0,
       acknowledgedAt: content.acknowledgments[0]?.acknowledgedAt ?? null,
+      targetAudience: content.targetAudience,
     },
   });
 }
@@ -72,8 +88,12 @@ const updateContentSchema = z.object({
   title: z.string().min(1).max(500).optional(),
   body: z.string().min(1).optional(),
   departmentId: z.string().nullable().optional(),
+  targetDepartmentIds: z.array(z.string()).optional(),
+  targetAllDepartments: z.boolean().optional(),
   sendToReview: z.boolean().optional(),
+  publishDirectly: z.boolean().optional(),
   requireNewAcknowledgment: z.boolean().optional(),
+  revisionNote: z.string().max(500).optional(),
 });
 
 export async function PUT(
@@ -97,7 +117,7 @@ export async function PUT(
 
   const content = await prisma.content.findUnique({
     where: { id, isDeleted: false },
-    select: { id: true, status: true, propertyId: true, departmentId: true, type: true, version: true },
+    select: { id: true, status: true, propertyId: true, departmentId: true, type: true, version: true, title: true, body: true },
   });
 
   if (!content) {
@@ -135,8 +155,46 @@ export async function PUT(
     return NextResponse.json({ error: "Accesso negato" }, { status: 403 });
   }
 
-  const { title, body, departmentId, sendToReview, requireNewAcknowledgment } = parsed.data;
-  const isPublishedEdit = content.status === "PUBLISHED";
+  const { title, body, departmentId, sendToReview, publishDirectly, requireNewAcknowledgment, revisionNote } = parsed.data;
+
+  // Blocca cambio departmentId non autorizzato
+  if (departmentId !== undefined && departmentId !== content.departmentId) {
+    if (departmentId !== null) {
+      const newDept = await prisma.department.findFirst({
+        where: { id: departmentId, propertyId: content.propertyId },
+      });
+      if (!newDept) {
+        return NextResponse.json({ error: "Reparto non trovato nella property" }, { status: 400 });
+      }
+      const hasAccessToNewDept = await checkAccess(userId, "HOD", content.propertyId, departmentId);
+      if (!hasAccessToNewDept) {
+        return NextResponse.json({ error: "Non hai accesso al reparto selezionato" }, { status: 403 });
+      }
+    }
+  }
+
+  // Determina se title o body stanno cambiando
+  const isTitleChanging = title !== undefined && title !== content.title;
+  const isBodyChanging = body !== undefined && body !== content.body;
+  const isContentChanging = isTitleChanging || isBodyChanging;
+  const isReviewOrPublished = ["REVIEW_HM", "REVIEW_ADMIN", "PUBLISHED"].includes(content.status);
+  const shouldIncrementVersion = isReviewOrPublished && isContentChanging;
+
+  // Se contenuto cambia e siamo in review/published → salva revisione (snapshot before/after)
+  if (isContentChanging && isReviewOrPublished) {
+    await prisma.contentRevision.create({
+      data: {
+        contentId: id,
+        revisedById: userId,
+        previousTitle: content.title,
+        previousBody: content.body,
+        newTitle: title ?? content.title,
+        newBody: body ?? content.body,
+        note: revisionNote || null,
+        status: content.status,
+      },
+    });
+  }
 
   const updated = await prisma.content.update({
     where: { id },
@@ -145,36 +203,65 @@ export async function PUT(
       ...(body !== undefined && { body }),
       ...(departmentId !== undefined && { departmentId }),
       updatedById: userId,
-      ...(isPublishedEdit && { version: content.version + 1 }),
+      ...(shouldIncrementVersion && { version: content.version + 1 }),
     },
   });
 
-  // Modifica post-pubblicazione: traccia in history
-  if (isPublishedEdit) {
+  // Modifica post-pubblicazione: traccia in status history
+  if (content.status === "PUBLISHED" && isContentChanging) {
     await prisma.contentStatusHistory.create({
       data: {
         contentId: id,
         fromStatus: "PUBLISHED",
         toStatus: "PUBLISHED",
         changedById: userId,
-        note: "Modifica post-pubblicazione",
+        note: revisionNote ? `Modifica post-pubblicazione: ${revisionNote}` : "Modifica post-pubblicazione",
       },
     });
 
-    // Reset prese visione se richiesto
     if (requireNewAcknowledgment) {
       await prisma.contentAcknowledgment.deleteMany({ where: { contentId: id } });
     }
   }
 
-  // Invio a review (per DRAFT/RETURNED)
-  if (sendToReview && (content.status === "DRAFT" || content.status === "RETURNED")) {
+  // Aggiornamento ContentTarget (solo se non ancora pubblicato)
+  if ((content.status === "DRAFT" || content.status === "RETURNED") &&
+      (parsed.data.targetDepartmentIds !== undefined || parsed.data.targetAllDepartments !== undefined)) {
+    await prisma.contentTarget.deleteMany({ where: { contentId: id } });
+    if (parsed.data.targetAllDepartments) {
+      await prisma.contentTarget.create({
+        data: { contentId: id, targetType: "ROLE", targetRole: "OPERATOR" },
+      });
+    } else if (parsed.data.targetDepartmentIds && parsed.data.targetDepartmentIds.length > 0) {
+      await prisma.contentTarget.createMany({
+        data: parsed.data.targetDepartmentIds.map((deptId: string) => ({
+          contentId: id,
+          targetType: "DEPARTMENT" as const,
+          targetDepartmentId: deptId,
+        })),
+      });
+    }
+  }
+
+  // Invio a review o pubblicazione diretta (per DRAFT/RETURNED)
+  if ((sendToReview || publishDirectly) && (content.status === "DRAFT" || content.status === "RETURNED")) {
+    // Validazione server-side
+    if (publishDirectly && role !== "ADMIN" && role !== "SUPER_ADMIN") {
+      return NextResponse.json({ error: "Solo ADMIN e SUPER_ADMIN possono pubblicare direttamente" }, { status: 403 });
+    }
+    const action = publishDirectly ? "publishDirectly" : "sendToReview";
+    const targetStatus = getSubmitTargetStatus(role, action);
+    const noteMap: Record<string, string> = {
+      REVIEW_HM: "Inviata a Hotel Manager",
+      REVIEW_ADMIN: "Inviata per approvazione finale",
+      PUBLISHED: `Pubblicazione diretta da ${role}`,
+    };
     await changeContentStatus({
       contentId: id,
       fromStatus: content.status,
-      toStatus: "REVIEW_HM",
+      toStatus: targetStatus,
       changedById: userId,
-      note: "Inviata a review HM",
+      note: noteMap[targetStatus] || `Inviata a ${targetStatus}`,
     });
   }
 
