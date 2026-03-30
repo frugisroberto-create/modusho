@@ -70,7 +70,7 @@ export function BookForm({ mode, contentType, backPath, contentId, initialData }
 
   return (
     <div className="max-w-3xl space-y-6">
-      <section className="bg-ivory-medium border border-ivory-dark rounded-lg p-6 space-y-4">
+      <section className="bg-ivory-medium border border-ivory-dark  p-6 space-y-4">
         <div>
           <label className="block text-sm font-ui font-medium text-charcoal mb-1.5">Titolo</label>
           <input type="text" value={title} onChange={(e) => setTitle(e.target.value)}
@@ -97,22 +97,22 @@ export function BookForm({ mode, contentType, backPath, contentId, initialData }
         {mode === "create" && (
           <>
             <button onClick={() => handleSubmit(false)} disabled={loading}
-              className="px-5 py-2.5 text-sm font-ui font-medium text-charcoal bg-ivory border border-ivory-dark hover:bg-ivory-dark rounded-lg disabled:opacity-50 transition-colors">
+              className="px-5 py-2.5 text-sm font-ui font-medium text-charcoal bg-ivory border border-ivory-dark hover:bg-ivory-dark  disabled:opacity-50 transition-colors">
               {loading ? "..." : "Salva bozza"}
             </button>
             <button onClick={() => handleSubmit(true)} disabled={loading}
-              className="px-5 py-2.5 text-sm font-ui font-semibold text-white bg-terracotta hover:bg-terracotta-light rounded-lg disabled:opacity-50 transition-colors">
+              className="px-5 py-2.5 text-sm font-ui font-semibold text-white bg-terracotta hover:bg-terracotta-light  disabled:opacity-50 transition-colors">
               {loading ? "..." : "Pubblica"}
             </button>
           </>
         )}
         {mode === "edit" && (
           <button onClick={() => handleSubmit(false)} disabled={loading}
-            className="px-5 py-2.5 text-sm font-ui font-semibold text-white bg-terracotta hover:bg-terracotta-light rounded-lg disabled:opacity-50 transition-colors">
+            className="px-5 py-2.5 text-sm font-ui font-semibold text-white bg-terracotta hover:bg-terracotta-light  disabled:opacity-50 transition-colors">
             {loading ? "..." : "Salva modifiche"}
           </button>
         )}
-        <button onClick={() => router.back()} className="px-5 py-2.5 text-sm font-ui text-charcoal hover:bg-ivory-dark rounded-lg transition-colors">
+        <button onClick={() => router.back()} className="px-5 py-2.5 text-sm font-ui text-charcoal hover:bg-ivory-dark  transition-colors">
           Annulla
         </button>
       </div>

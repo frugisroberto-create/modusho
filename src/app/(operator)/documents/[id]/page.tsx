@@ -58,11 +58,11 @@ export default async function DocumentDetailPage({ params }: Props) {
       </div>
 
       <article
-        className="prose prose-gray max-w-none mb-8 bg-ivory-medium border border-ivory-dark rounded-lg p-6 font-body"
+        className="prose prose-gray max-w-none mb-8 bg-ivory-medium border border-ivory-dark  p-6 font-body"
         dangerouslySetInnerHTML={{ __html: content.body }}
       />
 
-      {(user.role === "OPERATOR" || user.role === "HOD") && (
+      {(user.role === "OPERATOR") && (
         <div className="border-t border-ivory-dark pt-6">
           <AcknowledgeButton contentId={content.id} acknowledged={acknowledged} acknowledgedAt={acknowledgedAt} />
         </div>

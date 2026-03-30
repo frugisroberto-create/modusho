@@ -75,14 +75,14 @@ export default function MemoManagementPage() {
     <div className="max-w-4xl space-y-4">
       <div className="flex items-center justify-between">
         <h1 className="text-xl font-bold text-gray-900">Memo</h1>
-        <Link href="/memo/new" className="px-4 py-2 text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 rounded-lg">
+        <Link href="/memo/new" className="px-4 py-2 text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 ">
           Nuovo memo
         </Link>
       </div>
 
       <div className="flex gap-3 flex-wrap">
         <select value={propertyId} onChange={(e) => setPropertyId(e.target.value)}
-          className="text-sm border border-gray-300 rounded-md px-3 py-2 bg-white">
+          className="text-sm border border-gray-300  px-3 py-2 bg-white">
           {properties.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
         </select>
         <label className="flex items-center gap-2 text-sm text-gray-600">
@@ -92,7 +92,7 @@ export default function MemoManagementPage() {
       </div>
 
       {loading ? (
-        <div className="space-y-2">{[1,2,3].map(i => <div key={i} className="h-20 bg-gray-200 rounded-lg animate-pulse" />)}</div>
+        <div className="space-y-2">{[1,2,3].map(i => <div key={i} className="h-20 bg-gray-200  animate-pulse" />)}</div>
       ) : memos.length === 0 ? (
         <p className="text-gray-500 text-sm py-8 text-center">Nessun memo</p>
       ) : (
@@ -100,7 +100,7 @@ export default function MemoManagementPage() {
           {memos.map((m) => {
             const isExpired = m.expiresAt && new Date(m.expiresAt) < now;
             return (
-              <div key={m.id} className={`bg-white rounded-lg border p-4 ${isExpired ? "border-gray-300 opacity-60" : m.isPinned ? "border-yellow-300" : "border-gray-200"}`}>
+              <div key={m.id} className={`bg-white  border p-4 ${isExpired ? "border-gray-300 opacity-60" : m.isPinned ? "border-yellow-300" : "border-gray-200"}`}>
                 <div className="flex items-start justify-between gap-3">
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-2 mb-1">
@@ -135,9 +135,9 @@ export default function MemoManagementPage() {
           <p className="text-sm text-gray-500">Pagina {page} di {totalPages}</p>
           <div className="flex gap-2">
             <button onClick={() => setPage(p => Math.max(1, p - 1))} disabled={page <= 1}
-              className="px-3 py-1.5 text-sm border rounded-md hover:bg-gray-50 disabled:opacity-50">Precedente</button>
+              className="px-3 py-1.5 text-sm border  hover:bg-gray-50 disabled:opacity-50">Precedente</button>
             <button onClick={() => setPage(p => Math.min(totalPages, p + 1))} disabled={page >= totalPages}
-              className="px-3 py-1.5 text-sm border rounded-md hover:bg-gray-50 disabled:opacity-50">Successivo</button>
+              className="px-3 py-1.5 text-sm border  hover:bg-gray-50 disabled:opacity-50">Successivo</button>
           </div>
         </div>
       )}

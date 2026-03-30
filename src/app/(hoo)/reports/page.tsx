@@ -46,7 +46,7 @@ export default function ReportsPage() {
 
   useEffect(() => { fetchReport(); }, [fetchReport]);
 
-  if (loading && !data) return <div className="h-40 bg-gray-200 rounded-lg animate-pulse" />;
+  if (loading && !data) return <div className="h-40 bg-gray-200  animate-pulse" />;
   if (!data) return <p className="text-gray-500">Errore nel caricamento del report</p>;
 
   const periodLabels: Record<PeriodPreset, string> = { month: "Ultimo mese", quarter: "Ultimo trimestre", semester: "Ultimo semestre" };
@@ -57,23 +57,23 @@ export default function ReportsPage() {
       <div className="flex items-center justify-between print:hidden">
         <h1 className="text-xl font-bold text-gray-900">Report per Managing Director</h1>
         <div className="flex gap-2">
-          <div className="flex gap-1 bg-white border border-gray-200 rounded-lg p-0.5">
+          <div className="flex gap-1 bg-white border border-gray-200  p-0.5">
             {(["month", "quarter", "semester"] as PeriodPreset[]).map((p) => (
               <button key={p} onClick={() => setPeriod(p)}
-                className={`px-3 py-1.5 text-sm rounded-md transition-colors ${period === p ? "bg-gray-900 text-white" : "text-gray-600 hover:bg-gray-100"}`}>
+                className={`px-3 py-1.5 text-sm  transition-colors ${period === p ? "bg-gray-900 text-white" : "text-gray-600 hover:bg-gray-100"}`}>
                 {periodLabels[p]}
               </button>
             ))}
           </div>
           <button onClick={() => window.print()}
-            className="px-4 py-1.5 text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 rounded-lg">
+            className="px-4 py-1.5 text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 ">
             Stampa / PDF
           </button>
         </div>
       </div>
 
       {/* Intestazione stampabile */}
-      <div className="bg-white rounded-lg border border-gray-200 p-6 print:border-0 print:p-0">
+      <div className="bg-white  border border-gray-200 p-6 print:border-0 print:p-0">
         <div className="flex items-center justify-between mb-4 pb-4 border-b border-gray-100">
           <div>
             <h2 className="text-lg font-bold text-gray-900">HO Collection — Report Operativo</h2>
@@ -100,7 +100,7 @@ export default function ReportsPage() {
               { label: "Approvate nel periodo", value: data.kpi.sopApprovedInPeriod, color: "text-green-600" },
               { label: "Restituite nel periodo", value: data.kpi.sopReturnedInPeriod, color: "text-red-600" },
             ].map((k) => (
-              <div key={k.label} className="text-center py-3 bg-gray-50 rounded-lg print:bg-white print:border print:border-gray-200">
+              <div key={k.label} className="text-center py-3 bg-gray-50  print:bg-white print:border print:border-gray-200">
                 <p className={`text-2xl font-bold ${k.color || "text-gray-900"}`}>{k.value}</p>
                 <p className="text-xs text-gray-500 mt-0.5">{k.label}</p>
               </div>
@@ -110,15 +110,15 @@ export default function ReportsPage() {
 
         {/* Metriche operative */}
         <div className="grid grid-cols-3 gap-4 mb-6">
-          <div className="py-3 px-4 bg-gray-50 rounded-lg print:bg-white print:border">
+          <div className="py-3 px-4 bg-gray-50  print:bg-white print:border">
             <p className="text-xs text-gray-500">Tempo medio approvazione</p>
             <p className="text-xl font-bold text-gray-900">{data.kpi.avgWorkflowDays != null ? `${data.kpi.avgWorkflowDays} giorni` : "n/d"}</p>
           </div>
-          <div className="py-3 px-4 bg-gray-50 rounded-lg print:bg-white print:border">
+          <div className="py-3 px-4 bg-gray-50  print:bg-white print:border">
             <p className="text-xs text-gray-500">Tasso presa visione</p>
             <p className="text-xl font-bold text-gray-900">{data.kpi.ackRate != null ? `${data.kpi.ackRate}%` : "n/d"}</p>
           </div>
-          <div className="py-3 px-4 bg-gray-50 rounded-lg print:bg-white print:border">
+          <div className="py-3 px-4 bg-gray-50  print:bg-white print:border">
             <p className="text-xs text-gray-500">Operatori attivi</p>
             <p className="text-xl font-bold text-gray-900">{data.kpi.totalOperators}</p>
           </div>

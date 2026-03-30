@@ -37,7 +37,7 @@ export default function PropertiesPage() {
       <div className="flex items-center justify-between">
         <h1 className="text-xl font-heading font-semibold text-charcoal-dark">Strutture</h1>
         <Link href="/properties/new"
-          className="px-4 py-2 text-sm font-ui font-medium text-white bg-terracotta hover:bg-terracotta-light rounded-lg transition-colors">
+          className="px-4 py-2 text-sm font-ui font-medium text-white bg-terracotta hover:bg-terracotta-light  transition-colors">
           Aggiungi struttura
         </Link>
       </div>
@@ -45,7 +45,7 @@ export default function PropertiesPage() {
       <div className="grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
         {properties.map((p) => (
           <Link key={p.id} href={`/properties/${p.id}`}
-            className="group bg-ivory border border-sage/20 rounded-xl p-6 hover:border-terracotta/40 transition-all flex flex-col">
+            className="group bg-ivory border border-sage/20  p-6 hover:border-terracotta/40 transition-all flex flex-col">
             {/* Tagline + Nome stile hocollection.com */}
             <div className="mb-4">
               {p.tagline && (

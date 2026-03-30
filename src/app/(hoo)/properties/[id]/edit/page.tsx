@@ -64,7 +64,7 @@ export default function EditPropertyPage() {
     <div className="max-w-2xl">
       <h1 className="text-xl font-heading font-semibold text-charcoal-dark mb-6">Modifica — {property.name}</h1>
       <div className="space-y-6">
-        <section className="bg-ivory-medium border border-ivory-dark rounded-lg p-6 space-y-4">
+        <section className="bg-ivory-medium border border-ivory-dark  p-6 space-y-4">
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div>
               <label className="block text-sm font-ui font-medium text-charcoal mb-1.5">Nome</label>
@@ -108,11 +108,11 @@ export default function EditPropertyPage() {
 
         <div className="flex gap-3">
           <button onClick={handleSave} disabled={saving}
-            className="px-6 py-3 text-sm font-ui font-semibold text-white bg-terracotta hover:bg-terracotta-light rounded-lg disabled:opacity-50 transition-colors">
+            className="px-6 py-3 text-sm font-ui font-semibold text-white bg-terracotta hover:bg-terracotta-light  disabled:opacity-50 transition-colors">
             {saving ? "Salvataggio..." : "Salva modifiche"}
           </button>
           <button onClick={() => router.back()}
-            className="px-6 py-3 text-sm font-ui text-charcoal hover:bg-ivory-dark rounded-lg transition-colors">
+            className="px-6 py-3 text-sm font-ui text-charcoal hover:bg-ivory-dark  transition-colors">
             Annulla
           </button>
         </div>

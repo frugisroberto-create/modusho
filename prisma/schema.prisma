@@ -49,6 +49,11 @@ enum TargetType {
   USER
 }
 
+enum AttachmentKind {
+  IMAGE
+  DOCUMENT
+}
+
 model User {
   id           String  @id @default(cuid())
   email        String  @unique
@@ -75,6 +80,7 @@ model User {
   contentRevisions     ContentRevision[]      @relation("ContentRevisedBy")
   contentNotes         ContentNote[]          @relation("ContentNoteAuthor")
   targetedContents     ContentTarget[]        @relation("ContentTargetUser")
+  attachments          Attachment[]           @relation("AttachmentUploadedBy")
 
   @@index([role])
   @@index([email])
@@ -183,6 +189,7 @@ model Content {
   targetAudience   ContentTarget[]
   revisions        ContentRevision[]
   notes            ContentNote[]
+  attachments      Attachment[]
   memo             Memo?
 
   @@index([propertyId])
@@ -303,6 +310,33 @@ model Memo {
 
   @@index([propertyId])
   @@index([expiresAt])
+}
+
+model Attachment {
+  id               String         @id @default(cuid())
+  contentId        String
+  contentType      ContentType    // SOP, MEMO, DOCUMENT, etc. — denormalized for query perf
+  kind             AttachmentKind // IMAGE or DOCUMENT
+  originalFileName String
+  storedFileName   String
+  mimeType         String
+  fileSize         Int            // bytes
+  storageKey       String         @unique // full path in bucket
+  storageBucket    String
+  uploadedById     String
+  sortOrder        Int            @default(0)
+  isInline         Boolean        @default(false) // true = inline/gallery, false = attachment
+  caption          String?
+  createdAt        DateTime       @default(now())
+
+  content    Content @relation(fields: [contentId], references: [id], onDelete: Cascade)
+  uploadedBy User    @relation("AttachmentUploadedBy", fields: [uploadedById], references: [id])
+
+  @@index([contentId])
+  @@index([contentType])
+  @@index([uploadedById])
+  @@index([createdAt])
+  @@index([contentId, kind, sortOrder])
 }
 
 model StaticDocument {

@@ -2,12 +2,14 @@
 
 import { useState, useEffect } from "react";
 import { useParams, useRouter } from "next/navigation";
+import { AttachmentUploader } from "@/components/shared/attachment-uploader";
 
 export default function EditMemoPage() {
   const { id } = useParams<{ id: string }>();
   const router = useRouter();
   const [title, setTitle] = useState("");
   const [body, setBody] = useState("");
+  const [contentId, setContentId] = useState("");
   const [expiresAt, setExpiresAt] = useState("");
   const [isPinned, setIsPinned] = useState(false);
   const [loading, setLoading] = useState(true);
@@ -15,12 +17,12 @@ export default function EditMemoPage() {
 
   useEffect(() => {
     async function fetchMemo() {
-      // Fetch via content API
       const res = await fetch(`/api/content/${id}`);
       if (res.ok) {
         const json = await res.json();
         setTitle(json.data.title);
         setBody(json.data.body);
+        setContentId(json.data.id);
       }
       setLoading(false);
     }
@@ -33,52 +35,47 @@ export default function EditMemoPage() {
       const res = await fetch(`/api/memo/${id}`, {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          title, body,
-          expiresAt: expiresAt || null,
-          isPinned,
-        }),
+        body: JSON.stringify({ title, body, expiresAt: expiresAt || null, isPinned }),
       });
       if (res.ok) { router.push("/memo"); router.refresh(); }
     } finally { setSaving(false); }
   };
 
-  if (loading) return <div className="h-40 bg-gray-200 rounded-lg animate-pulse" />;
+  if (loading) return <div className="h-40 skeleton" />;
 
   return (
-    <div className="max-w-2xl">
-      <h1 className="text-xl font-bold text-gray-900 mb-6">Modifica memo</h1>
-      <div className="bg-white rounded-lg border border-gray-200 p-5 space-y-4">
+    <div className="max-w-2xl space-y-6">
+      <h1 className="text-xl font-heading font-medium text-charcoal-dark">Modifica memo</h1>
+      <div className="bg-white border border-ivory-dark p-5 space-y-4">
         <div>
-          <label className="block text-sm font-medium text-gray-700 mb-1">Titolo</label>
-          <input type="text" value={title} onChange={(e) => setTitle(e.target.value)}
-            className="w-full px-3 py-2 border rounded-lg text-sm" />
+          <label className="block text-sm font-ui font-medium text-charcoal mb-1.5">Titolo</label>
+          <input type="text" value={title} onChange={(e) => setTitle(e.target.value)} className="w-full" />
         </div>
         <div>
-          <label className="block text-sm font-medium text-gray-700 mb-1">Contenuto</label>
-          <textarea value={body} onChange={(e) => setBody(e.target.value)} rows={6}
-            className="w-full px-3 py-2 border rounded-lg text-sm" />
+          <label className="block text-sm font-ui font-medium text-charcoal mb-1.5">Contenuto</label>
+          <textarea value={body} onChange={(e) => setBody(e.target.value)} rows={6} className="w-full" />
         </div>
         <div className="grid grid-cols-2 gap-4">
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Nuova scadenza</label>
-            <input type="date" value={expiresAt} onChange={(e) => setExpiresAt(e.target.value)}
-              className="w-full px-3 py-2 border rounded-lg text-sm" />
+            <label className="block text-sm font-ui font-medium text-charcoal mb-1.5">Scadenza</label>
+            <input type="date" value={expiresAt} onChange={(e) => setExpiresAt(e.target.value)} className="w-full" />
           </div>
           <div className="flex items-end pb-1">
-            <label className="flex items-center gap-2 text-sm">
-              <input type="checkbox" checked={isPinned} onChange={(e) => setIsPinned(e.target.checked)} />
+            <label className="flex items-center gap-2 text-sm font-ui text-charcoal">
+              <input type="checkbox" checked={isPinned} onChange={(e) => setIsPinned(e.target.checked)} className="accent-terracotta" />
               In evidenza (pin)
             </label>
           </div>
         </div>
-        <div className="flex gap-2 pt-2">
-          <button onClick={handleSave} disabled={saving}
-            className="px-5 py-2.5 text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 rounded-lg disabled:opacity-50">
-            {saving ? "Salvataggio..." : "Salva modifiche"}
-          </button>
-          <button onClick={() => router.back()} className="px-5 py-2.5 text-sm text-gray-500">Annulla</button>
-        </div>
+      </div>
+
+      {contentId && <AttachmentUploader contentId={contentId} canEdit={true} />}
+
+      <div className="flex gap-3">
+        <button onClick={handleSave} disabled={saving} className="btn-primary disabled:opacity-50">
+          {saving ? "Salvataggio..." : "Salva modifiche"}
+        </button>
+        <button onClick={() => router.back()} className="btn-outline">Annulla</button>
       </div>
     </div>
   );

@@ -45,17 +45,17 @@ export default function ApprovalsPage() {
   return (
     <div className="max-w-5xl space-y-4">
       <h1 className="text-xl font-bold text-gray-900">Approvazioni</h1>
-      <div className="flex gap-1 bg-gray-100 rounded-lg p-0.5 w-fit">
+      <div className="flex gap-1 bg-gray-100  p-0.5 w-fit">
         {([["pending", "Da approvare"], ["returned", "Restituite"]] as [Tab, string][]).map(([key, label]) => (
           <button key={key} onClick={() => setTab(key)}
-            className={`px-4 py-1.5 text-sm rounded-md transition-colors ${tab === key ? "bg-white shadow-sm font-medium" : "text-gray-600 hover:text-gray-900"}`}>
+            className={`px-4 py-1.5 text-sm  transition-colors ${tab === key ? "bg-white shadow-sm font-medium" : "text-gray-600 hover:text-gray-900"}`}>
             {label}
           </button>
         ))}
       </div>
 
       {loading ? (
-        <div className="space-y-2">{[1,2,3].map(i => <div key={i} className="h-16 bg-gray-200 rounded-lg animate-pulse" />)}</div>
+        <div className="space-y-2">{[1,2,3].map(i => <div key={i} className="h-16 bg-gray-200  animate-pulse" />)}</div>
       ) : items.length === 0 ? (
         <p className="text-gray-500 text-sm py-8 text-center">
           {tab === "pending" ? "Nessuna SOP in attesa di approvazione" : "Nessuna SOP restituita"}
@@ -64,7 +64,7 @@ export default function ApprovalsPage() {
         <div className="space-y-2">
           {items.map((item) => (
             <Link key={item.id} href={`/approvals/${item.id}`}
-              className="block bg-white rounded-lg border border-gray-200 p-4 hover:border-blue-300 hover:shadow-sm transition-all">
+              className="block bg-white  border border-gray-200 p-4 hover:border-blue-300 hover:shadow-sm transition-all">
               <div className="flex items-center justify-between">
                 <div>
                   <div className="flex items-center gap-2 mb-1">
@@ -91,9 +91,9 @@ export default function ApprovalsPage() {
           <p className="text-sm text-gray-500">Pagina {page} di {totalPages} ({total} risultati)</p>
           <div className="flex gap-2">
             <button onClick={() => setPage(p => Math.max(1, p - 1))} disabled={page <= 1}
-              className="px-3 py-1.5 text-sm border rounded-md hover:bg-gray-50 disabled:opacity-50">Precedente</button>
+              className="px-3 py-1.5 text-sm border  hover:bg-gray-50 disabled:opacity-50">Precedente</button>
             <button onClick={() => setPage(p => Math.min(totalPages, p + 1))} disabled={page >= totalPages}
-              className="px-3 py-1.5 text-sm border rounded-md hover:bg-gray-50 disabled:opacity-50">Successivo</button>
+              className="px-3 py-1.5 text-sm border  hover:bg-gray-50 disabled:opacity-50">Successivo</button>
           </div>
         </div>
       )}

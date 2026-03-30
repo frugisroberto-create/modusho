@@ -3,6 +3,7 @@
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { DepartmentTargetSelector } from "@/components/shared/department-target-selector";
+import { AttachmentUploader } from "@/components/shared/attachment-uploader";
 
 interface Property {
   id: string; name: string; code: string;
@@ -140,6 +141,10 @@ export function SopForm({ mode, contentId, initialData, userRole = "ADMIN", user
         <textarea value={body} onChange={(e) => setBody(e.target.value)} rows={15}
           className="w-full font-mono text-sm" placeholder="Contenuto della SOP (HTML o testo)" />
       </div>
+
+      {mode === "edit" && contentId && (
+        <AttachmentUploader contentId={contentId} canEdit={true} />
+      )}
 
       <div className="flex gap-3 pt-2">
         <button onClick={() => handleSubmit("draft")} disabled={loading || !isValid}

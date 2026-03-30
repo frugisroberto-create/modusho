@@ -48,29 +48,29 @@ export default function NewMemoPage() {
   return (
     <div className="max-w-2xl">
       <h1 className="text-xl font-bold text-gray-900 mb-6">Nuovo memo</h1>
-      <form onSubmit={handleSubmit} className="bg-white rounded-lg border border-gray-200 p-5 space-y-4">
+      <form onSubmit={handleSubmit} className="bg-white  border border-gray-200 p-5 space-y-4">
         <div>
           <label className="block text-sm font-medium text-gray-700 mb-1">Titolo</label>
           <input type="text" value={title} onChange={(e) => setTitle(e.target.value)} required
-            className="w-full px-3 py-2 border rounded-lg text-sm" placeholder="Titolo del memo" />
+            className="w-full px-3 py-2 border  text-sm" placeholder="Titolo del memo" />
         </div>
         <div>
           <label className="block text-sm font-medium text-gray-700 mb-1">Struttura</label>
           <select value={propertyId} onChange={(e) => setPropertyId(e.target.value)}
-            className="w-full px-3 py-2 border rounded-lg text-sm bg-white">
+            className="w-full px-3 py-2 border  text-sm bg-white">
             {properties.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
           </select>
         </div>
         <div>
           <label className="block text-sm font-medium text-gray-700 mb-1">Contenuto</label>
           <textarea value={body} onChange={(e) => setBody(e.target.value)} rows={6} required
-            className="w-full px-3 py-2 border rounded-lg text-sm" placeholder="Testo del memo..." />
+            className="w-full px-3 py-2 border  text-sm" placeholder="Testo del memo..." />
         </div>
         <div className="grid grid-cols-2 gap-4">
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">Scadenza (opzionale)</label>
             <input type="date" value={expiresAt} onChange={(e) => setExpiresAt(e.target.value)}
-              className="w-full px-3 py-2 border rounded-lg text-sm" />
+              className="w-full px-3 py-2 border  text-sm" />
           </div>
           <div className="flex items-end pb-1">
             <label className="flex items-center gap-2 text-sm">
@@ -81,7 +81,7 @@ export default function NewMemoPage() {
         </div>
         <div className="flex gap-2 pt-2">
           <button type="submit" disabled={loading}
-            className="px-5 py-2.5 text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 rounded-lg disabled:opacity-50">
+            className="px-5 py-2.5 text-sm font-medium text-white bg-blue-600 hover:bg-blue-700  disabled:opacity-50">
             {loading ? "Pubblicazione..." : "Pubblica memo"}
           </button>
           <button type="button" onClick={() => router.back()} className="px-5 py-2.5 text-sm text-gray-500">Annulla</button>

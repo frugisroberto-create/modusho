@@ -54,7 +54,7 @@ export function ContentActions({ contentId, contentStatus, userRole, isFeatured 
   return (
     <div className="relative">
       <button onClick={() => setOpen(!open)}
-        className="p-2 text-sage-light hover:text-charcoal hover:bg-ivory-dark rounded-lg transition-colors">
+        className="p-2 text-sage-light hover:text-charcoal hover:bg-ivory-dark  transition-colors">
         <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M12 5v.01M12 12v.01M12 19v.01M12 6a1 1 0 110-2 1 1 0 010 2zm0 7a1 1 0 110-2 1 1 0 010 2zm0 7a1 1 0 110-2 1 1 0 010 2z" />
         </svg>
@@ -63,7 +63,7 @@ export function ContentActions({ contentId, contentStatus, userRole, isFeatured 
       {open && (
         <>
           <div className="fixed inset-0 z-40" onClick={() => setOpen(false)} />
-          <div className="absolute right-0 mt-1 w-44 bg-ivory border border-ivory-dark rounded-lg shadow-lg z-50 py-1">
+          <div className="absolute right-0 mt-1 w-44 bg-ivory border border-ivory-dark  shadow-lg z-50 py-1">
             {contentStatus !== "PUBLISHED" && contentStatus !== "ARCHIVED" && (
               <button onClick={() => { setOpen(false); router.push(`/hoo-sop/${contentId}/edit`); }}
                 className="w-full text-left px-4 py-2 text-sm font-ui text-charcoal hover:bg-ivory-dark transition-colors">
@@ -97,15 +97,15 @@ export function ContentActions({ contentId, contentStatus, userRole, isFeatured 
       {/* Modale archivia */}
       {archiveModal && (
         <div className="fixed inset-0 bg-charcoal-dark/60 flex items-center justify-center z-50 p-4">
-          <div className="bg-ivory rounded-xl w-full max-w-md p-6 border border-ivory-dark">
+          <div className="bg-ivory  w-full max-w-md p-6 border border-ivory-dark">
             <h3 className="text-lg font-heading font-semibold text-charcoal-dark mb-2">Archivia contenuto</h3>
             <p className="text-sm font-ui text-sage-light mb-4">Il contenuto non sarà più visibile agli operatori.</p>
             <textarea value={archiveNote} onChange={(e) => setArchiveNote(e.target.value)}
               placeholder="Motivo dell'archiviazione (min 5 caratteri)..." rows={3} className="w-full mb-4" />
             <div className="flex justify-end gap-2">
-              <button onClick={() => setArchiveModal(false)} className="px-4 py-2 text-sm font-ui text-charcoal hover:bg-ivory-dark rounded-lg">Annulla</button>
+              <button onClick={() => setArchiveModal(false)} className="px-4 py-2 text-sm font-ui text-charcoal hover:bg-ivory-dark ">Annulla</button>
               <button onClick={handleArchive} disabled={loading || archiveNote.length < 5}
-                className="px-4 py-2 text-sm font-ui font-medium text-white bg-sage hover:bg-sage-dark rounded-lg disabled:opacity-50">
+                className="px-4 py-2 text-sm font-ui font-medium text-white bg-sage hover:bg-sage-dark  disabled:opacity-50">
                 {loading ? "..." : "Archivia"}
               </button>
             </div>
@@ -116,15 +116,15 @@ export function ContentActions({ contentId, contentStatus, userRole, isFeatured 
       {/* Modale elimina */}
       {deleteModal && (
         <div className="fixed inset-0 bg-charcoal-dark/60 flex items-center justify-center z-50 p-4">
-          <div className="bg-ivory rounded-xl w-full max-w-md p-6 border border-ivory-dark">
+          <div className="bg-ivory  w-full max-w-md p-6 border border-ivory-dark">
             <h3 className="text-lg font-heading font-semibold text-alert-red mb-2">Elimina contenuto</h3>
             <p className="text-sm font-ui text-charcoal mb-4">
               Questa azione è reversibile solo dal Super Admin. Sei sicuro?
             </p>
             <div className="flex justify-end gap-2">
-              <button onClick={() => setDeleteModal(false)} className="px-4 py-2 text-sm font-ui text-charcoal hover:bg-ivory-dark rounded-lg">Annulla</button>
+              <button onClick={() => setDeleteModal(false)} className="px-4 py-2 text-sm font-ui text-charcoal hover:bg-ivory-dark ">Annulla</button>
               <button onClick={handleDelete} disabled={loading}
-                className="px-4 py-2 text-sm font-ui font-medium text-white bg-alert-red hover:bg-alert-red/80 rounded-lg disabled:opacity-50">
+                className="px-4 py-2 text-sm font-ui font-medium text-white bg-alert-red hover:bg-alert-red/80  disabled:opacity-50">
                 {loading ? "..." : "Elimina"}
               </button>
             </div>

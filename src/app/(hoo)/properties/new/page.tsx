@@ -70,7 +70,7 @@ export default function NewPropertyPage() {
       <h1 className="text-xl font-heading font-semibold text-charcoal-dark mb-6">Nuova struttura</h1>
       <form onSubmit={handleSubmit} className="space-y-6">
         {/* Info base */}
-        <section className="bg-ivory-medium border border-ivory-dark rounded-lg p-6 space-y-4">
+        <section className="bg-ivory-medium border border-ivory-dark  p-6 space-y-4">
           <h2 className="text-base font-heading font-semibold text-charcoal-dark">Informazioni</h2>
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div>
@@ -108,7 +108,7 @@ export default function NewPropertyPage() {
         </section>
 
         {/* Reparti */}
-        <section className="bg-ivory-medium border border-ivory-dark rounded-lg p-6 space-y-4">
+        <section className="bg-ivory-medium border border-ivory-dark  p-6 space-y-4">
           <h2 className="text-base font-heading font-semibold text-charcoal-dark">Reparti iniziali</h2>
           <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
             {depts.map((d, i) => (
@@ -123,7 +123,7 @@ export default function NewPropertyPage() {
             <input type="text" value={customDeptName} onChange={(e) => setCustomDeptName(e.target.value)}
               placeholder="Reparto personalizzato..." className="flex-1 text-sm" />
             <button type="button" onClick={addCustomDept}
-              className="px-3 py-2 text-sm font-ui text-sage hover:bg-sage/10 rounded-lg transition-colors">
+              className="px-3 py-2 text-sm font-ui text-sage hover:bg-sage/10  transition-colors">
               Aggiungi
             </button>
           </div>
@@ -133,11 +133,11 @@ export default function NewPropertyPage() {
 
         <div className="flex gap-3">
           <button type="submit" disabled={loading}
-            className="px-6 py-3 text-sm font-ui font-semibold text-white bg-terracotta hover:bg-terracotta-light rounded-lg disabled:opacity-50 transition-colors">
+            className="px-6 py-3 text-sm font-ui font-semibold text-white bg-terracotta hover:bg-terracotta-light  disabled:opacity-50 transition-colors">
             {loading ? "Creazione..." : "Salva"}
           </button>
           <button type="button" onClick={() => router.back()}
-            className="px-6 py-3 text-sm font-ui text-charcoal hover:bg-ivory-dark rounded-lg transition-colors">
+            className="px-6 py-3 text-sm font-ui text-charcoal hover:bg-ivory-dark  transition-colors">
             Annulla
           </button>
         </div>

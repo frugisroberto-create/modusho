@@ -28,7 +28,7 @@ const CT_LABELS: Record<string, string> = { SOP: "SOP", DOCUMENT: "Documenti", M
 
 function PermBadge({ active, label }: { active: boolean; label: string }) {
   return (
-    <div className={`flex items-center gap-2 px-3 py-2 rounded-lg border ${active ? "bg-sage/10 border-sage/30" : "bg-ivory border-ivory-dark"}`}>
+    <div className={`flex items-center gap-2 px-3 py-2  border ${active ? "bg-sage/10 border-sage/30" : "bg-ivory border-ivory-dark"}`}>
       <div className={`w-3 h-3 rounded-full ${active ? "bg-sage" : "bg-ivory-dark"}`} />
       <span className={`text-sm font-ui ${active ? "text-charcoal-dark" : "text-sage-light"}`}>{label}</span>
     </div>
@@ -130,7 +130,7 @@ export default function UserDetailPage() {
         </div>
         <div className="flex gap-2">
           <button onClick={() => setEditing(true)}
-            className="px-4 py-2 text-sm font-ui font-medium text-white bg-terracotta hover:bg-terracotta-light rounded-lg transition-colors">
+            className="px-4 py-2 text-sm font-ui font-medium text-white bg-terracotta hover:bg-terracotta-light  transition-colors">
             Modifica
           </button>
           <button onClick={() => router.push("/users")}
@@ -141,7 +141,7 @@ export default function UserDetailPage() {
       </div>
 
       {/* Card Permessi */}
-      <section className="bg-ivory-medium border border-ivory-dark rounded-lg p-5">
+      <section className="bg-ivory-medium border border-ivory-dark  p-5">
         <h2 className="text-sm font-heading font-semibold text-charcoal-dark mb-3">Permessi</h2>
         <div className="flex flex-wrap gap-2">
           <PermBadge active={user.canView} label="Può vedere" />
@@ -151,7 +151,7 @@ export default function UserDetailPage() {
       </section>
 
       {/* Card Strutture e Reparti */}
-      <section className="bg-ivory-medium border border-ivory-dark rounded-lg p-5">
+      <section className="bg-ivory-medium border border-ivory-dark  p-5">
         <h2 className="text-sm font-heading font-semibold text-charcoal-dark mb-3">Strutture e reparti</h2>
         <div className="space-y-2">
           {Array.from(propGroups.entries()).map(([propId, data]) => (
@@ -174,7 +174,7 @@ export default function UserDetailPage() {
       </section>
 
       {/* Card Tipi contenuto */}
-      <section className="bg-ivory-medium border border-ivory-dark rounded-lg p-5">
+      <section className="bg-ivory-medium border border-ivory-dark  p-5">
         <h2 className="text-sm font-heading font-semibold text-charcoal-dark mb-3">Tipi di contenuto gestibili</h2>
         {user.contentPermissions.length > 0 ? (
           <div className="flex flex-wrap gap-2">
@@ -190,7 +190,7 @@ export default function UserDetailPage() {
       </section>
 
       {/* Card Info */}
-      <section className="bg-ivory-medium border border-ivory-dark rounded-lg p-5">
+      <section className="bg-ivory-medium border border-ivory-dark  p-5">
         <h2 className="text-sm font-heading font-semibold text-charcoal-dark mb-3">Informazioni</h2>
         <div className="grid grid-cols-2 gap-3 text-sm font-ui">
           <div><span className="text-sage-light">Creato il:</span> <span className="text-charcoal">{new Date(user.createdAt).toLocaleDateString("it-IT")}</span></div>
@@ -201,7 +201,7 @@ export default function UserDetailPage() {
       {/* Disattiva */}
       <div className="pt-2">
         <button onClick={handleDeactivate} disabled={deactivating}
-          className={`px-4 py-2 text-sm font-ui font-medium rounded-lg border transition-colors disabled:opacity-50 ${
+          className={`px-4 py-2 text-sm font-ui font-medium  border transition-colors disabled:opacity-50 ${
             user.isActive
               ? "text-alert-red border-alert-red/30 hover:bg-alert-red/10"
               : "text-sage border-sage/30 hover:bg-sage/10"

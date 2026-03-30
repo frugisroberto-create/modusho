@@ -82,25 +82,25 @@ export default function LibraryPage() {
       <div className="flex items-center justify-between">
         <h1 className="text-xl font-bold text-gray-900">Libreria</h1>
         <button onClick={() => setShowUpload(!showUpload)}
-          className="px-4 py-2 text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 rounded-lg">
+          className="px-4 py-2 text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 ">
           Carica documento
         </button>
       </div>
 
       {/* Upload form */}
       {showUpload && (
-        <div className="bg-white rounded-lg border border-gray-200 p-5 space-y-3">
+        <div className="bg-white  border border-gray-200 p-5 space-y-3">
           <h3 className="text-sm font-semibold text-gray-900">Nuovo documento</h3>
           <div className="grid grid-cols-2 gap-3">
             <div>
               <label className="block text-xs text-gray-600 mb-1">Titolo</label>
               <input type="text" value={uploadTitle} onChange={(e) => setUploadTitle(e.target.value)}
-                className="w-full px-3 py-2 border rounded-lg text-sm" placeholder="Titolo del documento" />
+                className="w-full px-3 py-2 border  text-sm" placeholder="Titolo del documento" />
             </div>
             <div>
               <label className="block text-xs text-gray-600 mb-1">Tipo</label>
               <select value={uploadType} onChange={(e) => setUploadType(e.target.value)}
-                className="w-full px-3 py-2 border rounded-lg text-sm bg-white">
+                className="w-full px-3 py-2 border  text-sm bg-white">
                 <option value="BRAND_BOOK">Brand Book</option>
                 <option value="STANDARD_BOOK">Standard Book</option>
               </select>
@@ -108,7 +108,7 @@ export default function LibraryPage() {
             <div>
               <label className="block text-xs text-gray-600 mb-1">Struttura (opzionale)</label>
               <select value={uploadPropertyId} onChange={(e) => setUploadPropertyId(e.target.value)}
-                className="w-full px-3 py-2 border rounded-lg text-sm bg-white">
+                className="w-full px-3 py-2 border  text-sm bg-white">
                 <option value="">Tutto il gruppo</option>
                 {properties.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
               </select>
@@ -116,12 +116,12 @@ export default function LibraryPage() {
             <div>
               <label className="block text-xs text-gray-600 mb-1">File PDF</label>
               <input type="file" accept=".pdf" ref={fileRef}
-                className="w-full px-3 py-1.5 border rounded-lg text-sm" />
+                className="w-full px-3 py-1.5 border  text-sm" />
             </div>
           </div>
           <div className="flex gap-2">
             <button onClick={handleUpload} disabled={uploading || !uploadTitle.trim()}
-              className="px-4 py-2 text-sm text-white bg-blue-600 hover:bg-blue-700 rounded-lg disabled:opacity-50">
+              className="px-4 py-2 text-sm text-white bg-blue-600 hover:bg-blue-700  disabled:opacity-50">
               {uploading ? "Caricamento..." : "Carica"}
             </button>
             <button onClick={() => setShowUpload(false)} className="px-4 py-2 text-sm text-gray-500">Annulla</button>
@@ -132,13 +132,13 @@ export default function LibraryPage() {
       {/* Filters */}
       <div className="flex gap-3">
         <select value={typeFilter} onChange={(e) => setTypeFilter(e.target.value)}
-          className="text-sm border border-gray-300 rounded-md px-3 py-2 bg-white">
+          className="text-sm border border-gray-300  px-3 py-2 bg-white">
           <option value="">Tutti i tipi</option>
           <option value="BRAND_BOOK">Brand Book</option>
           <option value="STANDARD_BOOK">Standard Book</option>
         </select>
         <select value={propertyFilter} onChange={(e) => setPropertyFilter(e.target.value)}
-          className="text-sm border border-gray-300 rounded-md px-3 py-2 bg-white">
+          className="text-sm border border-gray-300  px-3 py-2 bg-white">
           <option value="">Tutte le strutture</option>
           {properties.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
         </select>
@@ -147,14 +147,14 @@ export default function LibraryPage() {
       {/* Documents grid */}
       {loading ? (
         <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-          {[1,2,3].map(i => <div key={i} className="h-32 bg-gray-200 rounded-lg animate-pulse" />)}
+          {[1,2,3].map(i => <div key={i} className="h-32 bg-gray-200  animate-pulse" />)}
         </div>
       ) : docs.length === 0 ? (
         <p className="text-gray-500 text-sm py-8 text-center">Nessun documento nella libreria</p>
       ) : (
         <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
           {docs.map((doc) => (
-            <div key={doc.id} className="bg-white rounded-lg border border-gray-200 p-4 flex flex-col gap-3">
+            <div key={doc.id} className="bg-white  border border-gray-200 p-4 flex flex-col gap-3">
               <div className="flex items-start justify-between">
                 <div>
                   <span className={`text-xs font-medium px-2 py-0.5 rounded ${
@@ -171,11 +171,11 @@ export default function LibraryPage() {
               </div>
               <div className="flex gap-2 mt-auto">
                 <button onClick={() => setPreviewUrl(doc.fileUrl)}
-                  className="flex-1 px-3 py-1.5 text-xs text-center text-blue-600 border border-blue-200 rounded-md hover:bg-blue-50">
+                  className="flex-1 px-3 py-1.5 text-xs text-center text-blue-600 border border-blue-200  hover:bg-blue-50">
                   Visualizza
                 </button>
                 <a href={doc.fileUrl} download
-                  className="flex-1 px-3 py-1.5 text-xs text-center text-gray-600 border border-gray-200 rounded-md hover:bg-gray-50">
+                  className="flex-1 px-3 py-1.5 text-xs text-center text-gray-600 border border-gray-200  hover:bg-gray-50">
                   Scarica
                 </a>
               </div>
@@ -189,9 +189,9 @@ export default function LibraryPage() {
           <p className="text-sm text-gray-500">Pagina {page} di {totalPages}</p>
           <div className="flex gap-2">
             <button onClick={() => setPage(p => Math.max(1, p - 1))} disabled={page <= 1}
-              className="px-3 py-1.5 text-sm border rounded-md hover:bg-gray-50 disabled:opacity-50">Precedente</button>
+              className="px-3 py-1.5 text-sm border  hover:bg-gray-50 disabled:opacity-50">Precedente</button>
             <button onClick={() => setPage(p => Math.min(totalPages, p + 1))} disabled={page >= totalPages}
-              className="px-3 py-1.5 text-sm border rounded-md hover:bg-gray-50 disabled:opacity-50">Successivo</button>
+              className="px-3 py-1.5 text-sm border  hover:bg-gray-50 disabled:opacity-50">Successivo</button>
           </div>
         </div>
       )}
@@ -199,7 +199,7 @@ export default function LibraryPage() {
       {/* PDF Preview Modal */}
       {previewUrl && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-6">
-          <div className="bg-white rounded-lg shadow-xl w-full max-w-4xl h-[80vh] flex flex-col">
+          <div className="bg-white  shadow-xl w-full max-w-4xl h-[80vh] flex flex-col">
             <div className="flex items-center justify-between px-4 py-3 border-b">
               <h3 className="text-sm font-semibold text-gray-900">Anteprima PDF</h3>
               <button onClick={() => setPreviewUrl(null)} className="text-sm text-gray-500 hover:text-gray-700">Chiudi</button>

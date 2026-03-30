@@ -12,12 +12,12 @@ interface SopItem {
 }
 
 const STATUS_COLORS: Record<string, string> = {
-  DRAFT: "bg-gray-100 text-gray-700",
-  REVIEW_HM: "bg-yellow-100 text-yellow-700",
-  REVIEW_ADMIN: "bg-orange-100 text-orange-700",
-  PUBLISHED: "bg-green-100 text-green-700",
-  RETURNED: "bg-red-100 text-red-700",
-  ARCHIVED: "bg-gray-200 text-gray-500",
+  DRAFT: "bg-ivory-medium text-charcoal/60",
+  REVIEW_HM: "bg-[#FFF3E0] text-[#E65100]",
+  REVIEW_ADMIN: "bg-[#FFF3E0] text-[#E65100]",
+  PUBLISHED: "bg-[#E8F5E9] text-[#2E7D32]",
+  RETURNED: "bg-[#FECACA] text-[#991B1B]",
+  ARCHIVED: "bg-ivory-dark text-charcoal/50",
 };
 
 export default function HooSopListPage() {
@@ -55,39 +55,44 @@ export default function HooSopListPage() {
         </Link>
       </div>
 
-      <select value={statusFilter} onChange={(e) => setStatusFilter(e.target.value)}
-        className="text-sm border border-gray-300 rounded-md px-3 py-2 bg-white">
-        <option value="">Tutti gli stati</option>
-        {["DRAFT", "REVIEW_HM", "REVIEW_ADMIN", "PUBLISHED", "RETURNED", "ARCHIVED"].map(s => (
-          <option key={s} value={s}>{s}</option>
-        ))}
-      </select>
+      <div>
+        <label className="block text-[11px] font-ui uppercase tracking-wider text-charcoal/45 mb-1">Stato</label>
+        <select value={statusFilter} onChange={(e) => setStatusFilter(e.target.value)}
+          className="text-sm border border-ivory-dark px-3 py-2 bg-white font-ui">
+          <option value="">Tutti gli stati</option>
+          {["DRAFT", "REVIEW_HM", "REVIEW_ADMIN", "PUBLISHED", "RETURNED", "ARCHIVED"].map(s => (
+            <option key={s} value={s}>{s}</option>
+          ))}
+        </select>
+      </div>
 
       {loading ? (
-        <div className="space-y-2">{[1,2,3].map(i => <div key={i} className="h-16 bg-gray-200 rounded-lg animate-pulse" />)}</div>
+        <div className="space-y-2">{[1,2,3].map(i => <div key={i} className="h-16 skeleton" />)}</div>
       ) : items.length === 0 ? (
-        <p className="text-gray-500 text-sm py-8 text-center">Nessuna SOP trovata</p>
+        <p className="text-charcoal/40 text-sm font-ui py-8 text-center">Nessuna SOP trovata</p>
       ) : (
-        <div className="space-y-2">
-          {items.map((item) => (
-            <div key={item.id} className="bg-white rounded-lg border border-gray-200 p-4 flex items-center justify-between">
-              <div>
+        <div className="bg-white border border-ivory-dark">
+          {items.map((item, index) => (
+            <div key={item.id} className={`p-4 flex items-center justify-between ${index < items.length - 1 ? "border-b border-ivory-medium" : ""}`}>
+              <div className="flex-1 min-w-0">
                 <div className="flex items-center gap-2 mb-1">
-                  <span className={`text-xs font-medium px-2 py-0.5 rounded ${STATUS_COLORS[item.status] || ""}`}>{item.status}</span>
-                  <span className="text-xs text-gray-500">{item.property.code}</span>
-                  {item.department && <span className="text-xs text-gray-500">{item.department.name}</span>}
+                  <span className={`text-[10px] font-ui font-bold uppercase tracking-wider px-2 py-0.5 ${STATUS_COLORS[item.status] || ""}`}>{item.status}</span>
+                  <span className="text-[11px] font-ui text-charcoal/45">{item.property.code}</span>
+                  {item.department && <span className="text-[11px] font-ui text-charcoal/45">{item.department.name}</span>}
                 </div>
-                <h3 className="font-medium text-gray-900 text-sm">{item.title}</h3>
-                <p className="text-xs text-gray-400 mt-1">{new Date(item.createdAt).toLocaleDateString("it-IT")}</p>
+                <Link href={`/hoo-sop/${item.id}`} className="font-ui font-medium text-charcoal-dark text-sm hover:text-terracotta transition-colors">
+                  {item.title}
+                </Link>
+                <p className="text-[11px] font-ui text-charcoal/35 mt-1">{new Date(item.createdAt).toLocaleDateString("it-IT")}</p>
               </div>
-              <div className="flex gap-2">
+              <div className="flex gap-2 shrink-0">
                 {(item.status !== "ARCHIVED" && (item.status !== "PUBLISHED" || canEditPublished)) && (
-                  <Link href={`/hoo-sop/${item.id}/edit`} className="px-3 py-1.5 text-xs font-ui text-terracotta hover:bg-terracotta/10 border border-terracotta/30">
+                  <Link href={`/hoo-sop/${item.id}/edit`} className="px-3 py-1.5 text-[11px] font-ui font-semibold uppercase tracking-wider text-terracotta border border-terracotta/30 hover:bg-terracotta hover:text-white transition-colors">
                     Modifica
                   </Link>
                 )}
                 {(item.status === "REVIEW_ADMIN" || item.status === "REVIEW_HM") && (
-                  <Link href={`/approvals/${item.id}`} className="px-3 py-1.5 text-xs font-ui text-sage hover:bg-sage/10 rounded-md border border-sage/30">
+                  <Link href={`/approvals/${item.id}`} className="px-3 py-1.5 text-[11px] font-ui font-semibold uppercase tracking-wider text-sage border border-sage/30 hover:bg-sage hover:text-white transition-colors">
                     Review
                   </Link>
                 )}
@@ -99,12 +104,12 @@ export default function HooSopListPage() {
 
       {totalPages > 1 && (
         <div className="flex items-center justify-between pt-2">
-          <p className="text-sm text-gray-500">Pagina {page} di {totalPages}</p>
+          <p className="text-sm text-charcoal/45">Pagina {page} di {totalPages}</p>
           <div className="flex gap-2">
             <button onClick={() => setPage(p => Math.max(1, p - 1))} disabled={page <= 1}
-              className="px-3 py-1.5 text-sm border rounded-md hover:bg-gray-50 disabled:opacity-50">Precedente</button>
+              className="px-3 py-1.5 text-sm border  hover:bg-ivory-dark disabled:opacity-50">Precedente</button>
             <button onClick={() => setPage(p => Math.min(totalPages, p + 1))} disabled={page >= totalPages}
-              className="px-3 py-1.5 text-sm border rounded-md hover:bg-gray-50 disabled:opacity-50">Successivo</button>
+              className="px-3 py-1.5 text-sm border  hover:bg-ivory-dark disabled:opacity-50">Successivo</button>
           </div>
         </div>
       )}

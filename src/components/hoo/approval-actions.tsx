@@ -38,16 +38,16 @@ export function ApprovalActions({ contentId, currentStatus }: ApprovalActionsPro
   };
 
   return (
-    <div className="bg-ivory-medium border border-ivory-dark rounded-lg p-5 space-y-4">
+    <div className="bg-ivory-medium border border-ivory-dark  p-5 space-y-4">
       <h3 className="text-sm font-heading font-semibold text-charcoal-dark">Azioni</h3>
       {!showReturn ? (
         <div className="flex gap-3">
           <button onClick={handleApprove} disabled={loading}
-            className="px-5 py-2.5 text-sm font-ui font-medium text-white bg-sage hover:bg-sage-dark rounded-lg disabled:opacity-50 transition-colors">
+            className="px-5 py-2.5 text-sm font-ui font-medium text-white bg-sage hover:bg-sage-dark  disabled:opacity-50 transition-colors">
             {loading ? "Approvazione..." : currentStatus === "REVIEW_HM" ? "Approva e inoltra" : "Approva e pubblica"}
           </button>
           <button onClick={() => setShowReturn(true)}
-            className="px-5 py-2.5 text-sm font-ui font-medium text-terracotta border border-terracotta/30 hover:bg-terracotta/10 rounded-lg transition-colors">
+            className="px-5 py-2.5 text-sm font-ui font-medium text-terracotta border border-terracotta/30 hover:bg-terracotta/10  transition-colors">
             Restituisci
           </button>
         </div>
@@ -58,11 +58,11 @@ export function ApprovalActions({ contentId, currentStatus }: ApprovalActionsPro
             className="w-full" />
           <div className="flex gap-2">
             <button onClick={handleReturn} disabled={loading || !note.trim()}
-              className="px-4 py-2 text-sm font-ui font-medium text-white bg-terracotta hover:bg-terracotta-light rounded-lg disabled:opacity-50 transition-colors">
+              className="px-4 py-2 text-sm font-ui font-medium text-white bg-terracotta hover:bg-terracotta-light  disabled:opacity-50 transition-colors">
               {loading ? "Invio..." : "Conferma restituzione"}
             </button>
             <button onClick={() => { setShowReturn(false); setNote(""); }}
-              className="px-4 py-2 text-sm font-ui text-charcoal hover:bg-ivory-dark rounded-lg transition-colors">
+              className="px-4 py-2 text-sm font-ui text-charcoal hover:bg-ivory-dark  transition-colors">
               Annulla
             </button>
           </div>

@@ -46,12 +46,12 @@ export default async function BrandBookDetailPage({ params }: Props) {
         </div>
       </div>
 
-      <article className="prose prose-gray max-w-none mb-8 bg-ivory-medium border border-ivory-dark rounded-lg p-6 font-body"
+      <article className="prose prose-gray max-w-none mb-8 bg-ivory-medium border border-ivory-dark  p-6 font-body"
         dangerouslySetInnerHTML={{ __html: content.body }} />
 
-      <div className="border-t border-ivory-dark pt-6">
+      {user.role === "OPERATOR" && (<div className="border-t border-ivory-dark pt-6">
         <AcknowledgeButton contentId={content.id} acknowledged={acknowledged} acknowledgedAt={acknowledgedAt} />
-      </div>
+      </div>)}
     </div>
   );
 }

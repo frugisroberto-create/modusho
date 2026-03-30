@@ -241,7 +241,7 @@ export function UserForm({ mode, userId, initialData }: UserFormProps) {
   return (
     <div className="max-w-2xl space-y-6">
       {/* SEZIONE 1 — Anagrafica */}
-      <section className="bg-ivory-medium border border-ivory-dark rounded-lg p-6 space-y-4">
+      <section className="bg-ivory-medium border border-ivory-dark  p-6 space-y-4">
         <h2 className="text-base font-heading font-semibold text-charcoal-dark">Anagrafica</h2>
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
           <div>
@@ -273,12 +273,12 @@ export function UserForm({ mode, userId, initialData }: UserFormProps) {
       </section>
 
       {/* SEZIONE 2 — Ruolo */}
-      <section className="bg-ivory-medium border border-ivory-dark rounded-lg p-6 space-y-4">
+      <section className="bg-ivory-medium border border-ivory-dark  p-6 space-y-4">
         <h2 className="text-base font-heading font-semibold text-charcoal-dark">Ruolo</h2>
         <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
           {(["OPERATOR", "HOD", "HOTEL_MANAGER", "ADMIN"] as RoleOption[]).map((r) => (
             <button key={r} type="button" onClick={() => handleRoleChange(r)}
-              className={`px-3 py-2.5 text-sm font-ui font-medium rounded-lg border transition-colors ${
+              className={`px-3 py-2.5 text-sm font-ui font-medium  border transition-colors ${
                 role === r
                   ? "bg-terracotta text-white border-terracotta"
                   : "bg-ivory text-charcoal border-ivory-dark hover:border-terracotta/40"
@@ -290,7 +290,7 @@ export function UserForm({ mode, userId, initialData }: UserFormProps) {
       </section>
 
       {/* SEZIONE 3 — Permessi base */}
-      <section className="bg-ivory-medium border border-ivory-dark rounded-lg p-6 space-y-4">
+      <section className="bg-ivory-medium border border-ivory-dark  p-6 space-y-4">
         <h2 className="text-base font-heading font-semibold text-charcoal-dark">Permessi</h2>
         <div className="space-y-3">
           <label className="flex items-center justify-between py-2">
@@ -339,7 +339,7 @@ export function UserForm({ mode, userId, initialData }: UserFormProps) {
       </section>
 
       {/* SEZIONE 4+5 — Strutture e Reparti */}
-      <section className="bg-ivory-medium border border-ivory-dark rounded-lg p-6 space-y-4">
+      <section className="bg-ivory-medium border border-ivory-dark  p-6 space-y-4">
         <h2 className="text-base font-heading font-semibold text-charcoal-dark">Strutture e reparti</h2>
         <div className="space-y-3">
           {properties.map((prop) => {
@@ -348,7 +348,7 @@ export function UserForm({ mode, userId, initialData }: UserFormProps) {
             const hasAllDepts = propAssignments.some(a => a.departmentId === null);
 
             return (
-              <div key={prop.id} className={`border rounded-lg overflow-hidden transition-colors ${isSelected ? "border-terracotta/40 bg-ivory" : "border-ivory-dark"}`}>
+              <div key={prop.id} className={`border  overflow-hidden transition-colors ${isSelected ? "border-terracotta/40 bg-ivory" : "border-ivory-dark"}`}>
                 <label className="flex items-center gap-3 px-4 py-3 cursor-pointer">
                   <input type="checkbox" checked={isSelected} onChange={() => toggleProperty(prop.id)}
                     className="w-4 h-4 rounded border-ivory-dark text-terracotta focus:ring-terracotta" />
@@ -390,7 +390,7 @@ export function UserForm({ mode, userId, initialData }: UserFormProps) {
       </section>
 
       {/* SEZIONE 6 — Tipi di contenuto gestibili */}
-      <section className="bg-ivory-medium border border-ivory-dark rounded-lg p-6 space-y-4">
+      <section className="bg-ivory-medium border border-ivory-dark  p-6 space-y-4">
         <h2 className="text-base font-heading font-semibold text-charcoal-dark">Tipi di contenuto gestibili</h2>
         {canEdit ? (
           <div className="space-y-2">
@@ -417,11 +417,11 @@ export function UserForm({ mode, userId, initialData }: UserFormProps) {
 
       <div className="flex gap-3 pt-2">
         <button onClick={handleSubmit} disabled={loading}
-          className="px-6 py-3 text-sm font-ui font-semibold text-white bg-terracotta hover:bg-terracotta-light rounded-lg disabled:opacity-50 transition-colors">
+          className="px-6 py-3 text-sm font-ui font-semibold text-white bg-terracotta hover:bg-terracotta-light  disabled:opacity-50 transition-colors">
           {loading ? "Salvataggio..." : mode === "create" ? "Crea utente" : "Salva modifiche"}
         </button>
         <button onClick={() => router.back()}
-          className="px-6 py-3 text-sm font-ui text-charcoal hover:bg-ivory-dark rounded-lg transition-colors">
+          className="px-6 py-3 text-sm font-ui text-charcoal hover:bg-ivory-dark  transition-colors">
           Annulla
         </button>
       </div>

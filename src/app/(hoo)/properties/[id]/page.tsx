@@ -85,7 +85,7 @@ export default function PropertyDetailPage() {
         </div>
         <div className="flex gap-2">
           <Link href={`/properties/${id}/edit`}
-            className="px-4 py-2 text-sm font-ui font-medium text-white bg-terracotta hover:bg-terracotta-light rounded-lg transition-colors">
+            className="px-4 py-2 text-sm font-ui font-medium text-white bg-terracotta hover:bg-terracotta-light  transition-colors">
             Modifica
           </Link>
           <button onClick={() => router.push("/properties")}
@@ -94,11 +94,11 @@ export default function PropertyDetailPage() {
       </div>
 
       {/* Reparti */}
-      <section className="bg-ivory-medium border border-ivory-dark rounded-lg p-5">
+      <section className="bg-ivory-medium border border-ivory-dark  p-5">
         <h2 className="text-base font-heading font-semibold text-charcoal-dark mb-4">Reparti</h2>
         <div className="space-y-2">
           {property.departments.map((d) => (
-            <div key={d.id} className="flex items-center justify-between py-2.5 px-3 bg-ivory rounded-lg">
+            <div key={d.id} className="flex items-center justify-between py-2.5 px-3 bg-ivory ">
               <div className="flex items-center gap-3">
                 <span className="font-ui font-medium text-charcoal-dark text-sm">{d.name}</span>
                 <span className="text-xs font-ui text-sage-light">{d.code}</span>
@@ -119,14 +119,14 @@ export default function PropertyDetailPage() {
           <input type="text" value={newDeptName} onChange={(e) => setNewDeptName(e.target.value)}
             placeholder="Nuovo reparto..." className="flex-1 text-sm" />
           <button onClick={handleAddDept} disabled={addingDept || !newDeptName.trim()}
-            className="px-3 py-2 text-sm font-ui font-medium text-white bg-sage hover:bg-sage-dark rounded-lg disabled:opacity-50 transition-colors">
+            className="px-3 py-2 text-sm font-ui font-medium text-white bg-sage hover:bg-sage-dark  disabled:opacity-50 transition-colors">
             Aggiungi
           </button>
         </div>
       </section>
 
       {/* Operatori */}
-      <section className="bg-ivory-medium border border-ivory-dark rounded-lg p-5">
+      <section className="bg-ivory-medium border border-ivory-dark  p-5">
         <h2 className="text-base font-heading font-semibold text-charcoal-dark mb-4">Utenti assegnati</h2>
         {property.operators.length === 0 ? (
           <p className="text-sm font-ui text-sage-light">Nessun utente assegnato</p>
@@ -136,7 +136,7 @@ export default function PropertyDetailPage() {
               const badge = ROLE_BADGE[op.role] || { label: op.role, cls: "bg-ivory-dark text-charcoal" };
               const deptName = op.propertyAssignments[0]?.department?.name;
               return (
-                <div key={op.id} className="flex items-center justify-between py-2 px-3 bg-ivory rounded-lg">
+                <div key={op.id} className="flex items-center justify-between py-2 px-3 bg-ivory ">
                   <div className="flex items-center gap-2">
                     <span className={`text-[10px] font-ui font-medium px-1.5 py-0.5 rounded ${badge.cls}`}>{badge.label}</span>
                     <Link href={`/users/${op.id}`} className="text-sm font-ui font-medium text-charcoal-dark hover:text-terracotta transition-colors">

@@ -42,7 +42,7 @@ export default function DeletedContentPage() {
       ) : items.length === 0 ? (
         <p className="text-sage-light font-ui text-sm text-center py-10">Nessun contenuto eliminato</p>
       ) : (
-        <div className="bg-ivory-medium border border-ivory-dark rounded-lg overflow-hidden">
+        <div className="bg-ivory-medium border border-ivory-dark  overflow-hidden">
           <table className="w-full text-sm font-ui">
             <thead>
               <tr className="bg-ivory-dark text-left text-xs text-sage-light uppercase tracking-wide">
@@ -66,7 +66,7 @@ export default function DeletedContentPage() {
                   <td className="px-4 py-3 text-sage-light">{item.deletedAt ? new Date(item.deletedAt).toLocaleDateString("it-IT") : "—"}</td>
                   <td className="px-4 py-3">
                     <button onClick={() => handleRestore(item.id)} disabled={restoring === item.id}
-                      className="px-3 py-1 text-xs font-ui font-medium text-sage hover:bg-sage/10 rounded-md border border-sage/30 disabled:opacity-50">
+                      className="px-3 py-1 text-xs font-ui font-medium text-sage hover:bg-sage/10  border border-sage/30 disabled:opacity-50">
                       {restoring === item.id ? "..." : "Ripristina"}
                     </button>
                   </td>

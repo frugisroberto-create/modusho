@@ -80,7 +80,7 @@ export default function UsersPage() {
     <div className="space-y-5">
       <div className="flex items-center justify-between">
         <h1 className="text-xl font-heading font-semibold text-charcoal-dark">Utenti</h1>
-        <Link href="/users/new" className="px-4 py-2 text-sm font-ui font-medium text-white bg-terracotta hover:bg-terracotta-light rounded-lg transition-colors">
+        <Link href="/users/new" className="px-4 py-2 text-sm font-ui font-medium text-white bg-terracotta hover:bg-terracotta-light  transition-colors">
           Nuovo utente
         </Link>
       </div>
@@ -105,7 +105,7 @@ export default function UsersPage() {
       ) : users.length === 0 ? (
         <p className="text-sage-light font-ui text-sm text-center py-10">Nessun utente trovato</p>
       ) : (
-        <div className="bg-ivory-medium border border-ivory-dark rounded-lg overflow-x-auto">
+        <div className="bg-ivory-medium border border-ivory-dark  overflow-x-auto">
           <table className="w-full text-sm font-ui">
             <thead>
               <tr className="bg-ivory-dark text-left text-xs text-sage-light uppercase tracking-wide">
@@ -174,9 +174,9 @@ export default function UsersPage() {
           <p className="text-sm font-ui text-sage-light">Pagina {page} di {totalPages} ({total} utenti)</p>
           <div className="flex gap-2">
             <button onClick={() => setPage(p => Math.max(1, p - 1))} disabled={page <= 1}
-              className="px-3 py-1.5 text-sm font-ui border border-ivory-dark rounded-md hover:bg-ivory-dark disabled:opacity-50 transition-colors">Precedente</button>
+              className="px-3 py-1.5 text-sm font-ui border border-ivory-dark  hover:bg-ivory-dark disabled:opacity-50 transition-colors">Precedente</button>
             <button onClick={() => setPage(p => Math.min(totalPages, p + 1))} disabled={page >= totalPages}
-              className="px-3 py-1.5 text-sm font-ui border border-ivory-dark rounded-md hover:bg-ivory-dark disabled:opacity-50 transition-colors">Successivo</button>
+              className="px-3 py-1.5 text-sm font-ui border border-ivory-dark  hover:bg-ivory-dark disabled:opacity-50 transition-colors">Successivo</button>
           </div>
         </div>
       )}

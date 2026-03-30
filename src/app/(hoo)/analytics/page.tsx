@@ -119,17 +119,17 @@ export default function DashboardPage() {
   return (
     <div className="space-y-6">
       {/* SEZIONE 1 — Header sintetico */}
-      <div className="flex flex-wrap items-center gap-4 bg-ivory-medium border border-ivory-dark rounded-lg p-4">
-        <div className="flex gap-1 bg-ivory border border-ivory-dark rounded-lg p-0.5">
+      <div className="flex flex-wrap items-center gap-4 bg-ivory-medium border border-ivory-dark  p-4">
+        <div className="flex gap-1 bg-ivory border border-ivory-dark  p-0.5">
           {(["week", "month", "quarter"] as PeriodPreset[]).map((p) => (
             <button key={p} onClick={() => setPeriod(p)}
-              className={`px-3 py-1.5 text-sm font-ui rounded-md transition-colors ${period === p ? "bg-charcoal-dark text-white" : "text-charcoal hover:bg-ivory-dark"}`}
+              className={`px-3 py-1.5 text-sm font-ui  transition-colors ${period === p ? "bg-charcoal-dark text-white" : "text-charcoal hover:bg-ivory-dark"}`}
             >{periodLabels[p]}</button>
           ))}
         </div>
         {data.header.properties.length > 1 && (
           <select value={propertyFilter} onChange={(e) => setPropertyFilter(e.target.value)}
-            className="text-sm font-ui border-ivory-dark rounded-md px-3 py-1.5 bg-ivory">
+            className="text-sm font-ui border-ivory-dark  px-3 py-1.5 bg-ivory">
             <option value="">Tutte le strutture</option>
             {data.header.properties.map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}
           </select>
@@ -149,7 +149,7 @@ export default function DashboardPage() {
       {/* SEZIONE 2 — Coda approvazioni */}
       <section>
         <h2 className="text-xl font-heading font-semibold text-charcoal-dark mb-4">Approvazioni in attesa</h2>
-        <div className="bg-ivory-medium border border-ivory-dark rounded-lg overflow-hidden">
+        <div className="bg-ivory-medium border border-ivory-dark  overflow-hidden">
           {data.approvalQueue.length === 0 ? (
             <div className="px-5 py-10 text-center text-sage-light font-ui text-sm">
               Nessuna SOP in attesa di approvazione
@@ -205,7 +205,7 @@ export default function DashboardPage() {
               const href = alert.title ? `/approvals/${alert.id}` : `/properties/${alert.id}`;
               return (
                 <Link key={`${alert.id}-${i}`} href={href}
-                  className={`flex items-center justify-between px-5 py-3.5 bg-ivory-medium border border-ivory-dark border-l-4 ${borderColor} rounded-lg hover:bg-ivory-dark/40 transition-colors`}>
+                  className={`flex items-center justify-between px-5 py-3.5 bg-ivory-medium border border-ivory-dark border-l-4 ${borderColor}  hover:bg-ivory-dark/40 transition-colors`}>
                   <div className="flex items-center gap-3">
                     <svg className={`w-4 h-4 shrink-0 ${alert.severity === "critical" ? "text-alert-red" : alert.severity === "warning" ? "text-alert-yellow" : "text-sage-light"}`}
                       fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -238,7 +238,7 @@ export default function DashboardPage() {
             { label: "Tempo medio workflow", value: data.kpi.avgWorkflowDays != null ? `${data.kpi.avgWorkflowDays}g` : "n/d", highlight: data.kpi.avgWorkflowDays != null && data.kpi.avgWorkflowDays > 14 },
             { label: "Tasso presa visione", value: data.kpi.ackRate != null ? `${data.kpi.ackRate}%` : "n/d" },
           ].map((kpi) => (
-            <div key={kpi.label} className="bg-ivory-medium border border-ivory-dark rounded-lg p-5">
+            <div key={kpi.label} className="bg-ivory-medium border border-ivory-dark  p-5">
               <p className="text-[13px] font-ui text-sage-light mb-1">{kpi.label}</p>
               <p className={`text-[32px] font-heading font-semibold leading-tight ${kpi.highlight ? "text-terracotta" : "text-charcoal-dark"}`}>
                 {kpi.value}
@@ -247,7 +247,7 @@ export default function DashboardPage() {
           ))}
         </div>
         {Object.keys(data.kpi.avgTimePerStatus).length > 0 && (
-          <div className="bg-ivory-medium border border-ivory-dark rounded-lg p-5 mt-3">
+          <div className="bg-ivory-medium border border-ivory-dark  p-5 mt-3">
             <p className="text-[13px] font-ui text-sage-light mb-2">Tempo medio per stato (giorni)</p>
             <div className="flex gap-6">
               {Object.entries(data.kpi.avgTimePerStatus).map(([status, days]) => (
@@ -264,7 +264,7 @@ export default function DashboardPage() {
       {/* SEZIONE 5 — Confronto per hotel */}
       <section>
         <h2 className="text-xl font-heading font-semibold text-charcoal-dark mb-4">Confronto per hotel</h2>
-        <div className="bg-ivory-medium border border-ivory-dark rounded-lg overflow-hidden">
+        <div className="bg-ivory-medium border border-ivory-dark  overflow-hidden">
           <div className="overflow-x-auto">
             <table className="w-full text-sm font-ui">
               <thead><tr className="bg-ivory-dark text-left text-xs text-sage-light uppercase tracking-wide">
@@ -305,7 +305,7 @@ export default function DashboardPage() {
       {/* SEZIONE 6 — Confronto per reparto */}
       <section>
         <h2 className="text-xl font-heading font-semibold text-charcoal-dark mb-4">Confronto per reparto</h2>
-        <div className="bg-ivory-medium border border-ivory-dark rounded-lg overflow-hidden divide-y divide-ivory-dark">
+        <div className="bg-ivory-medium border border-ivory-dark  overflow-hidden divide-y divide-ivory-dark">
           {data.departmentComparison.map((prop) => (
             <div key={prop.propertyId}>
               <button
@@ -353,7 +353,7 @@ export default function DashboardPage() {
       {/* Modale restituzione */}
       {returnModal && (
         <div className="fixed inset-0 bg-charcoal-dark/60 flex items-center justify-center z-50 p-4">
-          <div className="bg-ivory rounded-xl w-full max-w-md p-6 border border-ivory-dark">
+          <div className="bg-ivory  w-full max-w-md p-6 border border-ivory-dark">
             <h3 className="text-lg font-heading font-semibold text-charcoal-dark mb-4">Restituisci SOP</h3>
             <textarea
               value={returnNote}
@@ -363,11 +363,11 @@ export default function DashboardPage() {
               className="w-full mb-4"
             />
             <div className="flex justify-end gap-2">
-              <button onClick={() => setReturnModal(null)} className="px-4 py-2 text-sm font-ui text-charcoal hover:bg-ivory-dark rounded-lg transition-colors">
+              <button onClick={() => setReturnModal(null)} className="px-4 py-2 text-sm font-ui text-charcoal hover:bg-ivory-dark  transition-colors">
                 Annulla
               </button>
               <button onClick={() => handleReturn(returnModal)} disabled={!returnNote.trim() || actionLoading === returnModal}
-                className="px-4 py-2 text-sm font-ui font-medium text-white bg-terracotta hover:bg-terracotta-light rounded-lg disabled:opacity-50 transition-colors">
+                className="px-4 py-2 text-sm font-ui font-medium text-white bg-terracotta hover:bg-terracotta-light  disabled:opacity-50 transition-colors">
                 {actionLoading === returnModal ? "Invio..." : "Restituisci"}
               </button>
             </div>

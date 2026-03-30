@@ -57,7 +57,7 @@ export function HooLatestByType() {
             })),
           },
           {
-            title: "Ultimi Documenti", linkAll: "/hoo-sop", linkAllLabel: "Vedi tutti",
+            title: "Ultimi Documenti", linkAll: "/library", linkAllLabel: "Vedi tutti",
             items: docData.map(d => ({
               id: d.id, title: d.title, href: `/approvals/${d.id}`, code: null,
               meta: [d.property.code, fmtDate(d.publishedAt)].filter(Boolean).join(" · "),
