@@ -1,0 +1,25 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 400 500" width="400" height="500">
+  <!-- ModusHO Logo v4: Doppio cerchio concentrico -->
+  <!-- Concept: Cerchio esterno = HO Collection, cerchio interno = ModusHO (governance nel cuore del brand) -->
+
+  <!-- Cerchio esterno (come HO) -->
+  <circle cx="200" cy="175" r="100" fill="none" stroke="#141413" stroke-width="18" stroke-linecap="round"/>
+
+  <!-- Cerchio interno più piccolo -->
+  <circle cx="200" cy="175" r="50" fill="none" stroke="#141413" stroke-width="10" stroke-linecap="round"/>
+
+  <!-- Punto centrale — fulcro della governance -->
+  <circle cx="200" cy="175" r="8" fill="#141413"/>
+
+  <!-- Linea brush sotto -->
+  <path d="M 125 310 Q 200 316, 275 310"
+        fill="none" stroke="#141413" stroke-width="12" stroke-linecap="round"/>
+
+  <!-- Testo ModusHO -->
+  <text x="200" y="400" text-anchor="middle" font-family="Georgia, 'Playfair Display', serif"
+        font-size="42" letter-spacing="12" fill="#141413" font-weight="400">MODUSHO</text>
+
+  <!-- Sottotitolo -->
+  <text x="200" y="445" text-anchor="middle" font-family="'Inter', 'Helvetica Neue', sans-serif"
+        font-size="16" letter-spacing="6" fill="#141413" font-weight="300">GOVERNANCE OPERATIVA</text>
+</svg>

@@ -2,18 +2,13 @@
 
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
+import { useSession } from "next-auth/react";
 import { DepartmentTargetSelector } from "@/components/shared/department-target-selector";
 import { AttachmentUploader } from "@/components/shared/attachment-uploader";
 
 interface Property {
   id: string; name: string; code: string;
   departments: { id: string; name: string; code: string }[];
-}
-
-interface SubmitActions {
-  canSendToReview: boolean;
-  canPublishDirectly: boolean;
-  reviewLabel: string;
 }
 
 interface SopFormProps {
@@ -24,41 +19,80 @@ interface SopFormProps {
   userDepartmentId?: string | null;
 }
 
-export function SopForm({ mode, contentId, initialData, userRole = "ADMIN", userDepartmentId }: SopFormProps) {
+export function SopForm({ mode, contentId, initialData, userRole, userDepartmentId }: SopFormProps) {
   const router = useRouter();
+  const { data: session } = useSession();
+  const effectiveRole = userRole || session?.user?.role || "ADMIN";
+
   const [title, setTitle] = useState(initialData?.title || "");
   const [body, setBody] = useState(initialData?.body || "");
   const [propertyId, setPropertyId] = useState(initialData?.propertyId || "");
+  const [departmentId, setDepartmentId] = useState(initialData?.departmentId || "");
   const [targetDepartmentIds, setTargetDepartmentIds] = useState<string[]>(
     initialData?.departmentId ? [initialData.departmentId] : []
   );
   const [targetAllDepartments, setTargetAllDepartments] = useState(!initialData?.departmentId);
   const [properties, setProperties] = useState<Property[]>([]);
-  const [submitActions, setSubmitActions] = useState<SubmitActions | null>(null);
   const [loading, setLoading] = useState(false);
+  const [error, setError] = useState("");
 
+  // RACI: coinvolgere HOD?
+  const canInvolveHod = effectiveRole === "HOTEL_MANAGER" || effectiveRole === "ADMIN" || effectiveRole === "SUPER_ADMIN";
+  const [involveHod, setInvolveHod] = useState(false);
+  const [hodUserId, setHodUserId] = useState("");
+  const [hodUsers, setHodUsers] = useState<{ id: string; name: string }[]>([]);
+
+  // Fetch properties
   useEffect(() => {
-    async function fetchData() {
-      const [propRes, actRes] = await Promise.all([
-        fetch("/api/properties"),
-        fetch("/api/content/submit-actions"),
-      ]);
-      if (propRes.ok) {
-        const json = await propRes.json();
+    async function fetchProps() {
+      const res = await fetch("/api/properties");
+      if (res.ok) {
+        const json = await res.json();
         setProperties(json.data);
-        if (!propertyId && json.data.length > 0) setPropertyId(json.data[0].id);
+        if (!propertyId && json.data.length > 0) {
+          const firstProp = json.data[0];
+          setPropertyId(firstProp.id);
+          // Auto-select department if only one
+          if (firstProp.departments?.length === 1) {
+            setDepartmentId(firstProp.departments[0].id);
+          }
+        }
       }
-      if (actRes.ok) {
-        const json = await actRes.json();
-        setSubmitActions(json.data);
-      }
+    }
+    fetchProps();
+  }, []);
 
-      // In edit mode, load existing targets
-      if (mode === "edit" && contentId) {
-        const targetRes = await fetch(`/api/content/${contentId}`);
-        if (targetRes.ok) {
-          const targetJson = await targetRes.json();
-          const targets = targetJson.data.targetAudience || [];
+  // Fetch HOD users for the selected property
+  const [hodLoading, setHodLoading] = useState(false);
+  useEffect(() => {
+    if (!canInvolveHod || !propertyId) {
+      setHodUsers([]);
+      return;
+    }
+    setHodLoading(true);
+    async function fetchHods() {
+      try {
+        const res = await fetch(`/api/users?role=HOD&propertyId=${propertyId}&pageSize=50`);
+        if (res.ok) {
+          const json = await res.json();
+          const users = json.data || [];
+          setHodUsers(users.map((u: { id: string; name: string }) => ({ id: u.id, name: u.name })));
+        }
+      } finally {
+        setHodLoading(false);
+      }
+    }
+    fetchHods();
+  }, [canInvolveHod, propertyId]);
+
+  // In edit mode, load existing targets
+  useEffect(() => {
+    if (mode === "edit" && contentId) {
+      async function loadTargets() {
+        const res = await fetch(`/api/content/${contentId}`);
+        if (res.ok) {
+          const json = await res.json();
+          const targets = json.data.targetAudience || [];
           const hasRoleTarget = targets.some((t: { targetType: string }) => t.targetType === "ROLE");
           if (hasRoleTarget) {
             setTargetAllDepartments(true);
@@ -72,61 +106,168 @@ export function SopForm({ mode, contentId, initialData, userRole = "ADMIN", user
           }
         }
       }
+      loadTargets();
     }
-    fetchData();
-  }, [propertyId, mode, contentId]);
+  }, [mode, contentId]);
 
-  const handleSubmit = async (action: "draft" | "sendToReview" | "publishDirectly") => {
-    if (!title.trim() || !body.trim() || !propertyId) return;
-    if (!targetAllDepartments && targetDepartmentIds.length === 0) return;
+  const selectedProperty = properties.find(p => p.id === propertyId);
+  const departments = selectedProperty?.departments || [];
+
+  const handleSubmit = async () => {
+    setError("");
+    if (!title.trim() || !body.trim() || !propertyId) {
+      setError("Titolo, contenuto e struttura sono obbligatori");
+      return;
+    }
+    if (!departmentId) {
+      setError("Seleziona il reparto della SOP");
+      return;
+    }
+    if (!targetAllDepartments && targetDepartmentIds.length === 0) {
+      setError("Seleziona almeno un reparto destinatario");
+      return;
+    }
+    if (involveHod && !hodUserId) {
+      setError("Seleziona l'HOD da coinvolgere");
+      return;
+    }
+
     setLoading(true);
     try {
-      const payload = {
-        title, body, propertyId,
-        departmentId: targetAllDepartments ? null : (targetDepartmentIds[0] || null),
-        targetDepartmentIds: targetAllDepartments ? [] : targetDepartmentIds,
-        targetAllDepartments,
-        ...(mode === "create" ? { type: "SOP" } : {}),
-        sendToReview: action === "sendToReview",
-        publishDirectly: action === "publishDirectly",
-      };
-      const url = mode === "create" ? "/api/content" : `/api/content/${contentId}`;
-      const method = mode === "create" ? "POST" : "PUT";
-      const res = await fetch(url, {
-        method,
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(payload),
-      });
-      if (res.ok) {
-        router.push("/hoo-sop");
-        router.refresh();
+      if (mode === "create") {
+        // Usa il nuovo workflow RACI
+        const payload = {
+          title, body, propertyId, departmentId,
+          involveHod,
+          ...(involveHod && hodUserId ? { hodUserId } : {}),
+          targetDepartmentIds: targetAllDepartments ? [] : targetDepartmentIds,
+          targetAllDepartments,
+        };
+        const res = await fetch("/api/sop-workflow", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(payload),
+        });
+        if (res.ok) {
+          const json = await res.json();
+          // Redirect al workflow editor dove note/allegati/versioni sono disponibili
+          router.push(`/sop-workflow/${json.data.id}`);
+          router.refresh();
+        } else {
+          const json = await res.json();
+          setError(json.error || "Errore nella creazione");
+        }
+      } else {
+        // Edit mode: aggiorna via content API esistente
+        const payload = {
+          title, body,
+          departmentId: departmentId || null,
+          targetDepartmentIds: targetAllDepartments ? [] : targetDepartmentIds,
+          targetAllDepartments,
+        };
+        const res = await fetch(`/api/content/${contentId}`, {
+          method: "PUT",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(payload),
+        });
+        if (res.ok) {
+          router.push("/hoo-sop");
+          router.refresh();
+        } else {
+          const json = await res.json();
+          setError(json.error || "Errore nel salvataggio");
+        }
       }
     } finally { setLoading(false); }
   };
 
-  const isValid = title.trim() && body.trim() && propertyId && (targetAllDepartments || targetDepartmentIds.length > 0);
+  const isValid = title.trim() && body.trim() && propertyId && departmentId && (targetAllDepartments || targetDepartmentIds.length > 0);
 
   return (
     <div className="max-w-3xl space-y-6">
+      {/* Titolo */}
       <div>
         <label className="block text-sm font-ui font-medium text-charcoal mb-1.5">Titolo</label>
         <input type="text" value={title} onChange={(e) => setTitle(e.target.value)}
           className="w-full" placeholder="Titolo della SOP" />
       </div>
 
+      {/* Struttura */}
       <div>
         <label className="block text-sm font-ui font-medium text-charcoal mb-1.5">Struttura</label>
         <select value={propertyId}
-          onChange={(e) => { setPropertyId(e.target.value); setTargetDepartmentIds([]); setTargetAllDepartments(false); }}
+          onChange={(e) => {
+            const newPropId = e.target.value;
+            setPropertyId(newPropId);
+            setTargetDepartmentIds([]);
+            setTargetAllDepartments(false);
+            setInvolveHod(false);
+            setHodUserId("");
+            // Auto-select department if only one
+            const prop = properties.find(p => p.id === newPropId);
+            if (prop?.departments?.length === 1) {
+              setDepartmentId(prop.departments[0].id);
+            } else {
+              setDepartmentId("");
+            }
+          }}
           disabled={mode === "edit"} className="w-full disabled:opacity-50">
+          <option value="">Seleziona struttura</option>
           {properties.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
         </select>
       </div>
 
+      {/* Reparto della SOP */}
+      {propertyId && (
+        <div>
+          <label className="block text-sm font-ui font-medium text-charcoal mb-1.5">Reparto</label>
+          <p className="text-xs font-ui text-charcoal/45 mb-2">Il reparto a cui appartiene la SOP</p>
+          <select value={departmentId} onChange={(e) => setDepartmentId(e.target.value)}
+            disabled={mode === "edit"} className="w-full disabled:opacity-50">
+            <option value="">Seleziona reparto</option>
+            {departments.map(d => <option key={d.id} value={d.id}>{d.name} ({d.code})</option>)}
+          </select>
+        </div>
+      )}
+
+      {/* Coinvolgimento HOD (solo HM/ADMIN/SUPER_ADMIN in creazione) */}
+      {mode === "create" && canInvolveHod && propertyId && (
+        <div className="bg-ivory border border-ivory-dark p-4 space-y-3">
+          <label className="flex items-center gap-2 cursor-pointer">
+            <input type="checkbox" checked={involveHod}
+              disabled={hodUsers.length === 0 && !hodLoading}
+              onChange={(e) => { setInvolveHod(e.target.checked); if (!e.target.checked) setHodUserId(""); }}
+              className="w-4 h-4 rounded border-ivory-dark text-terracotta focus:ring-terracotta disabled:opacity-40" />
+            <span className="text-sm font-ui font-medium text-charcoal">Coinvolgi HOD nella redazione</span>
+          </label>
+          {hodLoading ? (
+            <p className="text-xs font-ui text-charcoal/40">Caricamento HOD...</p>
+          ) : hodUsers.length === 0 ? (
+            <p className="text-xs font-ui text-charcoal/40">Nessun HOD assegnato a questa struttura</p>
+          ) : (
+            <p className="text-xs font-ui text-charcoal/45">
+              {involveHod
+                ? "L'HOD sarà il Responsabile (R) della bozza, tu sarai Consultato (C)"
+                : effectiveRole === "HOTEL_MANAGER"
+                  ? "Sarai tu il Responsabile (R) della bozza"
+                  : "L'Hotel Manager sarà il Responsabile (R) della bozza"
+              }
+            </p>
+          )}
+          {involveHod && hodUsers.length > 0 && (
+            <select value={hodUserId} onChange={(e) => setHodUserId(e.target.value)} className="w-full">
+              <option value="">Seleziona HOD</option>
+              {hodUsers.map(u => <option key={u.id} value={u.id}>{u.name}</option>)}
+            </select>
+          )}
+        </div>
+      )}
+
+      {/* Destinatari */}
       {propertyId && (
         <DepartmentTargetSelector
           propertyId={propertyId}
-          userRole={userRole}
+          userRole={effectiveRole}
           userDepartmentId={userDepartmentId}
           selectedDepartmentIds={targetDepartmentIds}
           onChange={(ids, all) => {
@@ -136,36 +277,45 @@ export function SopForm({ mode, contentId, initialData, userRole = "ADMIN", user
         />
       )}
 
+      {/* Contenuto */}
       <div>
         <label className="block text-sm font-ui font-medium text-charcoal mb-1.5">Contenuto</label>
         <textarea value={body} onChange={(e) => setBody(e.target.value)} rows={15}
           className="w-full font-mono text-sm" placeholder="Contenuto della SOP (HTML o testo)" />
       </div>
 
+      {/* Allegati (solo in edit, per create si gestiscono nell'editor workflow) */}
       {mode === "edit" && contentId && (
         <AttachmentUploader contentId={contentId} canEdit={true} />
       )}
 
+      {/* Nota: dopo il salvataggio si va nell'editor completo */}
+      {mode === "create" && (
+        <div className="px-4 py-3 bg-ivory border border-ivory-dark text-xs font-ui text-charcoal/50">
+          Dopo il salvataggio verrai portato nell&apos;editor della bozza, dove potrai aggiungere note, allegati e gestire il workflow completo.
+        </div>
+      )}
+
+      {/* Errore */}
+      {error && <p className="text-sm font-ui text-alert-red">{error}</p>}
+
+      {/* Validazione inline */}
+      {!isValid && (title || body) && (
+        <div className="text-xs font-ui text-charcoal/40 space-y-0.5">
+          {!title.trim() && <p>— Inserisci un titolo</p>}
+          {!body.trim() && <p>— Inserisci il contenuto</p>}
+          {!propertyId && <p>— Seleziona una struttura</p>}
+          {!departmentId && <p>— Seleziona il reparto della SOP</p>}
+          {!targetAllDepartments && targetDepartmentIds.length === 0 && <p>— Seleziona almeno un reparto destinatario</p>}
+        </div>
+      )}
+
+      {/* Azioni */}
       <div className="flex gap-3 pt-2">
-        <button onClick={() => handleSubmit("draft")} disabled={loading || !isValid}
-          className="btn-outline disabled:opacity-50">
-          {loading ? "..." : "Salva come bozza"}
+        <button onClick={handleSubmit} disabled={loading || !isValid}
+          className="btn-primary disabled:opacity-50">
+          {loading ? "Salvataggio..." : mode === "create" ? "Crea bozza" : "Salva modifiche"}
         </button>
-
-        {submitActions?.canSendToReview && (
-          <button onClick={() => handleSubmit("sendToReview")} disabled={loading || !isValid}
-            className="btn-primary disabled:opacity-50">
-            {loading ? "..." : submitActions.reviewLabel}
-          </button>
-        )}
-
-        {submitActions?.canPublishDirectly && (
-          <button onClick={() => handleSubmit("publishDirectly")} disabled={loading || !isValid}
-            className="px-7 py-3 text-[12.6px] font-ui font-semibold uppercase tracking-wider text-white bg-sage hover:bg-sage-dark disabled:opacity-50 transition-colors">
-            {loading ? "..." : "Pubblica"}
-          </button>
-        )}
-
         <button onClick={() => router.back()}
           className="px-7 py-3 text-[12.6px] font-ui text-charcoal/60 hover:text-charcoal transition-colors">
           Annulla

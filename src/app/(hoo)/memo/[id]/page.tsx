@@ -3,6 +3,7 @@
 import { useState, useEffect } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { AttachmentUploader } from "@/components/shared/attachment-uploader";
+import { ExportPdfButton } from "@/components/shared/export-pdf-button";
 
 export default function EditMemoPage() {
   const { id } = useParams<{ id: string }>();
@@ -55,17 +56,9 @@ export default function EditMemoPage() {
           <label className="block text-sm font-ui font-medium text-charcoal mb-1.5">Contenuto</label>
           <textarea value={body} onChange={(e) => setBody(e.target.value)} rows={6} className="w-full" />
         </div>
-        <div className="grid grid-cols-2 gap-4">
-          <div>
-            <label className="block text-sm font-ui font-medium text-charcoal mb-1.5">Scadenza</label>
-            <input type="date" value={expiresAt} onChange={(e) => setExpiresAt(e.target.value)} className="w-full" />
-          </div>
-          <div className="flex items-end pb-1">
-            <label className="flex items-center gap-2 text-sm font-ui text-charcoal">
-              <input type="checkbox" checked={isPinned} onChange={(e) => setIsPinned(e.target.checked)} className="accent-terracotta" />
-              In evidenza (pin)
-            </label>
-          </div>
+        <div>
+          <label className="block text-sm font-ui font-medium text-charcoal mb-1.5">Scadenza</label>
+          <input type="date" value={expiresAt} onChange={(e) => setExpiresAt(e.target.value)} className="w-full max-w-xs" />
         </div>
       </div>
 
@@ -76,6 +69,7 @@ export default function EditMemoPage() {
           {saving ? "Salvataggio..." : "Salva modifiche"}
         </button>
         <button onClick={() => router.back()} className="btn-outline">Annulla</button>
+        {contentId && <ExportPdfButton contentId={contentId} />}
       </div>
     </div>
   );

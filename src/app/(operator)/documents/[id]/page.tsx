@@ -3,7 +3,9 @@ import { getSessionUser } from "@/lib/session";
 import { prisma } from "@/lib/prisma";
 import { checkAccess } from "@/lib/rbac";
 import { AcknowledgeButton } from "@/components/operator/acknowledge-button";
+import { ContentActions } from "@/components/hoo/content-actions";
 import { ContentTimeline } from "@/components/shared/content-timeline";
+import { ExportPdfButton } from "@/components/shared/export-pdf-button";
 import Link from "next/link";
 
 interface Props { params: Promise<{ id: string }> }
@@ -54,6 +56,10 @@ export default async function DocumentDetailPage({ params }: Props) {
           {content.publishedAt && (
             <span>Pubblicato il {new Date(content.publishedAt).toLocaleDateString("it-IT")}</span>
           )}
+        </div>
+        <div className="mt-3 flex items-center gap-2">
+          <ExportPdfButton contentId={content.id} />
+          <ContentActions contentId={content.id} contentStatus={content.status} userRole={user.role} isFeatured={content.isFeatured} />
         </div>
       </div>
 

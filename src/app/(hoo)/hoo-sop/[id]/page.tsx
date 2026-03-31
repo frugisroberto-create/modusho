@@ -5,6 +5,7 @@ import { checkAccess } from "@/lib/rbac";
 import { ContentActions } from "@/components/hoo/content-actions";
 import { ContentTimeline } from "@/components/shared/content-timeline";
 import { AttachmentUploader } from "@/components/shared/attachment-uploader";
+import { ExportPdfButton } from "@/components/shared/export-pdf-button";
 import Link from "next/link";
 
 interface Props {
@@ -68,7 +69,10 @@ export default async function HooSopDetailPage({ params }: Props) {
           </div>
         </div>
 
-        <ContentActions contentId={content.id} contentStatus={content.status} userRole={user.role} isFeatured={content.isFeatured} />
+        <div className="flex items-center gap-2">
+          {content.status === "PUBLISHED" && <ExportPdfButton contentId={content.id} />}
+          <ContentActions contentId={content.id} contentStatus={content.status} userRole={user.role} isFeatured={content.isFeatured} />
+        </div>
       </div>
 
       <article className="prose prose-gray max-w-none bg-ivory border border-ivory-dark p-6 font-body"

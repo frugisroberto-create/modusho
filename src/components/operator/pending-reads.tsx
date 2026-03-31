@@ -39,7 +39,10 @@ export function PendingReads() {
       const res = await fetch(
         `/api/content?propertyId=${currentPropertyId}&status=PUBLISHED&acknowledged=false&pageSize=50`
       );
-      if (res.ok) { const json = await res.json(); setItems(json.data); }
+      if (res.ok) {
+        const json = await res.json();
+        setItems(json.data.filter((c: PendingContent) => c.type !== "BRAND_BOOK" && c.type !== "STANDARD_BOOK"));
+      }
     } finally { setLoading(false); }
   }, [currentPropertyId]);
 

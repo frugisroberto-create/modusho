@@ -3,24 +3,27 @@
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 
-interface Property { id: string; name: string; code: string }
+interface Property { id: string; name: string; code: string; departments: { id: string; name: string; code: string }[] }
 
 interface BookFormProps {
   mode: "create" | "edit";
   contentType: "BRAND_BOOK" | "STANDARD_BOOK";
   backPath: string;
   contentId?: string;
-  initialData?: { title: string; body: string; propertyId: string };
+  initialData?: { title: string; body: string; propertyId: string; departmentId?: string | null };
+  canDelete?: boolean;
 }
 
-export function BookForm({ mode, contentType, backPath, contentId, initialData }: BookFormProps) {
+export function BookForm({ mode, contentType, backPath, contentId, initialData, canDelete }: BookFormProps) {
   const router = useRouter();
   const [title, setTitle] = useState(initialData?.title ?? "");
   const [body, setBody] = useState(initialData?.body ?? "");
   const [propertyId, setPropertyId] = useState(initialData?.propertyId ?? "");
+  const [departmentId, setDepartmentId] = useState(initialData?.departmentId ?? "");
   const [properties, setProperties] = useState<Property[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
+  const [confirmDelete, setConfirmDelete] = useState(false);
 
   useEffect(() => {
     async function fetchProps() {
@@ -39,20 +42,15 @@ export function BookForm({ mode, contentType, backPath, contentId, initialData }
     setLoading(true); setError("");
     try {
       if (mode === "create") {
-        // Create as DRAFT then optionally publish
         const res = await fetch("/api/content", {
           method: "POST", headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ type: contentType, title, body, propertyId, sendToReview: false }),
+          body: JSON.stringify({
+            type: contentType, title, body, propertyId,
+            ...(contentType === "STANDARD_BOOK" && departmentId ? { departmentId } : {}),
+            ...(publish ? { publishDirectly: true } : { sendToReview: false }),
+          }),
         });
         if (!res.ok) { const j = await res.json(); setError(j.error || "Errore"); return; }
-        const json = await res.json();
-        if (publish) {
-          // Direct publish (ADMIN can bypass workflow for books)
-          await fetch(`/api/content/${json.data.id}/review`, {
-            method: "POST", headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ action: "APPROVED" }),
-          });
-        }
         router.push(backPath);
       } else {
         const res = await fetch(`/api/content/${contentId}`, {
@@ -66,6 +64,17 @@ export function BookForm({ mode, contentType, backPath, contentId, initialData }
     } finally { setLoading(false); }
   };
 
+  const handleDelete = async () => {
+    if (!contentId) return;
+    setLoading(true); setError("");
+    try {
+      const res = await fetch(`/api/content/${contentId}`, { method: "DELETE" });
+      if (!res.ok) { const j = await res.json(); setError(j.error || "Errore durante l'eliminazione"); return; }
+      router.push(backPath);
+      router.refresh();
+    } finally { setLoading(false); setConfirmDelete(false); }
+  };
+
   const typeLabel = contentType === "BRAND_BOOK" ? "Brand Book" : "Standard Book";
 
   return (
@@ -77,11 +86,24 @@ export function BookForm({ mode, contentType, backPath, contentId, initialData }
             className="w-full" placeholder={`Titolo del ${typeLabel}`} />
         </div>
         {mode === "create" && (
-          <div>
-            <label className="block text-sm font-ui font-medium text-charcoal mb-1.5">Struttura</label>
-            <select value={propertyId} onChange={(e) => setPropertyId(e.target.value)} className="w-full">
-              {properties.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
-            </select>
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <div>
+              <label className="block text-sm font-ui font-medium text-charcoal mb-1.5">Struttura</label>
+              <select value={propertyId} onChange={(e) => { setPropertyId(e.target.value); setDepartmentId(""); }} className="w-full">
+                {properties.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
+              </select>
+            </div>
+            {contentType === "STANDARD_BOOK" && (
+              <div>
+                <label className="block text-sm font-ui font-medium text-charcoal mb-1.5">Reparto</label>
+                <select value={departmentId} onChange={(e) => setDepartmentId(e.target.value)} className="w-full">
+                  <option value="">Trasversale (tutti i reparti)</option>
+                  {(properties.find(p => p.id === propertyId)?.departments || []).map(d => (
+                    <option key={d.id} value={d.id}>{d.name}</option>
+                  ))}
+                </select>
+              </div>
+            )}
           </div>
         )}
         <div>
@@ -115,6 +137,28 @@ export function BookForm({ mode, contentType, backPath, contentId, initialData }
         <button onClick={() => router.back()} className="px-5 py-2.5 text-sm font-ui text-charcoal hover:bg-ivory-dark  transition-colors">
           Annulla
         </button>
+        {mode === "edit" && canDelete && (
+          <div className="ml-auto">
+            {!confirmDelete ? (
+              <button onClick={() => setConfirmDelete(true)} disabled={loading}
+                className="px-5 py-2.5 text-sm font-ui font-medium text-alert-red hover:bg-alert-red/10 transition-colors disabled:opacity-50">
+                Elimina
+              </button>
+            ) : (
+              <div className="flex items-center gap-2">
+                <span className="text-xs font-ui text-alert-red">Confermi?</span>
+                <button onClick={handleDelete} disabled={loading}
+                  className="px-4 py-2 text-sm font-ui font-semibold text-white bg-alert-red hover:bg-alert-red/90 transition-colors disabled:opacity-50">
+                  {loading ? "..." : "Sì, elimina"}
+                </button>
+                <button onClick={() => setConfirmDelete(false)}
+                  className="px-3 py-2 text-sm font-ui text-charcoal hover:bg-ivory-dark transition-colors">
+                  No
+                </button>
+              </div>
+            )}
+          </div>
+        )}
       </div>
     </div>
   );

@@ -79,7 +79,7 @@ async function main() {
   const users: UserSeed[] = [
     {
       email: "super@modusho.test",
-      name: "Super Admin",
+      name: "HOO Frugis",
       role: Role.SUPER_ADMIN,
       canView: true, canEdit: true, canApprove: true,
       assignments: [],
@@ -87,7 +87,7 @@ async function main() {
     },
     {
       email: "admin@modusho.test",
-      name: "Admin Generale",
+      name: "HOO Frugis",
       role: Role.ADMIN,
       canView: true, canEdit: true, canApprove: true,
       assignments: [

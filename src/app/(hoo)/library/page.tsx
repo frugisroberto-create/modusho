@@ -1,6 +1,8 @@
 "use client";
 
 import { useState, useEffect, useCallback, useRef } from "react";
+import Link from "next/link";
+import { useHooContext } from "@/components/hoo/hoo-shell";
 
 interface StaticDoc {
   id: string; type: string; title: string; fileUrl: string;
@@ -8,21 +10,46 @@ interface StaticDoc {
   uploadedAt: string;
 }
 
+interface ContentDoc {
+  id: string; title: string; status: string; publishedAt: string | null; createdAt: string;
+  property: { id: string; name: string; code: string };
+  department: { id: string; name: string; code: string } | null;
+}
+
 interface Property { id: string; name: string; code: string }
 
+const STATIC_TYPE_LABELS: Record<string, string> = {
+  BRAND_BOOK: "Brand Book",
+  STANDARD_BOOK: "Standard Book",
+  DOCUMENT: "Documento",
+};
+
 export default function LibraryPage() {
-  const [docs, setDocs] = useState<StaticDoc[]>([]);
-  const [total, setTotal] = useState(0);
+  const { userRole } = useHooContext();
+  const isHoo = userRole === "ADMIN" || userRole === "SUPER_ADMIN";
+  const isHm = userRole === "HOTEL_MANAGER";
+  const canCreate = isHoo || isHm;
+
+  // Static documents (Brand Book, Standard Book, PDF uploads)
+  const [staticDocs, setStaticDocs] = useState<StaticDoc[]>([]);
+  const [staticTotal, setStaticTotal] = useState(0);
+
+  // Content documents (type=DOCUMENT, published)
+  const [contentDocs, setContentDocs] = useState<ContentDoc[]>([]);
+  const [contentTotal, setContentTotal] = useState(0);
+
   const [page, setPage] = useState(1);
   const [loading, setLoading] = useState(true);
-  const [typeFilter, setTypeFilter] = useState("");
   const [properties, setProperties] = useState<Property[]>([]);
   const [propertyFilter, setPropertyFilter] = useState("");
+
+  // Upload form
   const [showUpload, setShowUpload] = useState(false);
   const [uploadTitle, setUploadTitle] = useState("");
   const [uploadType, setUploadType] = useState("BRAND_BOOK");
   const [uploadPropertyId, setUploadPropertyId] = useState("");
   const [uploading, setUploading] = useState(false);
+  const [uploadError, setUploadError] = useState("");
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
   const fileRef = useRef<HTMLInputElement>(null);
   const pageSize = 20;
@@ -35,174 +62,234 @@ export default function LibraryPage() {
     fetchProps();
   }, []);
 
-  const fetchDocs = useCallback(async () => {
-    setLoading(true);
-    const params = new URLSearchParams({ page: page.toString(), pageSize: pageSize.toString() });
-    if (typeFilter) params.set("type", typeFilter);
-    if (propertyFilter) params.set("propertyId", propertyFilter);
-    try {
-      const res = await fetch(`/api/static-documents?${params}`);
-      if (res.ok) { const json = await res.json(); setDocs(json.data); setTotal(json.meta.total); }
-    } finally { setLoading(false); }
-  }, [page, typeFilter, propertyFilter]);
+  // HM: pre-seleziona property
+  useEffect(() => {
+    if (!isHoo && properties.length > 0) {
+      if (!uploadPropertyId) setUploadPropertyId(properties[0].id);
+      if (!propertyFilter) setPropertyFilter(properties[0].id);
+    }
+  }, [isHoo, properties, uploadPropertyId, propertyFilter]);
 
-  useEffect(() => { fetchDocs(); }, [fetchDocs]);
-  useEffect(() => { setPage(1); }, [typeFilter, propertyFilter]);
+  const fetchData = useCallback(async () => {
+    // Non-HOO: aspetta che propertyFilter sia settato
+    if (!isHoo && !propertyFilter) return;
+
+    setLoading(true);
+    try {
+      // Fetch static documents (Brand Book, Standard Book, PDF uploads)
+      const staticParams = new URLSearchParams({ page: page.toString(), pageSize: pageSize.toString() });
+      if (isHm) staticParams.set("type", "DOCUMENT");
+      if (propertyFilter) staticParams.set("propertyId", propertyFilter);
+      const staticRes = await fetch(`/api/static-documents?${staticParams}`);
+      if (staticRes.ok) {
+        const json = await staticRes.json();
+        setStaticDocs(json.data);
+        setStaticTotal(json.meta.total);
+      }
+
+      // Fetch content documents (type=DOCUMENT, published)
+      const contentParams = new URLSearchParams({
+        type: "DOCUMENT", status: "PUBLISHED", page: page.toString(), pageSize: pageSize.toString(),
+      });
+      if (propertyFilter) contentParams.set("propertyId", propertyFilter);
+      const contentRes = await fetch(`/api/content?${contentParams}`);
+      if (contentRes.ok) {
+        const json = await contentRes.json();
+        setContentDocs(json.data);
+        setContentTotal(json.meta.total);
+      }
+    } finally { setLoading(false); }
+  }, [page, propertyFilter, isHm, isHoo]);
+
+  useEffect(() => { fetchData(); }, [fetchData]);
+  useEffect(() => { setPage(1); }, [propertyFilter]);
 
   const handleUpload = async () => {
     const file = fileRef.current?.files?.[0];
     if (!file || !uploadTitle.trim()) return;
+    setUploadError("");
     setUploading(true);
     const formData = new FormData();
     formData.append("file", file);
     formData.append("title", uploadTitle);
-    formData.append("type", uploadType);
+    formData.append("type", isHm ? "DOCUMENT" : uploadType);
     if (uploadPropertyId) formData.append("propertyId", uploadPropertyId);
     try {
       const res = await fetch("/api/static-documents", { method: "POST", body: formData });
       if (res.ok) {
-        setShowUpload(false);
-        setUploadTitle("");
+        setShowUpload(false); setUploadTitle(""); setUploadError("");
         if (fileRef.current) fileRef.current.value = "";
-        fetchDocs();
+        fetchData();
+      } else {
+        const json = await res.json();
+        setUploadError(json.error || "Errore nel caricamento");
       }
     } finally { setUploading(false); }
   };
 
   const handleDelete = async (docId: string) => {
     const res = await fetch(`/api/static-documents/${docId}`, { method: "DELETE" });
-    if (res.ok) fetchDocs();
+    if (res.ok) fetchData();
   };
 
-  const totalPages = Math.ceil(total / pageSize);
-  const typeLabels: Record<string, string> = { BRAND_BOOK: "Brand Book", STANDARD_BOOK: "Standard Book" };
-
   return (
-    <div className="max-w-5xl space-y-4">
+    <div className="max-w-5xl space-y-6">
       <div className="flex items-center justify-between">
-        <h1 className="text-xl font-bold text-gray-900">Libreria</h1>
-        <button onClick={() => setShowUpload(!showUpload)}
-          className="px-4 py-2 text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 ">
-          Carica documento
-        </button>
+        <h1 className="text-xl font-heading font-medium text-charcoal-dark">Documenti</h1>
+        <div className="flex items-center gap-2">
+          {canCreate && (
+            <Link href="/library/new" className="btn-primary">Nuovo documento</Link>
+          )}
+          {(isHoo || isHm) && (
+            <button onClick={() => setShowUpload(!showUpload)} className="btn-outline">
+              Carica PDF
+            </button>
+          )}
+        </div>
       </div>
 
-      {/* Upload form */}
-      {showUpload && (
-        <div className="bg-white  border border-gray-200 p-5 space-y-3">
-          <h3 className="text-sm font-semibold text-gray-900">Nuovo documento</h3>
+      {/* Upload PDF form */}
+      {showUpload && canCreate && (
+        <div className="bg-white border border-ivory-dark p-5 space-y-3">
+          <h3 className="text-sm font-ui font-semibold text-charcoal-dark">Carica file PDF</h3>
+          {uploadError && (
+            <div className="px-3 py-2 text-sm font-ui bg-[#FECACA] border-l-4 border-alert-red text-alert-red">{uploadError}</div>
+          )}
           <div className="grid grid-cols-2 gap-3">
             <div>
-              <label className="block text-xs text-gray-600 mb-1">Titolo</label>
+              <label className="block text-xs font-ui text-charcoal/60 mb-1">Titolo</label>
               <input type="text" value={uploadTitle} onChange={(e) => setUploadTitle(e.target.value)}
-                className="w-full px-3 py-2 border  text-sm" placeholder="Titolo del documento" />
+                className="w-full px-3 py-2 border border-ivory-dark text-sm font-ui" placeholder="Titolo del documento" />
             </div>
+            {isHoo && (
+              <div>
+                <label className="block text-xs font-ui text-charcoal/60 mb-1">Tipo</label>
+                <select value={uploadType} onChange={(e) => setUploadType(e.target.value)}
+                  className="w-full px-3 py-2 border border-ivory-dark text-sm font-ui bg-white">
+                  <option value="BRAND_BOOK">Brand Book</option>
+                  <option value="STANDARD_BOOK">Standard Book</option>
+                </select>
+              </div>
+            )}
             <div>
-              <label className="block text-xs text-gray-600 mb-1">Tipo</label>
-              <select value={uploadType} onChange={(e) => setUploadType(e.target.value)}
-                className="w-full px-3 py-2 border  text-sm bg-white">
-                <option value="BRAND_BOOK">Brand Book</option>
-                <option value="STANDARD_BOOK">Standard Book</option>
-              </select>
-            </div>
-            <div>
-              <label className="block text-xs text-gray-600 mb-1">Struttura (opzionale)</label>
+              <label className="block text-xs font-ui text-charcoal/60 mb-1">
+                Struttura{isHoo ? " (opzionale)" : ""}
+              </label>
               <select value={uploadPropertyId} onChange={(e) => setUploadPropertyId(e.target.value)}
-                className="w-full px-3 py-2 border  text-sm bg-white">
-                <option value="">Tutto il gruppo</option>
+                className="w-full px-3 py-2 border border-ivory-dark text-sm font-ui bg-white">
+                {isHoo && <option value="">Tutto il gruppo</option>}
                 {properties.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
               </select>
             </div>
             <div>
-              <label className="block text-xs text-gray-600 mb-1">File PDF</label>
+              <label className="block text-xs font-ui text-charcoal/60 mb-1">File PDF</label>
               <input type="file" accept=".pdf" ref={fileRef}
-                className="w-full px-3 py-1.5 border  text-sm" />
+                className="w-full px-3 py-1.5 border border-ivory-dark text-sm font-ui" />
             </div>
           </div>
           <div className="flex gap-2">
             <button onClick={handleUpload} disabled={uploading || !uploadTitle.trim()}
-              className="px-4 py-2 text-sm text-white bg-blue-600 hover:bg-blue-700  disabled:opacity-50">
+              className="btn-primary disabled:opacity-50">
               {uploading ? "Caricamento..." : "Carica"}
             </button>
-            <button onClick={() => setShowUpload(false)} className="px-4 py-2 text-sm text-gray-500">Annulla</button>
+            <button onClick={() => { setShowUpload(false); setUploadError(""); }} className="btn-outline">Annulla</button>
           </div>
         </div>
       )}
 
-      {/* Filters */}
+      {/* Filtro struttura */}
       <div className="flex gap-3">
-        <select value={typeFilter} onChange={(e) => setTypeFilter(e.target.value)}
-          className="text-sm border border-gray-300  px-3 py-2 bg-white">
-          <option value="">Tutti i tipi</option>
-          <option value="BRAND_BOOK">Brand Book</option>
-          <option value="STANDARD_BOOK">Standard Book</option>
-        </select>
         <select value={propertyFilter} onChange={(e) => setPropertyFilter(e.target.value)}
-          className="text-sm border border-gray-300  px-3 py-2 bg-white">
-          <option value="">Tutte le strutture</option>
+          className="text-sm font-ui border border-ivory-dark px-3 py-2 bg-white">
+          {isHoo && <option value="">Tutte le strutture</option>}
           {properties.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
         </select>
       </div>
 
-      {/* Documents grid */}
       {loading ? (
-        <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-          {[1,2,3].map(i => <div key={i} className="h-32 bg-gray-200  animate-pulse" />)}
-        </div>
-      ) : docs.length === 0 ? (
-        <p className="text-gray-500 text-sm py-8 text-center">Nessun documento nella libreria</p>
+        <div className="space-y-2">{[1,2,3].map(i => <div key={i} className="h-20 skeleton" />)}</div>
       ) : (
-        <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-          {docs.map((doc) => (
-            <div key={doc.id} className="bg-white  border border-gray-200 p-4 flex flex-col gap-3">
-              <div className="flex items-start justify-between">
-                <div>
-                  <span className={`text-xs font-medium px-2 py-0.5 rounded ${
-                    doc.type === "BRAND_BOOK" ? "bg-purple-100 text-purple-700" : "bg-indigo-100 text-indigo-700"
-                  }`}>{typeLabels[doc.type] || doc.type}</span>
-                </div>
-                <button onClick={() => handleDelete(doc.id)} className="text-xs text-red-400 hover:text-red-600">Elimina</button>
+        <>
+          {/* Documenti testuali (Content type DOCUMENT) */}
+          {contentDocs.length > 0 && (
+            <section>
+              <h2 className="text-sm font-ui font-semibold uppercase tracking-wider text-charcoal/50 mb-2">Documenti</h2>
+              <div className="bg-white border border-ivory-dark">
+                {contentDocs.map((doc, index) => (
+                  <Link key={doc.id} href={`/hoo-sop/${doc.id}`}
+                    className={`flex items-center justify-between px-5 py-4 hover:bg-ivory/50 transition-colors ${index < contentDocs.length - 1 ? "border-b border-ivory-medium" : ""}`}>
+                    <div>
+                      <div className="flex items-center gap-2 mb-1">
+                        <span className="text-[10px] font-ui font-bold uppercase tracking-wider px-2 py-0.5 bg-[#E3F2FD] text-[#1565C0]">Documento</span>
+                        {doc.department && <span className="text-[11px] font-ui text-charcoal/45">{doc.department.name}</span>}
+                      </div>
+                      <h3 className="font-ui font-medium text-charcoal-dark text-sm">{doc.title}</h3>
+                      <div className="text-[11px] font-ui text-charcoal/45 mt-1">
+                        {doc.property.name}
+                        {doc.publishedAt && <span> &middot; {new Date(doc.publishedAt).toLocaleDateString("it-IT")}</span>}
+                      </div>
+                    </div>
+                    <svg className="w-4 h-4 text-charcoal/30 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                    </svg>
+                  </Link>
+                ))}
               </div>
-              <div>
-                <h3 className="font-medium text-gray-900 text-sm">{doc.title}</h3>
-                <p className="text-xs text-gray-500 mt-1">
-                  {doc.property ? doc.property.name : "Tutto il gruppo"} &middot; {new Date(doc.uploadedAt).toLocaleDateString("it-IT")}
-                </p>
-              </div>
-              <div className="flex gap-2 mt-auto">
-                <button onClick={() => setPreviewUrl(doc.fileUrl)}
-                  className="flex-1 px-3 py-1.5 text-xs text-center text-blue-600 border border-blue-200  hover:bg-blue-50">
-                  Visualizza
-                </button>
-                <a href={doc.fileUrl} download
-                  className="flex-1 px-3 py-1.5 text-xs text-center text-gray-600 border border-gray-200  hover:bg-gray-50">
-                  Scarica
-                </a>
-              </div>
-            </div>
-          ))}
-        </div>
-      )}
+            </section>
+          )}
 
-      {totalPages > 1 && (
-        <div className="flex items-center justify-between">
-          <p className="text-sm text-gray-500">Pagina {page} di {totalPages}</p>
-          <div className="flex gap-2">
-            <button onClick={() => setPage(p => Math.max(1, p - 1))} disabled={page <= 1}
-              className="px-3 py-1.5 text-sm border  hover:bg-gray-50 disabled:opacity-50">Precedente</button>
-            <button onClick={() => setPage(p => Math.min(totalPages, p + 1))} disabled={page >= totalPages}
-              className="px-3 py-1.5 text-sm border  hover:bg-gray-50 disabled:opacity-50">Successivo</button>
-          </div>
-        </div>
+          {/* File PDF (static documents) */}
+          {staticDocs.length > 0 && (
+            <section>
+              <h2 className="text-sm font-ui font-semibold uppercase tracking-wider text-charcoal/50 mb-2">
+                {isHoo ? "Brand Book e Standard Book" : "File PDF"}
+              </h2>
+              <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+                {staticDocs.map((doc) => (
+                  <div key={doc.id} className="bg-white border border-ivory-dark p-4 flex flex-col gap-3">
+                    <div className="flex items-start justify-between">
+                      <span className={`text-[10px] font-ui font-bold uppercase tracking-wider px-2 py-0.5 ${
+                        doc.type === "BRAND_BOOK" ? "bg-[#EDE7F6] text-[#5E35B1]" : doc.type === "DOCUMENT" ? "bg-[#E3F2FD] text-[#1565C0]" : "bg-[#E8F5E9] text-[#2E7D32]"
+                      }`}>{STATIC_TYPE_LABELS[doc.type] || doc.type}</span>
+                      {isHoo && (
+                        <button onClick={() => handleDelete(doc.id)} className="text-xs font-ui text-alert-red hover:underline">Elimina</button>
+                      )}
+                    </div>
+                    <div>
+                      <h3 className="font-ui font-medium text-charcoal-dark text-sm">{doc.title}</h3>
+                      <p className="text-[11px] font-ui text-charcoal/45 mt-1">
+                        {doc.property ? doc.property.name : "Tutto il gruppo"} &middot; {new Date(doc.uploadedAt).toLocaleDateString("it-IT")}
+                      </p>
+                    </div>
+                    <div className="flex gap-2 mt-auto">
+                      <button onClick={() => setPreviewUrl(doc.fileUrl)}
+                        className="flex-1 px-3 py-1.5 text-[11px] font-ui font-semibold uppercase tracking-wider text-terracotta border border-terracotta/30 hover:bg-terracotta hover:text-white transition-colors text-center">
+                        Visualizza
+                      </button>
+                      <a href={doc.fileUrl} download
+                        className="flex-1 px-3 py-1.5 text-[11px] font-ui font-semibold uppercase tracking-wider text-charcoal/60 border border-ivory-dark hover:bg-ivory-dark transition-colors text-center">
+                        Scarica
+                      </a>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </section>
+          )}
+
+          {contentDocs.length === 0 && staticDocs.length === 0 && (
+            <p className="text-charcoal/40 text-sm font-ui py-8 text-center">Nessun documento</p>
+          )}
+        </>
       )}
 
       {/* PDF Preview Modal */}
       {previewUrl && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-6">
-          <div className="bg-white  shadow-xl w-full max-w-4xl h-[80vh] flex flex-col">
-            <div className="flex items-center justify-between px-4 py-3 border-b">
-              <h3 className="text-sm font-semibold text-gray-900">Anteprima PDF</h3>
-              <button onClick={() => setPreviewUrl(null)} className="text-sm text-gray-500 hover:text-gray-700">Chiudi</button>
+        <div className="fixed inset-0 bg-charcoal-dark/60 flex items-center justify-center z-50 p-6">
+          <div className="bg-white w-full max-w-4xl h-[80vh] flex flex-col border border-ivory-dark">
+            <div className="flex items-center justify-between px-4 py-3 border-b border-ivory-dark">
+              <h3 className="text-sm font-ui font-semibold text-charcoal-dark">Anteprima PDF</h3>
+              <button onClick={() => setPreviewUrl(null)} className="text-sm font-ui text-charcoal/50 hover:text-charcoal">Chiudi</button>
             </div>
             <iframe src={previewUrl} className="flex-1 w-full" title="PDF Preview" />
           </div>

@@ -36,7 +36,7 @@ const ROLE_LABELS: Record<RoleOption, string> = {
   OPERATOR: "Operatore",
   HOD: "Head of Department",
   HOTEL_MANAGER: "Hotel Manager",
-  ADMIN: "Admin",
+  ADMIN: "HOO",
 };
 
 const ROLE_PRESETS: Record<RoleOption, { canEdit: boolean; canApprove: boolean; contentTypes: ContentTypeOption[] }> = {
@@ -59,6 +59,9 @@ export function UserForm({ mode, userId, initialData }: UserFormProps) {
   const [name, setName] = useState(initialData?.name ?? "");
   const [email, setEmail] = useState(initialData?.email ?? "");
   const [password, setPassword] = useState("");
+  const [passwordConfirm, setPasswordConfirm] = useState("");
+  const [showPassword, setShowPassword] = useState(false);
+  const [changePassword, setChangePassword] = useState(false);
 
   // Sezione 2 — Ruolo
   const [role, setRole] = useState<RoleOption>(initialData?.role ?? "OPERATOR");
@@ -102,6 +105,12 @@ export function UserForm({ mode, userId, initialData }: UserFormProps) {
   const handleRoleChange = (newRole: RoleOption) => {
     setRole(newRole);
     applyRolePreset(newRole);
+    // If switching to a role that requires specific depts, convert any null departmentIds to pending
+    if (newRole === "OPERATOR" || newRole === "HOD") {
+      setAssignments(prev => prev.map(a =>
+        a.departmentId === null ? { ...a, departmentId: "__pending__" as string } : a
+      ));
+    }
   };
 
   // Validate warnings
@@ -130,15 +139,23 @@ export function UserForm({ mode, userId, initialData }: UserFormProps) {
   // Selected property IDs
   const selectedPropertyIds = [...new Set(assignments.map(a => a.propertyId))];
 
+  const roleRequiresSpecificDepts = role === "OPERATOR" || role === "HOD";
+
   const toggleProperty = (propId: string) => {
     if (selectedPropertyIds.includes(propId)) {
-      // Remove property and its assignments
+      // Remove property and all its assignments
       setAssignments(prev => prev.filter(a => a.propertyId !== propId));
     } else {
-      // Add property — for HM add without dept (all depts), for others add empty
-      if (role === "HOTEL_MANAGER" || role === "ADMIN") {
-        setAssignments(prev => [...prev, { propertyId: propId, departmentId: null }]);
+      if (roleRequiresSpecificDepts) {
+        // OPERATOR / HOD: add property placeholder without any dept — user must pick specific depts
+        // We use a temporary marker: propertyId present but no assignment yet
+        // Just add nothing — the property will show as selected via the next dept toggle
+        // Actually we need at least one entry to mark the property as selected,
+        // so we add a "pending" entry that won't be submitted (departmentId = undefined placeholder)
+        // Better approach: for these roles, just show the property expanded, user must pick depts
+        setAssignments(prev => [...prev, { propertyId: propId, departmentId: "__pending__" as string }]);
       } else {
+        // HM / ADMIN: default to all depts (departmentId = null)
         setAssignments(prev => [...prev, { propertyId: propId, departmentId: null }]);
       }
     }
@@ -147,25 +164,36 @@ export function UserForm({ mode, userId, initialData }: UserFormProps) {
   const toggleDepartment = (propId: string, deptId: string) => {
     const exists = assignments.some(a => a.propertyId === propId && a.departmentId === deptId);
     if (exists) {
-      setAssignments(prev => prev.filter(a => !(a.propertyId === propId && a.departmentId === deptId)));
+      // Remove this dept; if it was the last specific dept, add pending marker to keep property selected
+      const remaining = assignments.filter(a => !(a.propertyId === propId && a.departmentId === deptId));
+      const hasOtherForProp = remaining.some(a => a.propertyId === propId && a.departmentId !== "__pending__");
+      if (!hasOtherForProp) {
+        setAssignments([...remaining.filter(a => a.propertyId !== propId), { propertyId: propId, departmentId: "__pending__" as string }]);
+      } else {
+        setAssignments(remaining);
+      }
     } else {
-      // Remove the "all depts" entry for this property if it exists, add specific dept
+      // Remove "all depts" (null) and pending marker for this property, add specific dept
       setAssignments(prev => {
-        const filtered = prev.filter(a => !(a.propertyId === propId && a.departmentId === null));
+        const filtered = prev.filter(a => !(a.propertyId === propId && (a.departmentId === null || a.departmentId === "__pending__")));
         return [...filtered, { propertyId: propId, departmentId: deptId }];
       });
     }
   };
 
   const toggleAllDepts = (propId: string) => {
+    // Only HM/ADMIN can toggle "all departments"
+    if (roleRequiresSpecificDepts) return;
+
     const hasAll = assignments.some(a => a.propertyId === propId && a.departmentId === null);
     if (hasAll) {
-      // Switch to no depts selected
-      setAssignments(prev => prev.filter(a => a.propertyId !== propId));
-      // Re-add property to keep it selected but with no dept
-      setAssignments(prev => [...prev, { propertyId: propId, departmentId: null }]);
+      // Deselect "all depts" — remove all assignments for this property, keep property selected with pending marker
+      setAssignments(prev => {
+        const filtered = prev.filter(a => a.propertyId !== propId);
+        return [...filtered, { propertyId: propId, departmentId: "__pending__" as string }];
+      });
     } else {
-      // Set to all depts
+      // Set to all depts (replace all specific depts with null)
       setAssignments(prev => {
         const filtered = prev.filter(a => a.propertyId !== propId);
         return [...filtered, { propertyId: propId, departmentId: null }];
@@ -186,13 +214,50 @@ export function UserForm({ mode, userId, initialData }: UserFormProps) {
       setError("Nome e email sono obbligatori");
       return;
     }
-    if (mode === "create" && password.length < 6) {
-      setError("La password deve avere almeno 6 caratteri");
+    if (mode === "create") {
+      if (password.length < 6) {
+        setError("La password deve avere almeno 6 caratteri");
+        return;
+      }
+      if (password !== passwordConfirm) {
+        setError("Le password non coincidono");
+        return;
+      }
+    }
+    if (mode === "edit" && changePassword) {
+      if (password.length < 6) {
+        setError("La nuova password deve avere almeno 6 caratteri");
+        return;
+      }
+      if (password !== passwordConfirm) {
+        setError("Le password non coincidono");
+        return;
+      }
+    }
+
+    // Filter out pending markers — only keep real assignments
+    const realAssignments = assignments.filter(a => a.departmentId !== "__pending__");
+
+    if (realAssignments.length === 0) {
+      setError("Seleziona almeno una struttura con reparti assegnati");
       return;
     }
-    if (assignments.length === 0) {
-      setError("Seleziona almeno una struttura");
-      return;
+
+    // Validate role-department coherence
+    if (roleRequiresSpecificDepts) {
+      const hasNullDept = realAssignments.some(a => a.departmentId === null);
+      if (hasNullDept) {
+        setError(`Un ${ROLE_LABELS[role]} deve avere reparti specifici, non "Tutti i reparti"`);
+        return;
+      }
+      // Check every selected property has at least one specific dept
+      const propsWithoutDepts = selectedPropertyIds.filter(propId =>
+        !realAssignments.some(a => a.propertyId === propId)
+      );
+      if (propsWithoutDepts.length > 0) {
+        setError("Ogni struttura selezionata deve avere almeno un reparto assegnato");
+        return;
+      }
     }
 
     setLoading(true);
@@ -200,7 +265,7 @@ export function UserForm({ mode, userId, initialData }: UserFormProps) {
       const payload: Record<string, unknown> = {
         name, role,
         canView: true, canEdit, canApprove,
-        propertyAssignments: assignments,
+        propertyAssignments: realAssignments,
         contentTypes,
       };
 
@@ -210,6 +275,9 @@ export function UserForm({ mode, userId, initialData }: UserFormProps) {
       }
       if (mode === "edit") {
         payload.isActive = isActive;
+        if (changePassword && password) {
+          payload.password = password;
+        }
       }
 
       const url = mode === "create" ? "/api/users" : `/api/users/${userId}`;
@@ -257,10 +325,76 @@ export function UserForm({ mode, userId, initialData }: UserFormProps) {
           </div>
         </div>
         {mode === "create" && (
-          <div>
-            <label className="block text-sm font-ui font-medium text-charcoal mb-1.5">Password iniziale</label>
-            <input type="password" value={password} onChange={(e) => setPassword(e.target.value)}
-              className="w-full" placeholder="Min. 6 caratteri" />
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <div>
+              <label className="block text-sm font-ui font-medium text-charcoal mb-1.5">Password</label>
+              <div className="relative">
+                <input type={showPassword ? "text" : "password"} value={password} onChange={(e) => setPassword(e.target.value)}
+                  className="w-full pr-10" placeholder="Min. 6 caratteri" />
+                <button type="button" onClick={() => setShowPassword(!showPassword)}
+                  className="absolute right-3 top-1/2 -translate-y-1/2 text-charcoal/40 hover:text-charcoal transition-colors"
+                  tabIndex={-1}>
+                  {showPassword ? <EyeOffIcon /> : <EyeIcon />}
+                </button>
+              </div>
+            </div>
+            <div>
+              <label className="block text-sm font-ui font-medium text-charcoal mb-1.5">Conferma password</label>
+              <div className="relative">
+                <input type={showPassword ? "text" : "password"} value={passwordConfirm} onChange={(e) => setPasswordConfirm(e.target.value)}
+                  className={`w-full pr-10 ${passwordConfirm && password !== passwordConfirm ? "!border-alert-red" : ""}`}
+                  placeholder="Ripeti la password" />
+                <button type="button" onClick={() => setShowPassword(!showPassword)}
+                  className="absolute right-3 top-1/2 -translate-y-1/2 text-charcoal/40 hover:text-charcoal transition-colors"
+                  tabIndex={-1}>
+                  {showPassword ? <EyeOffIcon /> : <EyeIcon />}
+                </button>
+              </div>
+              {passwordConfirm && password !== passwordConfirm && (
+                <p className="text-xs font-ui text-alert-red mt-1">Le password non coincidono</p>
+              )}
+            </div>
+          </div>
+        )}
+        {mode === "edit" && (
+          <div className="space-y-3">
+            <label className="flex items-center gap-2 text-sm font-ui text-charcoal cursor-pointer">
+              <input type="checkbox" checked={changePassword} onChange={(e) => { setChangePassword(e.target.checked); if (!e.target.checked) { setPassword(""); setPasswordConfirm(""); } }}
+                className="w-4 h-4 rounded border-ivory-dark text-terracotta focus:ring-terracotta" />
+              Cambia password
+            </label>
+            {changePassword && (
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-sm font-ui font-medium text-charcoal mb-1.5">Nuova password</label>
+                  <div className="relative">
+                    <input type={showPassword ? "text" : "password"} value={password} onChange={(e) => setPassword(e.target.value)}
+                      className="w-full pr-10" placeholder="Min. 6 caratteri" />
+                    <button type="button" onClick={() => setShowPassword(!showPassword)}
+                      className="absolute right-3 top-1/2 -translate-y-1/2 text-charcoal/40 hover:text-charcoal transition-colors"
+                      tabIndex={-1}>
+                      {showPassword ? <EyeOffIcon /> : <EyeIcon />}
+                    </button>
+                  </div>
+                </div>
+                <div>
+                  <label className="block text-sm font-ui font-medium text-charcoal mb-1.5">Conferma nuova password</label>
+                  <div className="relative">
+                    <input type={showPassword ? "text" : "password"} value={passwordConfirm} onChange={(e) => setPasswordConfirm(e.target.value)}
+                      className={`w-full pr-10 ${passwordConfirm && password !== passwordConfirm ? "!border-alert-red" : ""}`}
+                      placeholder="Ripeti la password" />
+                    <button type="button" onClick={() => setShowPassword(!showPassword)}
+                      className="absolute right-3 top-1/2 -translate-y-1/2 text-charcoal/40 hover:text-charcoal transition-colors"
+                      tabIndex={-1}>
+                      {showPassword ? <EyeOffIcon /> : <EyeIcon />}
+                    </button>
+                  </div>
+                  {passwordConfirm && password !== passwordConfirm && (
+                    <p className="text-xs font-ui text-alert-red mt-1">Le password non coincidono</p>
+                  )}
+                </div>
+              </div>
+            )}
           </div>
         )}
         {mode === "edit" && (
@@ -360,13 +494,18 @@ export function UserForm({ mode, userId, initialData }: UserFormProps) {
 
                 {isSelected && (
                   <div className="px-4 pb-3 pt-1 border-t border-ivory-dark/50">
-                    <label className="flex items-center gap-2 py-1.5 cursor-pointer">
-                      <input type="checkbox" checked={hasAllDepts}
-                        onChange={() => toggleAllDepts(prop.id)}
-                        className="w-3.5 h-3.5 rounded border-ivory-dark text-terracotta focus:ring-terracotta" />
-                      <span className="text-xs font-ui text-sage-light italic">Tutti i reparti</span>
-                    </label>
-                    {!hasAllDepts && (
+                    {!roleRequiresSpecificDepts && (
+                      <label className="flex items-center gap-2 py-1.5 cursor-pointer">
+                        <input type="checkbox" checked={hasAllDepts}
+                          onChange={() => toggleAllDepts(prop.id)}
+                          className="w-3.5 h-3.5 rounded border-ivory-dark text-terracotta focus:ring-terracotta" />
+                        <span className="text-xs font-ui text-sage-light italic">Tutti i reparti</span>
+                      </label>
+                    )}
+                    {roleRequiresSpecificDepts && (
+                      <p className="text-xs font-ui text-sage-light py-1.5">Seleziona uno o più reparti:</p>
+                    )}
+                    {(roleRequiresSpecificDepts || !hasAllDepts) && (
                       <div className="grid grid-cols-2 sm:grid-cols-3 gap-1 mt-1">
                         {prop.departments.map((dept) => {
                           const isDeptSelected = propAssignments.some(a => a.departmentId === dept.id);
@@ -426,5 +565,24 @@ export function UserForm({ mode, userId, initialData }: UserFormProps) {
         </button>
       </div>
     </div>
+  );
+}
+
+// ─── Icons ───────────────────────────────────────────────────────────
+
+function EyeIcon() {
+  return (
+    <svg className="w-4.5 h-4.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
+      <path strokeLinecap="round" strokeLinejoin="round" d="M2.036 12.322a1.012 1.012 0 010-.639C3.423 7.51 7.36 4.5 12 4.5c4.638 0 8.573 3.007 9.963 7.178.07.207.07.431 0 .639C20.577 16.49 16.64 19.5 12 19.5c-4.638 0-8.573-3.007-9.963-7.178z" />
+      <path strokeLinecap="round" strokeLinejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+    </svg>
+  );
+}
+
+function EyeOffIcon() {
+  return (
+    <svg className="w-4.5 h-4.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
+      <path strokeLinecap="round" strokeLinejoin="round" d="M3.98 8.223A10.477 10.477 0 001.934 12c1.292 4.338 5.31 7.5 10.066 7.5.993 0 1.953-.138 2.863-.395M6.228 6.228A10.45 10.45 0 0112 4.5c4.756 0 8.773 3.162 10.065 7.498a10.523 10.523 0 01-4.293 5.774M6.228 6.228L3 3m3.228 3.228l3.65 3.65m7.894 7.894L21 21m-3.228-3.228l-3.65-3.65m0 0a3 3 0 10-4.243-4.243m4.242 4.242L9.88 9.88" />
+    </svg>
   );
 }

@@ -9,7 +9,7 @@ const searchSchema = z.object({
   q: z.string().min(1).max(200),
   propertyId: z.string().optional(),
   departmentId: z.string().optional(),
-  type: z.enum(["SOP", "DOCUMENT", "MEMO"]).optional(),
+  type: z.enum(["SOP", "DOCUMENT", "MEMO", "STANDARD_BOOK", "BRAND_BOOK"]).optional(),
   page: z.coerce.number().int().min(1).default(1),
   pageSize: z.coerce.number().int().min(1).max(50).default(20),
 });
@@ -86,6 +86,11 @@ export async function GET(request: NextRequest) {
   // Build type filter
   const typeFilter = type ? `AND c."type" = '${type}'` : "";
 
+  // Brand Book: escluso per OPERATOR e HOD
+  const brandBookFilter = (session.user.role === "OPERATOR" || session.user.role === "HOD")
+    ? `AND c."type" != 'BRAND_BOOK'`
+    : "";
+
   // Full-text search with PostgreSQL
   const results = await prisma.$queryRawUnsafe<
     {
@@ -110,6 +115,7 @@ export async function GET(request: NextRequest) {
       AND c."propertyId" = ANY($2::text[])
       AND (c."departmentId" IS NULL OR c."departmentId" = ANY($3::text[]))
       ${typeFilter}
+      ${brandBookFilter}
       AND (
         to_tsvector('italian', c.title || ' ' || c.body) @@ to_tsquery('italian', $1)
         OR c.title ILIKE '%' || $4 || '%'
@@ -134,6 +140,7 @@ export async function GET(request: NextRequest) {
       AND c."propertyId" = ANY($2::text[])
       AND (c."departmentId" IS NULL OR c."departmentId" = ANY($3::text[]))
       ${typeFilter}
+      ${brandBookFilter}
       AND (
         to_tsvector('italian', c.title || ' ' || c.body) @@ to_tsquery('italian', $1)
         OR c.title ILIKE '%' || $4 || '%'

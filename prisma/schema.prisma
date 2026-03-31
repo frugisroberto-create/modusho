@@ -41,6 +41,7 @@ enum ReviewAction {
 enum StaticDocumentType {
   BRAND_BOOK
   STANDARD_BOOK
+  DOCUMENT
 }
 
 enum TargetType {
@@ -52,6 +53,29 @@ enum TargetType {
 enum AttachmentKind {
   IMAGE
   DOCUMENT
+}
+
+enum SopStatus {
+  IN_LAVORAZIONE
+  PUBBLICATA
+  ARCHIVIATA
+}
+
+enum SopEventType {
+  DRAFT_CREATED
+  TEXT_SAVED
+  NOTE_ADDED
+  ATTACHMENT_ADDED
+  ATTACHMENT_REMOVED
+  ATTACHMENT_REPLACED
+  SUBMITTED_TO_C
+  SUBMITTED_TO_A
+  SUBMITTED_TO_C_AND_A
+  C_CONSULTATION_CONFIRMED
+  RETURNED_BY_A
+  APPROVED
+  PUBLISHED
+  REVIEW_DUE_DATE_CHANGED
 }
 
 model User {
@@ -81,6 +105,12 @@ model User {
   contentNotes         ContentNote[]          @relation("ContentNoteAuthor")
   targetedContents     ContentTarget[]        @relation("ContentTargetUser")
   attachments          Attachment[]           @relation("AttachmentUploadedBy")
+
+  sopWorkflowsAsR      SopWorkflow[]          @relation("SopResponsible")
+  sopWorkflowsAsC      SopWorkflow[]          @relation("SopConsulted")
+  sopWorkflowsAsA      SopWorkflow[]          @relation("SopAccountable")
+  sopTextVersions      SopTextVersion[]       @relation("SopTextVersionSavedBy")
+  sopWorkflowEvents    SopWorkflowEvent[]     @relation("SopWorkflowEventActor")
 
   @@index([role])
   @@index([email])
@@ -191,6 +221,7 @@ model Content {
   notes            ContentNote[]
   attachments      Attachment[]
   memo             Memo?
+  sopWorkflow      SopWorkflow?
 
   @@index([propertyId])
   @@index([departmentId])
@@ -351,4 +382,89 @@ model StaticDocument {
 
   @@index([propertyId])
   @@index([type])
+}
+
+// ─── SOP RACI Workflow ───────────────────────────────────────────────
+
+model SopWorkflow {
+  id            String    @id @default(cuid())
+  contentId     String    @unique
+  sopStatus     SopStatus @default(IN_LAVORAZIONE)
+
+  // RACI roles
+  responsibleId String
+  consultedId   String?
+  accountableId String
+
+  // Current flags — sottoposizione a C e/o A
+  submittedToC     Boolean   @default(false)
+  submittedToCAt   DateTime?
+  submittedToCById String?
+  submittedToA     Boolean   @default(false)
+  submittedToAAt   DateTime?
+  submittedToAById String?
+
+  // Conferma consultazione C (valida per versione corrente)
+  consultedConfirmedAt      DateTime?
+  consultedConfirmedById    String?
+  consultedConfirmedVersion Int?
+  consultedConfirmedNote    String?
+
+  // Review lifecycle
+  reviewDueDate        DateTime?
+  reviewDueDateSetById String?
+  reviewDueMonths      Int       @default(12)
+
+  // Concurrency / last save tracking
+  lastSavedAt   DateTime?
+  lastSavedById String?
+  textVersionCount Int @default(0)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  content     Content @relation(fields: [contentId], references: [id], onDelete: Cascade)
+  responsible User    @relation("SopResponsible", fields: [responsibleId], references: [id])
+  consulted   User?   @relation("SopConsulted", fields: [consultedId], references: [id])
+  accountable User    @relation("SopAccountable", fields: [accountableId], references: [id])
+
+  textVersions   SopTextVersion[]
+  workflowEvents SopWorkflowEvent[]
+
+  @@index([sopStatus])
+  @@index([responsibleId])
+  @@index([accountableId])
+  @@index([reviewDueDate])
+}
+
+model SopTextVersion {
+  id            String   @id @default(cuid())
+  sopWorkflowId String
+  versionNumber Int
+  title         String
+  body          String   @db.Text
+  savedById     String
+  createdAt     DateTime @default(now())
+
+  sopWorkflow SopWorkflow @relation(fields: [sopWorkflowId], references: [id], onDelete: Cascade)
+  savedBy     User        @relation("SopTextVersionSavedBy", fields: [savedById], references: [id])
+
+  @@unique([sopWorkflowId, versionNumber])
+  @@index([sopWorkflowId, createdAt])
+}
+
+model SopWorkflowEvent {
+  id            String       @id @default(cuid())
+  sopWorkflowId String
+  eventType     SopEventType
+  actorId       String
+  note          String?      @db.Text
+  metadata      Json?
+  createdAt     DateTime     @default(now())
+
+  sopWorkflow SopWorkflow @relation(fields: [sopWorkflowId], references: [id], onDelete: Cascade)
+  actor       User        @relation("SopWorkflowEventActor", fields: [actorId], references: [id])
+
+  @@index([sopWorkflowId, createdAt])
+  @@index([actorId])
 }

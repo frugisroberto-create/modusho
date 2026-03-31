@@ -16,15 +16,15 @@ interface Revision {
 }
 
 const ROLE_BADGE: Record<string, { label: string; cls: string }> = {
-  SUPER_ADMIN: { label: "Super Admin", cls: "bg-charcoal-dark text-white" },
-  ADMIN: { label: "Admin", cls: "bg-sage text-white" },
+  SUPER_ADMIN: { label: "HOO", cls: "bg-charcoal-dark text-white" },
+  ADMIN: { label: "HOO", cls: "bg-sage text-white" },
   HOTEL_MANAGER: { label: "HM", cls: "bg-terracotta text-white" },
   HOD: { label: "HOD", cls: "bg-mauve text-white" },
 };
 
 const STATUS_LABEL: Record<string, string> = {
   REVIEW_HM: "Durante review HM",
-  REVIEW_ADMIN: "Durante review Admin",
+  REVIEW_ADMIN: "Durante review HOO",
   PUBLISHED: "Post-pubblicazione",
 };
 

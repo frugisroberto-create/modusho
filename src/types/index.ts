@@ -1,6 +1,6 @@
 import { Role } from "@prisma/client";
 
-export type { Role, ContentType, ContentStatus, ReviewAction, StaticDocumentType, AttachmentKind } from "@prisma/client";
+export type { Role, ContentType, ContentStatus, ReviewAction, StaticDocumentType, AttachmentKind, SopStatus, SopEventType } from "@prisma/client";
 
 declare module "next-auth" {
   interface Session {

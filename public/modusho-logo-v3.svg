@@ -1,0 +1,26 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 400 500" width="400" height="500">
+  <!-- ModusHO Logo v3: Cerchio aperto con tre linee documento -->
+  <!-- Concept: Il cerchio HO + tre linee orizzontali = procedura/documento -->
+
+  <!-- Cerchio brush stroke, leggermente aperto in basso -->
+  <path d="M 130 240
+           A 95 95 0 1 1 270 240"
+        fill="none" stroke="#141413" stroke-width="22" stroke-linecap="round"/>
+
+  <!-- Tre linee orizzontali dentro il cerchio — evocano un documento/lista -->
+  <line x1="155" y1="135" x2="245" y2="135" stroke="#141413" stroke-width="8" stroke-linecap="round"/>
+  <line x1="155" y1="170" x2="230" y2="170" stroke="#141413" stroke-width="8" stroke-linecap="round"/>
+  <line x1="155" y1="205" x2="215" y2="205" stroke="#141413" stroke-width="8" stroke-linecap="round"/>
+
+  <!-- Linea brush sotto (richiamo HO) -->
+  <path d="M 130 295 Q 200 300, 270 295"
+        fill="none" stroke="#141413" stroke-width="12" stroke-linecap="round"/>
+
+  <!-- Testo ModusHO -->
+  <text x="200" y="385" text-anchor="middle" font-family="Georgia, 'Playfair Display', serif"
+        font-size="42" letter-spacing="12" fill="#141413" font-weight="400">MODUSHO</text>
+
+  <!-- Sottotitolo -->
+  <text x="200" y="430" text-anchor="middle" font-family="'Inter', 'Helvetica Neue', sans-serif"
+        font-size="16" letter-spacing="6" fill="#141413" font-weight="300">GOVERNANCE OPERATIVA</text>
+</svg>

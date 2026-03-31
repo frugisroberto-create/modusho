@@ -6,11 +6,11 @@ import { it } from "date-fns/locale";
 
 const ROLE_LABELS: Record<string, string> = {
   HOD: "Capo Reparto", HOTEL_MANAGER: "Hotel Manager",
-  ADMIN: "Admin", SUPER_ADMIN: "Super Admin",
+  ADMIN: "HOO", SUPER_ADMIN: "HOO",
 };
 
 const STATUS_LABELS: Record<string, string> = {
-  DRAFT: "Bozza", REVIEW_HM: "Revisione HM", REVIEW_ADMIN: "Revisione Admin",
+  DRAFT: "Bozza", REVIEW_HM: "Revisione HM", REVIEW_ADMIN: "Revisione HOO",
   PUBLISHED: "Pubblicato", RETURNED: "Restituito", ARCHIVED: "Archiviato",
 };
 

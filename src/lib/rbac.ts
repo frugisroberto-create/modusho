@@ -79,7 +79,7 @@ export async function canUserManageContentType(
   });
 
   if (!user) return false;
-  if (user.role === "SUPER_ADMIN") return true;
+  if (user.role === "SUPER_ADMIN" || user.role === "ADMIN") return true;
   if (!user.canEdit) return false;
 
   const permission = await prisma.userContentPermission.findUnique({
@@ -103,7 +103,7 @@ export async function getUserContentPermissions(
 
   if (!user) return [];
 
-  if (user.role === "SUPER_ADMIN") {
+  if (user.role === "SUPER_ADMIN" || user.role === "ADMIN") {
     return ["SOP", "DOCUMENT", "MEMO"];
   }
 

@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useCallback } from "react";
 import Link from "next/link";
+import { ExportPdfButton } from "@/components/shared/export-pdf-button";
 
 interface MemoItem {
   id: string; contentId: string; title: string; body: string;
@@ -57,15 +58,6 @@ export default function MemoManagementPage() {
     if (res.ok) fetchMemos();
   };
 
-  const handleTogglePin = async (memoId: string, currentPinned: boolean) => {
-    const res = await fetch(`/api/memo/${memoId}`, {
-      method: "PUT",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ isPinned: !currentPinned }),
-    });
-    if (res.ok) fetchMemos();
-  };
-
   const totalPages = Math.ceil(total / pageSize);
   const now = new Date();
 
@@ -100,13 +92,12 @@ export default function MemoManagementPage() {
           {memos.map((m) => {
             const isExpired = m.expiresAt && new Date(m.expiresAt) < now;
             return (
-              <div key={m.id} className={`bg-white  border p-4 ${isExpired ? "border-gray-300 opacity-60" : m.isPinned ? "border-yellow-300" : "border-gray-200"}`}>
+              <div key={m.id} className={`bg-white border border-ivory-dark p-4 ${isExpired ? "opacity-60" : ""}`}>
                 <div className="flex items-start justify-between gap-3">
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-2 mb-1">
-                      {m.isPinned && <span className="text-xs font-medium px-2 py-0.5 rounded bg-yellow-100 text-yellow-800">Pinnato</span>}
-                      {isExpired && <span className="text-xs font-medium px-2 py-0.5 rounded bg-gray-100 text-gray-500">Scaduto</span>}
-                      <h3 className="font-medium text-gray-900 text-sm truncate">{m.title}</h3>
+                      {isExpired && <span className="text-xs font-medium px-2 py-0.5 bg-ivory-dark text-charcoal/50">Scaduto</span>}
+                      <h3 className="font-medium text-charcoal-dark text-sm truncate">{m.title}</h3>
                     </div>
                     <p className="text-sm text-gray-500 line-clamp-2">{stripHtml(m.body)}</p>
                     <div className="flex gap-3 mt-2 text-xs text-gray-400">
@@ -115,13 +106,10 @@ export default function MemoManagementPage() {
                       {m.expiresAt && <span>Scade: {new Date(m.expiresAt).toLocaleDateString("it-IT")}</span>}
                     </div>
                   </div>
-                  <div className="flex gap-1 shrink-0">
-                    <button onClick={() => handleTogglePin(m.id, m.isPinned)}
-                      className={`px-2 py-1 text-xs rounded ${m.isPinned ? "text-yellow-700 hover:bg-yellow-50" : "text-gray-500 hover:bg-gray-50"}`}>
-                      {m.isPinned ? "Unpin" : "Pin"}
-                    </button>
-                    <Link href={`/memo/${m.id}`} className="px-2 py-1 text-xs text-blue-600 hover:bg-blue-50 rounded">Modifica</Link>
-                    <button onClick={() => handleArchive(m.id)} className="px-2 py-1 text-xs text-red-500 hover:bg-red-50 rounded">Archivia</button>
+                  <div className="flex items-center gap-1 shrink-0">
+                    <ExportPdfButton contentId={m.contentId} />
+                    <Link href={`/memo/${m.contentId}`} className="px-2 py-1 text-xs text-terracotta hover:bg-terracotta/10">Modifica</Link>
+                    <button onClick={() => handleArchive(m.id)} className="px-2 py-1 text-xs text-alert-red hover:bg-alert-red/10">Archivia</button>
                   </div>
                 </div>
               </div>

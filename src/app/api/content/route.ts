@@ -78,8 +78,13 @@ export async function GET(request: NextRequest) {
 
   if (type) where.type = type;
 
-  // Status enforcement per ruolo
+  // Brand Book: solo HM+ (blocca OPERATOR e HOD)
   const userRole = session.user.role;
+  if (type === "BRAND_BOOK" && (userRole === "OPERATOR" || userRole === "HOD")) {
+    return NextResponse.json({ data: [], meta: { page, pageSize, total: 0 } });
+  }
+
+  // Status enforcement per ruolo
   if (userRole === "OPERATOR") {
     where.status = "PUBLISHED";
   } else if (userRole === "HOD") {
@@ -197,10 +202,22 @@ export async function POST(request: NextRequest) {
   const userId = session.user.id;
   const role = session.user.role;
 
-  // Verifica permesso sul tipo di contenuto
-  const canManageType = await canUserManageContentType(userId, type);
-  if (!canManageType) {
-    return NextResponse.json({ error: `Non hai permesso di creare contenuti di tipo ${type}` }, { status: 403 });
+  // Brand Book: solo ADMIN/SUPER_ADMIN possono creare
+  if (type === "BRAND_BOOK" && role !== "ADMIN" && role !== "SUPER_ADMIN") {
+    return NextResponse.json({ error: "Solo ADMIN può creare Brand Book" }, { status: 403 });
+  }
+
+  // Standard Book: solo ADMIN/SUPER_ADMIN possono creare
+  if (type === "STANDARD_BOOK" && role !== "ADMIN" && role !== "SUPER_ADMIN") {
+    return NextResponse.json({ error: "Solo ADMIN può creare Standard Book" }, { status: 403 });
+  }
+
+  // Verifica permesso sul tipo di contenuto (Brand Book e Standard Book sono già protetti dal check ruolo sopra)
+  if (type !== "BRAND_BOOK" && type !== "STANDARD_BOOK") {
+    const canManageType = await canUserManageContentType(userId, type);
+    if (!canManageType) {
+      return NextResponse.json({ error: `Non hai permesso di creare contenuti di tipo ${type}` }, { status: 403 });
+    }
   }
 
   // RBAC: verifica accesso alla property e department

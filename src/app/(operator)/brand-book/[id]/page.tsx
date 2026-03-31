@@ -10,6 +10,12 @@ interface Props { params: Promise<{ id: string }> }
 export default async function BrandBookDetailPage({ params }: Props) {
   const user = await getSessionUser();
   if (!user) redirect("/login");
+
+  // Brand Book: solo HM+
+  if (!["HOTEL_MANAGER", "ADMIN", "SUPER_ADMIN"].includes(user.role)) {
+    notFound();
+  }
+
   const { id } = await params;
 
   const content = await prisma.content.findUnique({

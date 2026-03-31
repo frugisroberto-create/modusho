@@ -23,7 +23,7 @@ export default async function StandardBookDetailPage({ params }: Props) {
 
   if (!content || content.status !== "PUBLISHED" || content.type !== "STANDARD_BOOK") notFound();
 
-  const hasAccess = await checkAccess(user.id, "OPERATOR", content.propertyId);
+  const hasAccess = await checkAccess(user.id, "OPERATOR", content.propertyId, content.departmentId ?? undefined);
   if (!hasAccess) notFound();
 
   const acknowledged = content.acknowledgments.length > 0;

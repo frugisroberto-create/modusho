@@ -29,10 +29,17 @@ export async function PUT(
   const parsed = updateMemoSchema.safeParse(rawBody);
   if (!parsed.success) return NextResponse.json({ error: "Parametri non validi" }, { status: 400 });
 
-  const memo = await prisma.memo.findUnique({
+  // Cerca per memo.id oppure per contentId (la UI naviga con content.id)
+  let memo = await prisma.memo.findUnique({
     where: { id: memoId },
     include: { content: { select: { id: true, propertyId: true, status: true } } },
   });
+  if (!memo) {
+    memo = await prisma.memo.findUnique({
+      where: { contentId: memoId },
+      include: { content: { select: { id: true, propertyId: true, status: true } } },
+    });
+  }
 
   if (!memo) return NextResponse.json({ error: "Memo non trovato" }, { status: 404 });
 

@@ -38,7 +38,10 @@ export default async function ApprovalDetailPage({ params }: Props) {
   const hasAccess = await checkAccess(user.id, "HOTEL_MANAGER", content.propertyId);
   if (!hasAccess) notFound();
 
-  const canReview = content.status === "REVIEW_ADMIN" || content.status === "REVIEW_HM";
+  // HM può fare review solo in REVIEW_HM (inoltra). Solo ADMIN/SUPER_ADMIN possono approvare e pubblicare in REVIEW_ADMIN.
+  const canReview =
+    (content.status === "REVIEW_HM" && ["HOTEL_MANAGER", "ADMIN", "SUPER_ADMIN"].includes(user.role)) ||
+    (content.status === "REVIEW_ADMIN" && ["ADMIN", "SUPER_ADMIN"].includes(user.role));
   const canEdit = canReview && (
     (content.status === "REVIEW_HM" && ["HOTEL_MANAGER", "ADMIN", "SUPER_ADMIN"].includes(user.role)) ||
     (content.status === "REVIEW_ADMIN" && ["ADMIN", "SUPER_ADMIN"].includes(user.role))

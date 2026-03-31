@@ -15,9 +15,9 @@ export default async function OperatorLayout({
   const dbUser = await prisma.user.findUnique({ where: { id: user.id }, select: { id: true } });
   if (!dbUser) redirect("/api/auth/signout");
 
-  // SUPER_ADMIN vede tutte le property
+  // SUPER_ADMIN e ADMIN vedono tutte le property attive
   let properties;
-  if (user.role === "SUPER_ADMIN") {
+  if (user.role === "SUPER_ADMIN" || user.role === "ADMIN") {
     properties = await prisma.property.findMany({
       where: { isActive: true },
       select: { id: true, name: true, code: true, tagline: true },
@@ -43,6 +43,7 @@ export default async function OperatorLayout({
       isDeleted: false,
       status: "PUBLISHED",
       propertyId: { in: propertyIds },
+      type: { notIn: ["BRAND_BOOK", "STANDARD_BOOK"] },
       acknowledgments: {
         none: { userId: user.id },
       },

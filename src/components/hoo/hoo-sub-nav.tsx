@@ -8,12 +8,11 @@ interface HooSubNavProps {
 }
 
 const SUB_NAV_ITEMS: { href: string; label: string; minRole?: string }[] = [
-  { href: "/dashboard", label: "Overview" },
-  { href: "/approvals", label: "Approvazioni" },
+  { href: "/dashboard", label: "Dashboard", minRole: "ADMIN" },
+  { href: "/approvals", label: "Approvazioni", minRole: "ADMIN" },
   { href: "/users", label: "Gestione utenti", minRole: "ADMIN" },
   { href: "/properties", label: "Strutture", minRole: "ADMIN" },
-  { href: "/reports", label: "Report" },
-  { href: "/memo", label: "Memo" },
+  { href: "/reports", label: "Report", minRole: "ADMIN" },
 ];
 
 export function HooSubNav({ userRole }: HooSubNavProps) {

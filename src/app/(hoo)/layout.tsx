@@ -1,8 +1,7 @@
 import { redirect } from "next/navigation";
-import { getSessionUser } from "@/lib/session";
+import { getSessionUser, getUserProperties } from "@/lib/session";
 import { prisma } from "@/lib/prisma";
-import { HooHeader } from "@/components/hoo/hoo-header";
-import { HooSubNav } from "@/components/hoo/hoo-sub-nav";
+import { HooShell } from "@/components/hoo/hoo-shell";
 
 export default async function HooLayout({
   children,
@@ -15,17 +14,29 @@ export default async function HooLayout({
   const dbUser = await prisma.user.findUnique({ where: { id: user.id }, select: { id: true } });
   if (!dbUser) redirect("/api/auth/signout");
 
-  if (user.role !== "HOTEL_MANAGER" && user.role !== "ADMIN" && user.role !== "SUPER_ADMIN") {
+  if (user.role !== "HOD" && user.role !== "HOTEL_MANAGER" && user.role !== "ADMIN" && user.role !== "SUPER_ADMIN") {
     redirect("/");
   }
 
+  // Carica le property accessibili
+  let properties;
+  if (user.role === "SUPER_ADMIN" || user.role === "ADMIN") {
+    properties = await prisma.property.findMany({
+      where: { isActive: true },
+      select: { id: true, name: true, code: true },
+      orderBy: { code: "asc" },
+    });
+  } else {
+    properties = await getUserProperties(user.id);
+  }
+
   return (
-    <div className="min-h-screen bg-ivory-medium">
-      <HooHeader userName={user.name} userRole={user.role} />
-      <HooSubNav userRole={user.role} />
-      <main className="max-w-[1200px] mx-auto px-6 lg:px-10 py-8">
-        {children}
-      </main>
-    </div>
+    <HooShell
+      userName={user.name}
+      userRole={user.role}
+      properties={properties}
+    >
+      {children}
+    </HooShell>
   );
 }

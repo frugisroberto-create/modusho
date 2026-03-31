@@ -21,14 +21,18 @@ interface OperatorHeaderProps {
   onPropertyChange: (propertyId: string) => void;
 }
 
-const NAV_ITEMS = [
+const NAV_ITEMS: { href: string; label: string; minRole?: string }[] = [
   { href: "/", label: "Home" },
   { href: "/sop", label: "SOP" },
   { href: "/documents", label: "Documenti" },
   { href: "/comunicazioni", label: "Memo" },
-  { href: "/brand-book", label: "Brand Book" },
+  { href: "/brand-book", label: "Brand Book", minRole: "HOTEL_MANAGER" },
   { href: "/standard-book", label: "Standard Book" },
 ];
+
+const ROLE_LEVEL: Record<string, number> = {
+  OPERATOR: 0, HOD: 1, HOTEL_MANAGER: 2, ADMIN: 3, SUPER_ADMIN: 4,
+};
 
 export function OperatorHeader({
   userName,
@@ -40,7 +44,7 @@ export function OperatorHeader({
 }: OperatorHeaderProps) {
   const pathname = usePathname();
   const [userMenuOpen, setUserMenuOpen] = useState(false);
-  const canAccessDashboard = ["HOTEL_MANAGER", "ADMIN", "SUPER_ADMIN"].includes(userRole);
+  const canAccessDashboard = ["HOD", "HOTEL_MANAGER", "ADMIN", "SUPER_ADMIN"].includes(userRole);
   const currentProperty = properties.find((p) => p.id === currentPropertyId);
   const initials = userName.split(" ").map(n => n[0]).join("").slice(0, 2);
 
@@ -56,9 +60,9 @@ export function OperatorHeader({
             </span>
           </Link>
 
-          {/* BLOCK 2 — Primary Navigation (centered) */}
-          <nav className="hidden lg:flex items-center gap-6 flex-1">
-            {NAV_ITEMS.map((item) => {
+          {/* BLOCK 2 — Primary Navigation */}
+          <nav className="hidden md:flex items-center gap-4 lg:gap-6 flex-1">
+            {NAV_ITEMS.filter(item => !item.minRole || (ROLE_LEVEL[userRole] ?? 0) >= (ROLE_LEVEL[item.minRole] ?? 0)).map((item) => {
               const isActive = item.href === "/" ? pathname === "/" : pathname.startsWith(item.href);
               return (
                 <Link key={item.href} href={item.href}
@@ -122,7 +126,7 @@ export function OperatorHeader({
                   <div className="absolute right-0 top-full mt-1 w-52 bg-white border border-ivory-dark z-50 py-1 shadow-lg">
                     <div className="px-4 py-3 border-b border-ivory-dark">
                       <p className="text-sm font-ui font-medium text-charcoal-dark">{userName}</p>
-                      <p className="text-[11px] font-ui text-charcoal/50 mt-0.5">{userRole.replace("_", " ")}</p>
+                      <p className="text-[11px] font-ui text-charcoal/50 mt-0.5">{userRole === "ADMIN" || userRole === "SUPER_ADMIN" ? "HOO" : userRole.replace("_", " ")}</p>
                     </div>
                     {canAccessDashboard && (
                       <Link href="/dashboard" onClick={() => setUserMenuOpen(false)}

@@ -1,32 +1,52 @@
 "use client";
 
 import Link from "next/link";
-import { usePathname } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
 import { signOut } from "next-auth/react";
+
+interface HooProperty {
+  id: string;
+  name: string;
+  code: string;
+}
 
 interface HooHeaderProps {
   userName: string;
   userRole: string;
+  properties: HooProperty[];
+  currentPropertyId: string;
+  onPropertyChange: (id: string) => void;
 }
 
-const HOO_NAV_ITEMS: { href: string; label: string; minRole?: string }[] = [
-  { href: "/dashboard", label: "Home" },
+const HOO_NAV_ITEMS: { href: string; label: string; minRole?: string; adminOnly?: boolean; hmHodOnly?: boolean }[] = [
+  { href: "/dashboard", label: "Home", adminOnly: true },
   { href: "/hoo-sop", label: "SOP" },
-  { href: "/library", label: "Documenti" },
-  { href: "/memo", label: "Memo" },
-  { href: "/hoo-brand-book", label: "Brand Book" },
+  { href: "/library", label: "Documenti", minRole: "HOTEL_MANAGER" },
+  { href: "/memo", label: "Memo", minRole: "HOTEL_MANAGER" },
+  { href: "/hoo-brand-book", label: "Brand Book", minRole: "HOTEL_MANAGER" },
   { href: "/hoo-standard-book", label: "Standard Book" },
-  { href: "/analytics", label: "Analytics", minRole: "ADMIN" },
 ];
 
-export function HooHeader({ userName, userRole }: HooHeaderProps) {
-  const pathname = usePathname();
-  const isAdmin = userRole === "ADMIN" || userRole === "SUPER_ADMIN";
+const ROLE_LEVEL: Record<string, number> = {
+  OPERATOR: 0, HOD: 1, HOTEL_MANAGER: 2, ADMIN: 3, SUPER_ADMIN: 4,
+};
 
+export function HooHeader({ userName, userRole, properties, currentPropertyId, onPropertyChange }: HooHeaderProps) {
+  const pathname = usePathname();
+  const router = useRouter();
+
+  const handlePropertySelect = (propertyId: string) => {
+    onPropertyChange(propertyId);
+    if (propertyId) {
+      router.push(`/?propertyId=${propertyId}`);
+    }
+  };
+
+  const isHoo = userRole === "ADMIN" || userRole === "SUPER_ADMIN";
   const visibleNav = HOO_NAV_ITEMS.filter((item) => {
+    if (item.adminOnly && !isHoo) return false;
     if (!item.minRole) return true;
-    if (item.minRole === "ADMIN") return isAdmin;
-    return false;
+    return (ROLE_LEVEL[userRole] ?? 0) >= (ROLE_LEVEL[item.minRole] ?? 0);
   });
 
   return (
@@ -34,9 +54,9 @@ export function HooHeader({ userName, userRole }: HooHeaderProps) {
       <div className="max-w-[1200px] mx-auto px-6 lg:px-10">
         <div className="flex items-center justify-between h-14">
           <div className="flex items-center gap-10">
-            <Link href="/dashboard" className="shrink-0">
+            <Link href={isHoo ? "/dashboard" : "/hoo-sop"} className="shrink-0">
               <span className="font-heading text-white text-base tracking-[0.25em] font-normal">
-                HO COLLECTION
+                MODUSHO
               </span>
             </Link>
             <nav className="hidden md:flex gap-7">
@@ -58,6 +78,21 @@ export function HooHeader({ userName, userRole }: HooHeaderProps) {
           </div>
 
           <div className="flex items-center gap-4">
+            {/* Property selector */}
+            {properties.length > 1 && (
+              <select
+                value={currentPropertyId}
+                onChange={(e) => handlePropertySelect(e.target.value)}
+                className="text-[11px] font-ui border border-white/20 px-2 py-1 bg-white/10 text-white/90 focus:outline-none max-w-[160px] truncate"
+                style={{ borderRadius: 0 }}
+              >
+                <option value="" className="text-charcoal">Tutte le strutture</option>
+                {properties.map((p) => (
+                  <option key={p.id} value={p.id} className="text-charcoal">{p.code} — {p.name}</option>
+                ))}
+              </select>
+            )}
+
             <Link href="/"
               className="text-sm font-ui font-medium text-white/80 hover:text-white bg-white/10 px-3 py-1.5 transition-colors">
               Vista Hotel

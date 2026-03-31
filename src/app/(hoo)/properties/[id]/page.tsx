@@ -16,8 +16,8 @@ interface PropertyDetail {
 }
 
 const ROLE_BADGE: Record<string, { label: string; cls: string }> = {
-  SUPER_ADMIN: { label: "SA", cls: "bg-charcoal-dark text-white" },
-  ADMIN: { label: "Admin", cls: "bg-sage text-white" },
+  SUPER_ADMIN: { label: "HOO", cls: "bg-charcoal-dark text-white" },
+  ADMIN: { label: "HOO", cls: "bg-sage text-white" },
   HOTEL_MANAGER: { label: "HM", cls: "bg-terracotta text-white" },
   HOD: { label: "HOD", cls: "bg-mauve text-white" },
   OPERATOR: { label: "Op", cls: "bg-ivory-dark text-charcoal" },

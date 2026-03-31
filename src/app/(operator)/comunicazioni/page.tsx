@@ -3,6 +3,7 @@
 import { useState, useEffect, useCallback, useRef } from "react";
 import { useSession } from "next-auth/react";
 import { useOperatorContext } from "@/components/operator/operator-shell";
+import { ExportPdfButton } from "@/components/shared/export-pdf-button";
 
 interface MemoItem {
   id: string; contentId: string; title: string; body: string;
@@ -116,6 +117,7 @@ export default function MemoListPage() {
                     {memo.expiresAt && <span>Scade: {new Date(memo.expiresAt).toLocaleDateString("it-IT")}</span>}
                   </div>
                 </div>
+                <ExportPdfButton contentId={memo.contentId} />
               </div>
             );
           })}

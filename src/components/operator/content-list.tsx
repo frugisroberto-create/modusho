@@ -26,13 +26,16 @@ interface ContentListProps {
   description?: string;
   createPath?: string;
   createLabel?: string;
+  searchPlaceholder?: string;
 }
 
-export function ContentList({ contentType, detailPath, title, description, createPath, createLabel }: ContentListProps) {
+export function ContentList({ contentType, detailPath, title, description, createPath, createLabel, searchPlaceholder }: ContentListProps) {
   const { currentPropertyId } = useOperatorContext();
   const { data: session } = useSession();
   const userRole = session?.user?.role || "OPERATOR";
-  const canCreate = ["HOD", "HOTEL_MANAGER", "ADMIN", "SUPER_ADMIN"].includes(userRole);
+  const canCreate = contentType === "DOCUMENT"
+    ? ["HOTEL_MANAGER", "ADMIN", "SUPER_ADMIN"].includes(userRole)
+    : ["HOD", "HOTEL_MANAGER", "ADMIN", "SUPER_ADMIN"].includes(userRole);
 
   const [items, setItems] = useState<ContentItem[]>([]);
   const [departments, setDepartments] = useState<Department[]>([]);
@@ -40,24 +43,34 @@ export function ContentList({ contentType, detailPath, title, description, creat
   const [page, setPage] = useState(1);
   const [loading, setLoading] = useState(true);
   const [departmentFilter, setDepartmentFilter] = useState("");
+  const [deptsLoaded, setDeptsLoaded] = useState(false);
   const [readFilter, setReadFilter] = useState<"" | "true" | "false">("");
   const [searchQuery, setSearchQuery] = useState("");
   const [searchTerm, setSearchTerm] = useState("");
   const debounceRef = useRef<NodeJS.Timeout | null>(null);
   const pageSize = 20;
 
+  const roleRequiresSpecificDept = userRole === "OPERATOR" || userRole === "HOD";
+
+  // Load accessible departments (RBAC-filtered)
   useEffect(() => {
     async function fetchDepts() {
-      const res = await fetch(`/api/content?type=${contentType}&propertyId=${currentPropertyId}&status=PUBLISHED&pageSize=50`);
+      const res = await fetch(`/api/my-departments?propertyId=${currentPropertyId}`);
       if (res.ok) {
         const json = await res.json();
-        const depts = new Map<string, Department>();
-        for (const item of json.data) { if (item.department) depts.set(item.department.id, item.department); }
-        setDepartments(Array.from(depts.values()));
+        const depts: Department[] = json.data;
+        setDepartments(depts);
+        // OPERATOR/HOD with single dept: pre-select and lock
+        if (roleRequiresSpecificDept && depts.length === 1) {
+          setDepartmentFilter(depts[0].id);
+        }
       }
+      setDeptsLoaded(true);
     }
+    setDepartmentFilter("");
+    setDeptsLoaded(false);
     fetchDepts();
-  }, [contentType, currentPropertyId]);
+  }, [currentPropertyId, roleRequiresSpecificDept]);
 
   const fetchContent = useCallback(async () => {
     setLoading(true);
@@ -126,7 +139,7 @@ export function ContentList({ contentType, detailPath, title, description, creat
       {/* Search bar */}
       <div className="flex border border-ivory-dark bg-white overflow-hidden">
         <input type="text" value={searchQuery} onChange={(e) => handleSearchChange(e.target.value)}
-          placeholder="Cerca una procedura..."
+          placeholder={searchPlaceholder || (contentType === "SOP" ? "Cerca una procedura..." : "Cerca un documento...")}
           className="flex-1 px-5 py-3 text-sm font-ui text-charcoal bg-transparent"
           style={{ border: "none", boxShadow: "none" }} />
         <button type="button" onClick={() => setSearchTerm(searchQuery)}
@@ -140,8 +153,9 @@ export function ContentList({ contentType, detailPath, title, description, creat
         <div>
           <label className="block text-[11px] font-ui uppercase tracking-wider text-charcoal/45 mb-1">Reparto</label>
           <select value={departmentFilter} onChange={(e) => setDepartmentFilter(e.target.value)}
-            className="text-sm font-ui border-ivory-dark px-3 py-2 bg-white">
-            <option value="">Tutti i reparti</option>
+            className="text-sm font-ui border-ivory-dark px-3 py-2 bg-white"
+            disabled={roleRequiresSpecificDept && departments.length <= 1}>
+            {!roleRequiresSpecificDept && <option value="">Tutti i reparti</option>}
             {departments.map((d) => <option key={d.id} value={d.id}>{d.name}</option>)}
           </select>
         </div>

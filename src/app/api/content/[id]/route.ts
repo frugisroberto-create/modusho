@@ -52,8 +52,13 @@ export async function GET(
     return NextResponse.json({ error: "Contenuto non trovato" }, { status: 404 });
   }
 
-  // Visibilità basata su status + ruolo
+  // Brand Book: solo HM+
   const userRole = session.user.role;
+  if (content.type === "BRAND_BOOK" && (userRole === "OPERATOR" || userRole === "HOD")) {
+    return NextResponse.json({ error: "Contenuto non trovato" }, { status: 404 });
+  }
+
+  // Visibilità basata su status + ruolo
   if (content.status !== "PUBLISHED") {
     if (userRole === "OPERATOR") {
       return NextResponse.json({ error: "Contenuto non trovato" }, { status: 404 });

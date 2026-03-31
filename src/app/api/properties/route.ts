@@ -48,7 +48,6 @@ export async function GET(request: NextRequest) {
 
 const createPropertySchema = z.object({
   name: z.string().min(1).max(200),
-  code: z.string().min(1).max(5).transform(s => s.toUpperCase()),
   tagline: z.string().max(200).optional(),
   city: z.string().min(1).max(100),
   address: z.string().max(300).optional(),
@@ -68,10 +67,18 @@ export async function POST(request: NextRequest) {
   const parsed = createPropertySchema.safeParse(body);
   if (!parsed.success) return NextResponse.json({ error: "Parametri non validi", details: parsed.error.issues }, { status: 400 });
 
-  const { name, code, tagline, city, address, description, website, departmentCodes } = parsed.data;
+  const { name, tagline, city, address, description, website, departmentCodes } = parsed.data;
 
-  const existing = await prisma.property.findUnique({ where: { code } });
-  if (existing) return NextResponse.json({ error: "Codice già in uso" }, { status: 409 });
+  // Auto-genera codice sequenziale HO{N}
+  const allCodes = await prisma.property.findMany({
+    select: { code: true },
+    where: { code: { startsWith: "HO" } },
+  });
+  const maxNum = allCodes.reduce((max, p) => {
+    const num = parseInt(p.code.replace("HO", ""), 10);
+    return isNaN(num) ? max : Math.max(max, num);
+  }, 0);
+  const code = `HO${maxNum + 1}`;
 
   const property = await prisma.property.create({
     data: { name, code, tagline, city, address, description, website },
@@ -86,6 +93,11 @@ export async function POST(request: NextRequest) {
   for (const d of depts) {
     await prisma.department.create({ data: { name: d.name, code: d.code, propertyId: property.id } });
   }
+
+  // Auto-assign the new property to the creator (full access — no specific department)
+  await prisma.propertyAssignment.create({
+    data: { userId: session.user.id, propertyId: property.id, departmentId: null },
+  });
 
   return NextResponse.json({ data: { id: property.id } }, { status: 201 });
 }

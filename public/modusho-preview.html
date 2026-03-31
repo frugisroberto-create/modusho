@@ -1,0 +1,114 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+<meta charset="UTF-8">
+<title>ModusHO — Logo Finale</title>
+<link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@400;700&family=Inter:wght@300;400&display=swap" rel="stylesheet">
+<style>
+  * { box-sizing: border-box; }
+  body { background: #FEFBF4; font-family: 'Inter', sans-serif; margin: 0; padding: 40px 20px; }
+  h1 { font-family: 'Playfair Display', Georgia, serif; color: #964733; text-align: center; font-size: 32px; margin-bottom: 8px; }
+  p.sub { text-align: center; color: #4E564F; font-size: 13px; letter-spacing: 4px; margin-bottom: 50px; text-transform: uppercase; }
+
+  .comparison { display: flex; gap: 60px; justify-content: center; align-items: flex-start; max-width: 900px; margin: 0 auto 60px; }
+  .comp-item { text-align: center; flex: 1; }
+  .comp-item h3 { font-family: 'Inter', sans-serif; font-size: 12px; letter-spacing: 3px; text-transform: uppercase; color: #848B82; margin-bottom: 20px; }
+  .comp-item .logo-box { background: white; border-radius: 12px; padding: 40px; border: 1px solid #E8E5DC; }
+  .comp-item img { max-height: 200px; width: auto; }
+
+  .variants { max-width: 1000px; margin: 0 auto; }
+  .variants h2 { font-family: 'Playfair Display', serif; color: #141413; font-size: 22px; text-align: center; margin-bottom: 30px; }
+  .var-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 20px; }
+  .var-card { background: #F0EFE9; border: 1px solid #E8E5DC; border-radius: 10px; padding: 25px 15px; text-align: center; }
+  .var-card .label { font-size: 11px; letter-spacing: 2px; text-transform: uppercase; color: #4E564F; margin-bottom: 15px; }
+  .var-card .box { background: white; border-radius: 8px; padding: 20px; margin-bottom: 10px; min-height: 120px; display: flex; align-items: center; justify-content: center; }
+  .var-card .box.dark { background: #4E564F; }
+  .var-card .box.terra { background: #964733; }
+  .var-card img { max-height: 90px; width: auto; }
+  .var-card img.invert { filter: brightness(0) invert(1); }
+
+  .usage { max-width: 700px; margin: 50px auto 0; }
+  .usage h2 { font-family: 'Playfair Display', serif; color: #141413; font-size: 22px; text-align: center; margin-bottom: 20px; }
+  .usage-table { width: 100%; border-collapse: collapse; }
+  .usage-table th { text-align: left; font-size: 12px; letter-spacing: 2px; text-transform: uppercase; color: #848B82; padding: 10px 15px; border-bottom: 1px solid #E8E5DC; }
+  .usage-table td { padding: 12px 15px; border-bottom: 1px solid #E8E5DC; font-size: 14px; color: #333; }
+</style>
+</head>
+<body>
+
+  <h1>ModusHO</h1>
+  <p class="sub">Logo finale — Simbolo HO Collection + Check di governance</p>
+
+  <!-- Confronto HO originale vs ModusHO -->
+  <div class="comparison">
+    <div class="comp-item">
+      <h3>HO Collection — Originale</h3>
+      <div class="logo-box">
+        <img src="/images/ho-simbolo.png" alt="HO Collection">
+      </div>
+    </div>
+    <div class="comp-item">
+      <h3>ModusHO — Con check</h3>
+      <div class="logo-box">
+        <img src="/modusho-simbolo.svg" alt="ModusHO">
+      </div>
+    </div>
+  </div>
+
+  <!-- Logo completo verticale -->
+  <div class="comparison">
+    <div class="comp-item">
+      <h3>Logo completo verticale</h3>
+      <div class="logo-box">
+        <img src="/modusho-logo-final.svg" alt="ModusHO Logo Verticale" style="max-height: 340px;">
+      </div>
+    </div>
+  </div>
+
+  <!-- Varianti su diversi sfondi -->
+  <div class="variants">
+    <h2>Varianti e sfondi</h2>
+    <div class="var-grid">
+      <div class="var-card">
+        <div class="label">Su avorio</div>
+        <div class="box" style="background: #FEFBF4;">
+          <img src="/modusho-simbolo.svg" alt="Avorio">
+        </div>
+      </div>
+      <div class="var-card">
+        <div class="label">Su bianco</div>
+        <div class="box">
+          <img src="/modusho-simbolo.svg" alt="Bianco">
+        </div>
+      </div>
+      <div class="var-card">
+        <div class="label">Su sage (sidebar)</div>
+        <div class="box dark">
+          <img src="/modusho-simbolo.svg" alt="Sage" class="invert">
+        </div>
+      </div>
+      <div class="var-card">
+        <div class="label">Su terracotta (header)</div>
+        <div class="box terra">
+          <img src="/modusho-simbolo.svg" alt="Terracotta" class="invert">
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Tabella uso -->
+  <div class="usage">
+    <h2>Dove usare cosa</h2>
+    <table class="usage-table">
+      <tr><th>Contesto</th><th>File</th></tr>
+      <tr><td>Home operatore (sopra barra ricerca)</td><td>modusho-logo-final.svg (grande, centrato)</td></tr>
+      <tr><td>Login</td><td>modusho-logo-final.svg (centrato, max 250px)</td></tr>
+      <tr><td>Sidebar HOO</td><td>modusho-simbolo.svg (bianco, 32px) + testo "ModusHO"</td></tr>
+      <tr><td>Header operatore</td><td>modusho-simbolo.svg (bianco, 24px)</td></tr>
+      <tr><td>Favicon</td><td>modusho-simbolo.svg (ridotto 32x32)</td></tr>
+      <tr><td>Report PDF</td><td>modusho-logo-final.svg (header documento)</td></tr>
+    </table>
+  </div>
+
+</body>
+</html>

@@ -42,12 +42,37 @@ export default withAuth(
       }
     }
 
-    // 4. Route HOO generiche: almeno HOTEL_MANAGER
-    if (pathname.startsWith("/dashboard") || pathname.startsWith("/approvals") ||
-        pathname.startsWith("/reports") || pathname.startsWith("/hoo-sop") ||
-        pathname.startsWith("/library") || pathname.startsWith("/memo") ||
-        pathname.startsWith("/content") || pathname.startsWith("/hoo-brand-book") ||
-        pathname.startsWith("/hoo-standard-book")) {
+    // 4a. Dashboard: solo ADMIN+ (HM/HOD vanno a /hoo-sop)
+    if (pathname.startsWith("/dashboard")) {
+      if (ROLE_HIERARCHY[userRole] < ROLE_HIERARCHY.ADMIN) {
+        return NextResponse.redirect(new URL("/hoo-sop", req.url));
+      }
+    }
+
+    // 4a2. Approvazioni e report: accessibili da HOD+
+    if (pathname.startsWith("/approvals") || pathname.startsWith("/reports")) {
+      if (ROLE_HIERARCHY[userRole] < ROLE_HIERARCHY.HOD) {
+        return NextResponse.redirect(new URL("/unauthorized", req.url));
+      }
+    }
+
+    // 4b. Standard Book HOO: accessibile a HOD+
+    if (pathname.startsWith("/hoo-standard-book")) {
+      if (ROLE_HIERARCHY[userRole] < ROLE_HIERARCHY.HOD) {
+        return NextResponse.redirect(new URL("/unauthorized", req.url));
+      }
+    }
+
+    // 4c. SOP workflow: almeno HOD (HOD crea e gestisce bozze SOP)
+    if (pathname.startsWith("/hoo-sop") || pathname.startsWith("/sop-workflow")) {
+      if (ROLE_HIERARCHY[userRole] < ROLE_HIERARCHY.HOD) {
+        return NextResponse.redirect(new URL("/unauthorized", req.url));
+      }
+    }
+
+    // 4d. Route HOO gestione: almeno HOTEL_MANAGER (incluso Brand Book)
+    if (pathname.startsWith("/library") || pathname.startsWith("/memo") ||
+        pathname.startsWith("/content") || pathname.startsWith("/hoo-brand-book")) {
       if (ROLE_HIERARCHY[userRole] < ROLE_HIERARCHY.HOTEL_MANAGER) {
         return NextResponse.redirect(new URL("/unauthorized", req.url));
       }

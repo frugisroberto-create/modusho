@@ -1,0 +1,23 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 400 500" width="400" height="500">
+  <!-- ModusHO Logo v2: Cerchio con check integrato -->
+  <!-- Concept: Il cerchio HO contiene un check discreto — governance = verifica -->
+
+  <!-- Cerchio brush stroke -->
+  <circle cx="200" cy="175" r="95" fill="none" stroke="#141413" stroke-width="22" stroke-linecap="round"/>
+
+  <!-- Check mark elegante dentro il cerchio — angolo basso destro -->
+  <path d="M 160 175 L 190 205 L 245 145"
+        fill="none" stroke="#141413" stroke-width="14" stroke-linecap="round" stroke-linejoin="round"/>
+
+  <!-- Linea brush orizzontale sotto (come HO originale) -->
+  <path d="M 130 305 Q 200 310, 270 305"
+        fill="none" stroke="#141413" stroke-width="12" stroke-linecap="round"/>
+
+  <!-- Testo ModusHO -->
+  <text x="200" y="395" text-anchor="middle" font-family="Georgia, 'Playfair Display', serif"
+        font-size="42" letter-spacing="12" fill="#141413" font-weight="400">MODUSHO</text>
+
+  <!-- Sottotitolo -->
+  <text x="200" y="440" text-anchor="middle" font-family="'Inter', 'Helvetica Neue', sans-serif"
+        font-size="16" letter-spacing="6" fill="#141413" font-weight="300">GOVERNANCE OPERATIVA</text>
+</svg>

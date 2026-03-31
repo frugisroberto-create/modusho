@@ -6,7 +6,10 @@ export default function DocumentsListPage() {
       contentType="DOCUMENT"
       detailPath="documents"
       title="Documenti"
-      description="Consulta i documenti disponibili per la tua struttura"
+      description="Consulta i documenti operativi disponibili per la tua struttura"
+      searchPlaceholder="Cerca un documento..."
+      createPath="/library/new"
+      createLabel="Nuovo documento"
     />
   );
 }

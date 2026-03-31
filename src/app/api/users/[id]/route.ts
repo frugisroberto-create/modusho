@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
+import bcrypt from "bcryptjs";
 import { z } from "zod/v4";
 
 export async function GET(
@@ -39,6 +40,7 @@ export async function GET(
 
 const updateUserSchema = z.object({
   name: z.string().min(1).max(200).optional(),
+  password: z.string().min(6).optional(),
   role: z.enum(["OPERATOR", "HOD", "HOTEL_MANAGER", "ADMIN"]).optional(),
   canView: z.boolean().optional(),
   canEdit: z.boolean().optional(),
@@ -74,7 +76,7 @@ export async function PUT(
     return NextResponse.json({ error: "Solo SUPER_ADMIN può modificare utenti ADMIN" }, { status: 403 });
   }
 
-  const { name, role, canView, canEdit, canApprove, isActive, propertyAssignments, contentTypes } = parsed.data;
+  const { name, password, role, canView, canEdit, canApprove, isActive, propertyAssignments, contentTypes } = parsed.data;
 
   const finalRole = role ?? target.role;
   const finalCanEdit = canEdit ?? false;
@@ -91,18 +93,27 @@ export async function PUT(
     return NextResponse.json({ error: "Solo SUPER_ADMIN può assegnare ruolo ADMIN" }, { status: 403 });
   }
 
+  // Validazione coerenza ruolo-reparti: OPERATOR e HOD non possono avere departmentId = null
+  if (propertyAssignments !== undefined && (finalRole === "OPERATOR" || finalRole === "HOD")) {
+    const hasNullDept = propertyAssignments.some(a => !a.departmentId);
+    if (hasNullDept) {
+      return NextResponse.json({
+        error: `Un ${finalRole === "OPERATOR" ? "Operatore" : "HOD"} deve avere reparti specifici assegnati, non accesso a tutti i reparti`,
+      }, { status: 400 });
+    }
+  }
+
   // Update user fields
-  await prisma.user.update({
-    where: { id },
-    data: {
-      ...(name !== undefined && { name }),
-      ...(role !== undefined && { role }),
-      ...(canView !== undefined && { canView }),
-      ...(canEdit !== undefined && { canEdit }),
-      ...(canApprove !== undefined && { canApprove }),
-      ...(isActive !== undefined && { isActive }),
-    },
-  });
+  const updateData: Record<string, unknown> = {};
+  if (name !== undefined) updateData.name = name;
+  if (role !== undefined) updateData.role = role;
+  if (canView !== undefined) updateData.canView = canView;
+  if (canEdit !== undefined) updateData.canEdit = canEdit;
+  if (canApprove !== undefined) updateData.canApprove = canApprove;
+  if (isActive !== undefined) updateData.isActive = isActive;
+  if (password) updateData.passwordHash = await bcrypt.hash(password, 12);
+
+  await prisma.user.update({ where: { id }, data: updateData });
 
   // Replace property assignments if provided
   if (propertyAssignments !== undefined) {

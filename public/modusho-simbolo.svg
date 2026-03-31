@@ -1,0 +1,27 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 500 480" width="500" height="480">
+  <!-- ModusHO Simbolo — Solo cerchio HO + check + linea brush -->
+
+  <!-- Cerchio brush stroke HO -->
+  <path d="M 268 82
+           C 310 78, 355 95, 382 130
+           C 412 168, 420 215, 410 258
+           C 400 302, 372 340, 335 365
+           C 298 390, 255 398, 215 390
+           C 172 375, 130 330, 112 285
+           C 94 240, 95 190, 115 148
+           C 135 106, 175 85, 220 80
+           C 240 78, 255 80, 268 82"
+        fill="none" stroke="#141413" stroke-width="28" stroke-linecap="round" stroke-linejoin="round"/>
+
+  <!-- Linea brush sotto -->
+  <path d="M 148 445
+           C 165 443, 200 440, 250 438
+           C 300 436, 335 438, 352 442"
+        fill="none" stroke="#141413" stroke-width="16" stroke-linecap="round"/>
+
+  <!-- Check mark -->
+  <path d="M 208 240
+           L 240 275
+           L 300 200"
+        fill="none" stroke="#141413" stroke-width="20" stroke-linecap="round" stroke-linejoin="round"/>
+</svg>

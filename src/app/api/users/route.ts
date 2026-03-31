@@ -15,7 +15,12 @@ const querySchema = z.object({
 export async function GET(request: NextRequest) {
   const session = await getServerSession(authOptions);
   if (!session?.user) return NextResponse.json({ error: "Non autenticato" }, { status: 401 });
-  if (session.user.role !== "ADMIN" && session.user.role !== "SUPER_ADMIN") {
+
+  const userRole = session.user.role;
+  const isAdmin = userRole === "ADMIN" || userRole === "SUPER_ADMIN";
+  const isHM = userRole === "HOTEL_MANAGER";
+
+  if (!isAdmin && !isHM) {
     return NextResponse.json({ error: "Accesso negato" }, { status: 403 });
   }
 
@@ -27,7 +32,33 @@ export async function GET(request: NextRequest) {
 
   const where: Record<string, unknown> = {};
   if (role) where.role = role;
-  if (propertyId) where.propertyAssignments = { some: { propertyId } };
+
+  // HOTEL_MANAGER: accesso in sola lettura, limitato alle property assegnate
+  if (isHM) {
+    if (propertyId) {
+      // Se specifica una propertyId, verifica che HM sia assegnato
+      const hmAssignment = await prisma.propertyAssignment.findFirst({
+        where: { userId: session.user.id, propertyId },
+      });
+      if (!hmAssignment) {
+        return NextResponse.json({ error: "Accesso negato a questa struttura" }, { status: 403 });
+      }
+      where.propertyAssignments = { some: { propertyId } };
+    } else {
+      // Se non specifica propertyId, scope automatico su tutte le property assegnate
+      const hmProperties = await prisma.propertyAssignment.findMany({
+        where: { userId: session.user.id },
+        select: { propertyId: true },
+      });
+      if (hmProperties.length === 0) {
+        return NextResponse.json({ data: [], meta: { page, pageSize, total: 0 } });
+      }
+      const hmPropertyIds = hmProperties.map((p) => p.propertyId);
+      where.propertyAssignments = { some: { propertyId: { in: hmPropertyIds } } };
+    }
+  } else if (propertyId) {
+    where.propertyAssignments = { some: { propertyId } };
+  }
 
   const [users, total] = await Promise.all([
     prisma.user.findMany({
@@ -94,6 +125,16 @@ export async function POST(request: NextRequest) {
   }
   if (!canEdit && contentTypes.length > 0) {
     return NextResponse.json({ error: "Tipi contenuto non assegnabili senza permesso di modifica" }, { status: 400 });
+  }
+
+  // Validazione coerenza ruolo-reparti: OPERATOR e HOD non possono avere departmentId = null
+  if (role === "OPERATOR" || role === "HOD") {
+    const hasNullDept = propertyAssignments.some(a => !a.departmentId);
+    if (hasNullDept) {
+      return NextResponse.json({
+        error: `Un ${role === "OPERATOR" ? "Operatore" : "HOD"} deve avere reparti specifici assegnati, non accesso a tutti i reparti`,
+      }, { status: 400 });
+    }
   }
 
   // Solo SUPER_ADMIN può creare ADMIN

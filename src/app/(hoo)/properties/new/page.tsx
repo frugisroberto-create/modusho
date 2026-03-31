@@ -15,7 +15,6 @@ const DEFAULT_DEPTS = [
 export default function NewPropertyPage() {
   const router = useRouter();
   const [name, setName] = useState("");
-  const [code, setCode] = useState("");
   const [tagline, setTagline] = useState("");
   const [city, setCity] = useState("");
   const [address, setAddress] = useState("");
@@ -39,8 +38,8 @@ export default function NewPropertyPage() {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError("");
-    if (!name.trim() || !code.trim() || !city.trim()) {
-      setError("Nome, codice e città sono obbligatori");
+    if (!name.trim() || !city.trim()) {
+      setError("Nome e città sono obbligatori");
       return;
     }
     setLoading(true);
@@ -49,7 +48,7 @@ export default function NewPropertyPage() {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          name, code: code.toUpperCase(), tagline: tagline || undefined,
+          name, tagline: tagline || undefined,
           city, address: address || undefined, description: description || undefined,
           website: website || undefined,
           departmentCodes: depts.filter(d => d.checked).map(d => ({ name: d.name, code: d.code })),
@@ -72,16 +71,10 @@ export default function NewPropertyPage() {
         {/* Info base */}
         <section className="bg-ivory-medium border border-ivory-dark  p-6 space-y-4">
           <h2 className="text-base font-heading font-semibold text-charcoal-dark">Informazioni</h2>
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-            <div>
-              <label className="block text-sm font-ui font-medium text-charcoal mb-1.5">Nome *</label>
-              <input type="text" value={name} onChange={(e) => setName(e.target.value)} required className="w-full" placeholder="The Nicolaus Hotel" />
-            </div>
-            <div>
-              <label className="block text-sm font-ui font-medium text-charcoal mb-1.5">Codice * <span className="text-sage-light font-normal">(max 5, immutabile)</span></label>
-              <input type="text" value={code} onChange={(e) => setCode(e.target.value.toUpperCase().slice(0, 5))} required
-                className="w-full uppercase" placeholder="NCL" maxLength={5} />
-            </div>
+          <div>
+            <label className="block text-sm font-ui font-medium text-charcoal mb-1.5">Nome *</label>
+            <input type="text" value={name} onChange={(e) => setName(e.target.value)} required className="w-full" placeholder="The Nicolaus Hotel" />
+            <p className="text-xs font-ui text-sage-light mt-1">Il codice struttura verrà generato automaticamente</p>
           </div>
           <div>
             <label className="block text-sm font-ui font-medium text-charcoal mb-1.5">Tagline</label>

@@ -1,6 +1,7 @@
 "use client";
 
 import { createContext, useCallback, useContext, useState } from "react";
+import { useSearchParams } from "next/navigation";
 import { OperatorHeader } from "./operator-header";
 
 interface Property {
@@ -14,6 +15,7 @@ interface OperatorContextValue {
   currentPropertyId: string;
   setCurrentPropertyId: (id: string) => void;
   properties: Property[];
+  userRole: string;
 }
 
 const OperatorContext = createContext<OperatorContextValue | null>(null);
@@ -41,14 +43,19 @@ export function OperatorShell({
   pendingCount,
   children,
 }: OperatorShellProps) {
-  const [currentPropertyId, setCurrentPropertyId] = useState(defaultPropertyId);
+  const searchParams = useSearchParams();
+  const paramPropertyId = searchParams.get("propertyId");
+  const initialPropertyId = paramPropertyId && properties.some(p => p.id === paramPropertyId)
+    ? paramPropertyId
+    : defaultPropertyId;
+  const [currentPropertyId, setCurrentPropertyId] = useState(initialPropertyId);
 
   const handlePropertyChange = useCallback((id: string) => {
     setCurrentPropertyId(id);
   }, []);
 
   return (
-    <OperatorContext.Provider value={{ currentPropertyId, setCurrentPropertyId, properties }}>
+    <OperatorContext.Provider value={{ currentPropertyId, setCurrentPropertyId, properties, userRole }}>
       <div className="min-h-screen bg-ivory-medium">
         <OperatorHeader
           userName={userName}
