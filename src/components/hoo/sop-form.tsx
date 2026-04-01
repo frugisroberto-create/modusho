@@ -2,9 +2,9 @@
 
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
-import { useSession } from "next-auth/react";
 import { DepartmentTargetSelector } from "@/components/shared/department-target-selector";
 import { AttachmentUploader } from "@/components/shared/attachment-uploader";
+import { SopEditor } from "@/components/shared/sop-editor";
 
 interface Property {
   id: string; name: string; code: string;
@@ -21,8 +21,7 @@ interface SopFormProps {
 
 export function SopForm({ mode, contentId, initialData, userRole, userDepartmentId }: SopFormProps) {
   const router = useRouter();
-  const { data: session } = useSession();
-  const effectiveRole = userRole || session?.user?.role || "ADMIN";
+  const effectiveRole = userRole || "OPERATOR";
 
   const [title, setTitle] = useState(initialData?.title || "");
   const [body, setBody] = useState(initialData?.body || "");
@@ -280,8 +279,11 @@ export function SopForm({ mode, contentId, initialData, userRole, userDepartment
       {/* Contenuto */}
       <div>
         <label className="block text-sm font-ui font-medium text-charcoal mb-1.5">Contenuto</label>
-        <textarea value={body} onChange={(e) => setBody(e.target.value)} rows={15}
-          className="w-full font-mono text-sm" placeholder="Contenuto della SOP (HTML o testo)" />
+        <SopEditor
+          content={body}
+          onChange={setBody}
+          placeholder="Scrivi il contenuto della procedura..."
+        />
       </div>
 
       {/* Allegati (solo in edit, per create si gestiscono nell'editor workflow) */}

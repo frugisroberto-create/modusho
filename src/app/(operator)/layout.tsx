@@ -1,3 +1,4 @@
+import { Suspense } from "react";
 import { redirect } from "next/navigation";
 import { getSessionUser, getUserProperties } from "@/lib/session";
 import { prisma } from "@/lib/prisma";
@@ -36,29 +37,16 @@ export default async function OperatorLayout({
 
   const defaultPropertyId = properties[0].id;
 
-  // Conteggio contenuti da visionare (presa visione obbligatoria, non ancora confermata)
-  const propertyIds = properties.map((p) => p.id);
-  const pendingCount = await prisma.content.count({
-    where: {
-      isDeleted: false,
-      status: "PUBLISHED",
-      propertyId: { in: propertyIds },
-      type: { notIn: ["BRAND_BOOK", "STANDARD_BOOK"] },
-      acknowledgments: {
-        none: { userId: user.id },
-      },
-    },
-  });
-
   return (
-    <OperatorShell
-      userName={user.name}
-      userRole={user.role}
-      properties={properties}
-      defaultPropertyId={defaultPropertyId}
-      pendingCount={pendingCount}
-    >
-      {children}
-    </OperatorShell>
+    <Suspense>
+      <OperatorShell
+        userName={user.name}
+        userRole={user.role}
+        properties={properties}
+        defaultPropertyId={defaultPropertyId}
+      >
+        {children}
+      </OperatorShell>
+    </Suspense>
   );
 }

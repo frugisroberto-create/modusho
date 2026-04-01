@@ -27,10 +27,20 @@ export async function GET(request: NextRequest) {
   const pageSize = Math.min(50, Math.max(1, parseInt(params.pageSize || "20", 10)));
   const statusFilter = params.sopStatus as "IN_LAVORAZIONE" | "PUBBLICATA" | "ARCHIVIATA" | undefined;
   const excludeStatus = params.excludeStatus as "IN_LAVORAZIONE" | "PUBBLICATA" | "ARCHIVIATA" | undefined;
+  const search = (params.search || "").trim();
 
   // SUPER_ADMIN e ADMIN vedono tutti i workflow; HOD/HM solo quelli dove sono R/C/A
+  const contentFilter: Record<string, unknown> = { isDeleted: false };
+
+  if (search) {
+    contentFilter.OR = [
+      { title: { contains: search, mode: "insensitive" } },
+      { code: { contains: search, mode: "insensitive" } },
+    ];
+  }
+
   const where: Record<string, unknown> = {
-    content: { isDeleted: false },
+    content: contentFilter,
   };
 
   if (role !== "SUPER_ADMIN" && role !== "ADMIN") {
@@ -77,6 +87,11 @@ export async function GET(request: NextRequest) {
         responsible: { select: { id: true, name: true, role: true } },
         consulted: { select: { id: true, name: true, role: true } },
         accountable: { select: { id: true, name: true, role: true } },
+        workflowEvents: {
+          where: { eventType: "DRAFT_CREATED" },
+          select: { metadata: true },
+          take: 1,
+        },
       },
       orderBy: [{ sopStatus: "asc" }, { updatedAt: "desc" }],
       skip: (page - 1) * pageSize,
@@ -111,6 +126,10 @@ export async function GET(request: NextRequest) {
       responsible: wf.responsible,
       consulted: wf.consulted,
       accountable: wf.accountable,
+      isImported: ((wf as unknown as { workflowEvents: { metadata: unknown }[] }).workflowEvents ?? []).some((e) => {
+        const meta = e.metadata as Record<string, unknown> | null;
+        return meta?.source === "bulk-import";
+      }),
     };
   });
 

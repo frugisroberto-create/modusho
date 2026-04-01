@@ -76,6 +76,7 @@ enum SopEventType {
   APPROVED
   PUBLISHED
   REVIEW_DUE_DATE_CHANGED
+  ARCHIVED
 }
 
 model User {
@@ -111,6 +112,7 @@ model User {
   sopWorkflowsAsA      SopWorkflow[]          @relation("SopAccountable")
   sopTextVersions      SopTextVersion[]       @relation("SopTextVersionSavedBy")
   sopWorkflowEvents    SopWorkflowEvent[]     @relation("SopWorkflowEventActor")
+  sopViewRecords       SopViewRecord[]        @relation("SopViewRecordUser")
 
   @@index([role])
   @@index([email])
@@ -222,6 +224,7 @@ model Content {
   attachments      Attachment[]
   memo             Memo?
   sopWorkflow      SopWorkflow?
+  sopViewRecords   SopViewRecord[]        @relation("SopViewRecords")
 
   @@index([propertyId])
   @@index([departmentId])
@@ -420,6 +423,9 @@ model SopWorkflow {
   lastSavedById String?
   textVersionCount Int @default(0)
 
+  // Visualizzazione version-aware: la versione pubblicata corrente richiede nuova conferma?
+  requiresNewAcknowledgment Boolean @default(true)
+
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
@@ -467,4 +473,23 @@ model SopWorkflowEvent {
 
   @@index([sopWorkflowId, createdAt])
   @@index([actorId])
+}
+
+// ─── Registro visualizzazioni SOP (version-aware) ────────────────────
+
+model SopViewRecord {
+  id              String    @id @default(cuid())
+  contentId       String
+  userId          String
+  contentVersion  Int       // Content.version al momento della visualizzazione
+  viewedAt        DateTime  @default(now())
+  acknowledgedAt  DateTime? // null = visto ma non confermato formalmente
+
+  content Content @relation("SopViewRecords", fields: [contentId], references: [id], onDelete: Cascade)
+  user    User    @relation("SopViewRecordUser", fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([contentId, userId, contentVersion])
+  @@index([contentId])
+  @@index([userId])
+  @@index([contentId, contentVersion])
 }

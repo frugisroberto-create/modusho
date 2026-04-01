@@ -59,7 +59,7 @@ export default async function DocumentDetailPage({ params }: Props) {
         </div>
         <div className="mt-3 flex items-center gap-2">
           <ExportPdfButton contentId={content.id} />
-          <ContentActions contentId={content.id} contentStatus={content.status} userRole={user.role} isFeatured={content.isFeatured} />
+          <ContentActions contentId={content.id} contentType={content.type} contentStatus={content.status} userRole={user.role} isFeatured={content.isFeatured} />
         </div>
       </div>
 

@@ -85,7 +85,7 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
       needsReview: needsReview({ sopStatus: wf.sopStatus, reviewDueDate: wf.reviewDueDate }),
       lastSavedAt: wf.lastSavedAt,
       textVersionCount: wf.textVersionCount,
-      canEditText: canEditText(userId, wf),
+      canEditText: canEditText(userId, wf, userRole),
       property: wf.content.property,
       department: wf.content.department,
       createdBy: wf.content.createdBy,
@@ -147,8 +147,9 @@ export async function PUT(request: NextRequest, { params }: RouteParams) {
     return NextResponse.json({ error: "SOP non trovata" }, { status: 404 });
   }
 
-  // Solo R puo' modificare il testo, e solo se IN_LAVORAZIONE
-  if (!canEditText(userId, wf)) {
+  // Solo R puo' modificare il testo (o ADMIN/SUPER_ADMIN pre-submit)
+  const userRole = session.user.role;
+  if (!canEditText(userId, wf, userRole)) {
     // Messaggio specifico per C/A quando la bozza e' sottoposta
     if (isInvolved(userId, wf) && (wf.submittedToC || wf.submittedToA)) {
       return NextResponse.json({

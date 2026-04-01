@@ -40,6 +40,7 @@ export async function GET(
 
 const updateUserSchema = z.object({
   name: z.string().min(1).max(200).optional(),
+  email: z.email().optional(),
   password: z.string().min(6).optional(),
   role: z.enum(["OPERATOR", "HOD", "HOTEL_MANAGER", "ADMIN"]).optional(),
   canView: z.boolean().optional(),
@@ -76,7 +77,15 @@ export async function PUT(
     return NextResponse.json({ error: "Solo SUPER_ADMIN può modificare utenti ADMIN" }, { status: 403 });
   }
 
-  const { name, password, role, canView, canEdit, canApprove, isActive, propertyAssignments, contentTypes } = parsed.data;
+  const { name, email, password, role, canView, canEdit, canApprove, isActive, propertyAssignments, contentTypes } = parsed.data;
+
+  // Unicità email
+  if (email) {
+    const existing = await prisma.user.findUnique({ where: { email }, select: { id: true } });
+    if (existing && existing.id !== id) {
+      return NextResponse.json({ error: "Questa email è già utilizzata da un altro utente" }, { status: 400 });
+    }
+  }
 
   const finalRole = role ?? target.role;
   const finalCanEdit = canEdit ?? false;
@@ -106,6 +115,7 @@ export async function PUT(
   // Update user fields
   const updateData: Record<string, unknown> = {};
   if (name !== undefined) updateData.name = name;
+  if (email !== undefined) updateData.email = email;
   if (role !== undefined) updateData.role = role;
   if (canView !== undefined) updateData.canView = canView;
   if (canEdit !== undefined) updateData.canEdit = canEdit;
@@ -136,4 +146,49 @@ export async function PUT(
   }
 
   return NextResponse.json({ data: { id, success: true } });
+}
+
+export async function DELETE(
+  request: NextRequest,
+  { params }: { params: Promise<{ id: string }> }
+) {
+  const session = await getServerSession(authOptions);
+  if (!session?.user) return NextResponse.json({ error: "Non autenticato" }, { status: 401 });
+  if (session.user.role !== "SUPER_ADMIN") {
+    return NextResponse.json({ error: "Solo SUPER_ADMIN può eliminare utenti" }, { status: 403 });
+  }
+
+  const { id } = await params;
+
+  if (id === session.user.id) {
+    return NextResponse.json({ error: "Non puoi eliminare te stesso" }, { status: 400 });
+  }
+
+  const user = await prisma.user.findUnique({ where: { id }, select: { id: true, role: true } });
+  if (!user) return NextResponse.json({ error: "Utente non trovato" }, { status: 404 });
+
+  // Check if user is R/C/A in active workflows
+  const activeWorkflows = await prisma.sopWorkflow.count({
+    where: {
+      sopStatus: "IN_LAVORAZIONE",
+      OR: [
+        { responsibleId: id },
+        { consultedId: id },
+        { accountableId: id },
+      ],
+    },
+  });
+  if (activeWorkflows > 0) {
+    return NextResponse.json({
+      error: `Impossibile eliminare: l'utente è coinvolto in ${activeWorkflows} SOP in lavorazione. Riassegnare prima i ruoli.`,
+    }, { status: 409 });
+  }
+
+  await prisma.$transaction([
+    prisma.propertyAssignment.deleteMany({ where: { userId: id } }),
+    prisma.userContentPermission.deleteMany({ where: { userId: id } }),
+    prisma.user.delete({ where: { id } }),
+  ]);
+
+  return NextResponse.json({ data: { deleted: true } });
 }

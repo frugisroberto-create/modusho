@@ -42,13 +42,16 @@ export default function UserDetailPage() {
   const [loading, setLoading] = useState(true);
   const [editing, setEditing] = useState(false);
   const [deactivating, setDeactivating] = useState(false);
+  const [showDeleteModal, setShowDeleteModal] = useState(false);
+  const [deleting, setDeleting] = useState(false);
+  const [deleteError, setDeleteError] = useState("");
 
-  const fetchUser = useCallback(async () => {
-    setLoading(true);
+  const fetchUser = useCallback(async (silent = false) => {
+    if (!silent) setLoading(true);
     try {
       const res = await fetch(`/api/users/${id}`);
       if (res.ok) { const json = await res.json(); setUser(json.data); }
-    } finally { setLoading(false); }
+    } finally { if (!silent) setLoading(false); }
   }, [id]);
 
   useEffect(() => { fetchUser(); }, [fetchUser]);
@@ -87,6 +90,7 @@ export default function UserDetailPage() {
         <UserForm
           mode="edit"
           userId={user.id}
+          onSuccess={() => { setEditing(false); fetchUser(true); }}
           initialData={{
             name: user.name,
             email: user.email,
@@ -198,17 +202,59 @@ export default function UserDetailPage() {
         </div>
       </section>
 
-      {/* Disattiva */}
-      <div className="pt-2">
+      {/* Azioni */}
+      <div className="pt-2 flex items-center gap-3">
         <button onClick={handleDeactivate} disabled={deactivating}
-          className={`px-4 py-2 text-sm font-ui font-medium  border transition-colors disabled:opacity-50 ${
+          className={`px-4 py-2 text-sm font-ui font-medium border transition-colors disabled:opacity-50 ${
             user.isActive
               ? "text-alert-red border-alert-red/30 hover:bg-alert-red/10"
               : "text-sage border-sage/30 hover:bg-sage/10"
           }`}>
           {deactivating ? "..." : user.isActive ? "Disattiva utente" : "Riattiva utente"}
         </button>
+        <button onClick={() => { setShowDeleteModal(true); setDeleteError(""); }}
+          className="px-4 py-2 text-sm font-ui font-medium text-alert-red border border-alert-red/30 hover:bg-alert-red hover:text-white transition-colors">
+          Elimina definitivamente
+        </button>
       </div>
+
+      {/* Modale eliminazione definitiva */}
+      {showDeleteModal && (
+        <div className="fixed inset-0 bg-charcoal-dark/60 flex items-center justify-center z-50 p-4">
+          <div className="bg-ivory w-full max-w-md p-6 border border-ivory-dark">
+            <h3 className="text-lg font-heading font-semibold text-alert-red mb-2">Elimina utente</h3>
+            <p className="text-sm font-ui text-charcoal mb-4">
+              L&apos;utente <strong>{user.name}</strong> verrà eliminato definitivamente dal sistema. Questa azione non è reversibile.
+            </p>
+            {deleteError && (
+              <p className="text-sm font-ui text-alert-red bg-alert-red/5 border-l-4 border-alert-red px-3 py-2 mb-4">{deleteError}</p>
+            )}
+            <div className="flex justify-end gap-2">
+              <button onClick={() => setShowDeleteModal(false)}
+                className="px-4 py-2 text-sm font-ui text-charcoal hover:bg-ivory-dark">
+                Annulla
+              </button>
+              <button onClick={async () => {
+                setDeleting(true);
+                setDeleteError("");
+                try {
+                  const res = await fetch(`/api/users/${id}`, { method: "DELETE" });
+                  if (res.ok) {
+                    router.push("/users");
+                    router.refresh();
+                  } else {
+                    const json = await res.json().catch(() => null);
+                    setDeleteError(json?.error || "Errore nell'eliminazione");
+                  }
+                } finally { setDeleting(false); }
+              }} disabled={deleting}
+                className="px-4 py-2 text-sm font-ui font-medium text-white bg-alert-red hover:bg-alert-red/80 disabled:opacity-50 transition-colors">
+                {deleting ? "..." : "Elimina"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

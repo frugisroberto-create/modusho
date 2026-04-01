@@ -7,9 +7,11 @@ interface AcknowledgeButtonProps {
   contentId: string;
   acknowledged: boolean;
   acknowledgedAt: string | null;
+  /** Se true, usa l'endpoint SOP version-aware invece di quello generico */
+  useSopEndpoint?: boolean;
 }
 
-export function AcknowledgeButton({ contentId, acknowledged, acknowledgedAt }: AcknowledgeButtonProps) {
+export function AcknowledgeButton({ contentId, acknowledged, acknowledgedAt, useSopEndpoint }: AcknowledgeButtonProps) {
   const router = useRouter();
   const [loading, setLoading] = useState(false);
   const [done, setDone] = useState(acknowledged);
@@ -32,7 +34,10 @@ export function AcknowledgeButton({ contentId, acknowledged, acknowledgedAt }: A
   const handleAcknowledge = async () => {
     setLoading(true);
     try {
-      const res = await fetch(`/api/content/${contentId}/acknowledge`, { method: "POST" });
+      const endpoint = useSopEndpoint
+        ? `/api/sop/${contentId}/acknowledge`
+        : `/api/content/${contentId}/acknowledge`;
+      const res = await fetch(endpoint, { method: "POST" });
       if (res.ok) {
         const json = await res.json();
         setDone(true);

@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect, useCallback } from "react";
-import { useSession } from "next-auth/react";
+import { useHooContext } from "@/components/hoo/hoo-shell";
 import Link from "next/link";
 
 interface ContentItem {
@@ -17,8 +17,8 @@ const STATUS_BADGE: Record<string, string> = {
 };
 
 export default function HooBrandBookListPage() {
-  const { data: session } = useSession();
-  const canCreate = session?.user?.role === "ADMIN" || session?.user?.role === "SUPER_ADMIN";
+  const { userRole } = useHooContext();
+  const canCreate = userRole === "ADMIN" || userRole === "SUPER_ADMIN";
   const [items, setItems] = useState<ContentItem[]>([]);
   const [loading, setLoading] = useState(true);
 

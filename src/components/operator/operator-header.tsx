@@ -17,7 +17,6 @@ interface OperatorHeaderProps {
   userRole: string;
   properties: Property[];
   currentPropertyId: string;
-  pendingCount: number;
   onPropertyChange: (propertyId: string) => void;
 }
 
@@ -39,7 +38,6 @@ export function OperatorHeader({
   userRole,
   properties,
   currentPropertyId,
-  pendingCount,
   onPropertyChange,
 }: OperatorHeaderProps) {
   const pathname = usePathname();
@@ -79,19 +77,7 @@ export function OperatorHeader({
           {/* BLOCK 3 — Utility Area */}
           <div className="flex items-center gap-3 ml-auto">
 
-            {/* 3A — Approvals entry (only for management roles) */}
-            {canAccessDashboard && (
-              <Link href="/dashboard" className="flex items-center gap-1.5 text-white/80 hover:text-white transition-colors">
-                <span className="text-[11px] font-ui font-semibold uppercase tracking-wider hidden sm:inline">Governance</span>
-                {pendingCount > 0 && (
-                  <span className="flex items-center justify-center min-w-[20px] h-5 rounded-full bg-white/25 text-white text-[10px] font-ui font-bold px-1.5">
-                    {pendingCount > 99 ? "99+" : pendingCount}
-                  </span>
-                )}
-              </Link>
-            )}
-
-            {/* 3B — Property Switcher (compact) */}
+            {/* Property Switcher (compact) */}
             {properties.length > 1 ? (
               <select value={currentPropertyId}
                 onChange={(e) => onPropertyChange(e.target.value)}

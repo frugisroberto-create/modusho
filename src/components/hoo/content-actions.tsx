@@ -5,12 +5,21 @@ import { useRouter } from "next/navigation";
 
 interface ContentActionsProps {
   contentId: string;
+  contentType?: string;
   contentStatus: string;
   userRole: string;
   isFeatured?: boolean;
 }
 
-export function ContentActions({ contentId, contentStatus, userRole, isFeatured = false }: ContentActionsProps) {
+function getListRoute(contentType?: string): string {
+  switch (contentType) {
+    case "DOCUMENT": return "/library";
+    case "MEMO": return "/memo";
+    default: return "/hoo-sop";
+  }
+}
+
+export function ContentActions({ contentId, contentType, contentStatus, userRole, isFeatured = false }: ContentActionsProps) {
   const router = useRouter();
   const [open, setOpen] = useState(false);
   const [archiveModal, setArchiveModal] = useState(false);
@@ -39,7 +48,7 @@ export function ContentActions({ contentId, contentStatus, userRole, isFeatured 
         method: "PUT", headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ note: archiveNote }),
       });
-      if (res.ok) { router.refresh(); setArchiveModal(false); }
+      if (res.ok) { router.push(getListRoute(contentType)); router.refresh(); }
     } finally { setLoading(false); }
   };
 
@@ -47,7 +56,7 @@ export function ContentActions({ contentId, contentStatus, userRole, isFeatured 
     setLoading(true);
     try {
       const res = await fetch(`/api/content/${contentId}`, { method: "DELETE" });
-      if (res.ok) { router.push("/hoo-sop"); router.refresh(); }
+      if (res.ok) { router.push(getListRoute(contentType)); router.refresh(); }
     } finally { setLoading(false); }
   };
 

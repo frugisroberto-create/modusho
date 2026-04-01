@@ -1,6 +1,6 @@
 "use client";
 
-import { createContext, useCallback, useContext, useState } from "react";
+import { createContext, useCallback, useContext, useEffect, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import { OperatorHeader } from "./operator-header";
 
@@ -31,7 +31,6 @@ interface OperatorShellProps {
   userRole: string;
   properties: Property[];
   defaultPropertyId: string;
-  pendingCount: number;
   children: React.ReactNode;
 }
 
@@ -40,15 +39,18 @@ export function OperatorShell({
   userRole,
   properties,
   defaultPropertyId,
-  pendingCount,
   children,
 }: OperatorShellProps) {
   const searchParams = useSearchParams();
-  const paramPropertyId = searchParams.get("propertyId");
-  const initialPropertyId = paramPropertyId && properties.some(p => p.id === paramPropertyId)
-    ? paramPropertyId
-    : defaultPropertyId;
-  const [currentPropertyId, setCurrentPropertyId] = useState(initialPropertyId);
+  const [currentPropertyId, setCurrentPropertyId] = useState(defaultPropertyId);
+
+  // Sincronizza con searchParams solo lato client, dopo l'hydration
+  useEffect(() => {
+    const paramPropertyId = searchParams.get("propertyId");
+    if (paramPropertyId && properties.some(p => p.id === paramPropertyId)) {
+      setCurrentPropertyId(paramPropertyId);
+    }
+  }, [searchParams, properties]);
 
   const handlePropertyChange = useCallback((id: string) => {
     setCurrentPropertyId(id);
@@ -62,7 +64,6 @@ export function OperatorShell({
           userRole={userRole}
           properties={properties}
           currentPropertyId={currentPropertyId}
-          pendingCount={pendingCount}
           onPropertyChange={handlePropertyChange}
         />
         <main className="max-w-7xl mx-auto px-4 sm:px-6">

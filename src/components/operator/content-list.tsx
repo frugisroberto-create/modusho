@@ -1,7 +1,6 @@
 "use client";
 
 import { useState, useEffect, useCallback, useRef } from "react";
-import { useSession } from "next-auth/react";
 import Link from "next/link";
 import { useOperatorContext } from "./operator-shell";
 
@@ -30,9 +29,7 @@ interface ContentListProps {
 }
 
 export function ContentList({ contentType, detailPath, title, description, createPath, createLabel, searchPlaceholder }: ContentListProps) {
-  const { currentPropertyId } = useOperatorContext();
-  const { data: session } = useSession();
-  const userRole = session?.user?.role || "OPERATOR";
+  const { currentPropertyId, userRole } = useOperatorContext();
   const canCreate = contentType === "DOCUMENT"
     ? ["HOTEL_MANAGER", "ADMIN", "SUPER_ADMIN"].includes(userRole)
     : ["HOD", "HOTEL_MANAGER", "ADMIN", "SUPER_ADMIN"].includes(userRole);

@@ -15,11 +15,14 @@ export default withAuth(
     const { pathname } = req.nextUrl;
     const token = req.nextauth.token;
 
-    if (!token) {
+    if (!token || !token.role) {
       return NextResponse.redirect(new URL("/login", req.url));
     }
 
     const userRole = token.role as Role;
+    if (!(userRole in ROLE_HIERARCHY)) {
+      return NextResponse.redirect(new URL("/login", req.url));
+    }
 
     // 1. Cestino: solo SUPER_ADMIN
     if (pathname.startsWith("/content/deleted")) {

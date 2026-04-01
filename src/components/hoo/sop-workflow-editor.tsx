@@ -3,6 +3,7 @@
 import { useState, useEffect, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import { AttachmentUploader } from "@/components/shared/attachment-uploader";
+import { SopEditor } from "@/components/shared/sop-editor";
 
 // ─── Types ───────────────────────────────────────────────────────────
 
@@ -103,9 +104,18 @@ export function SopWorkflowEditor({ workflowId, currentUserId, currentUserRole }
   const [showReturnModal, setShowReturnModal] = useState(false);
   const [returnNote, setReturnNote] = useState("");
 
+  // Delegate to HOD
+  const [showDelegatePanel, setShowDelegatePanel] = useState(false);
+  const [hodUsers, setHodUsers] = useState<{ id: string; name: string }[]>([]);
+  const [selectedHodId, setSelectedHodId] = useState("");
+  const [delegateLoading, setDelegateLoading] = useState(false);
+
   // Review due date edit
   const [editingDueDate, setEditingDueDate] = useState(false);
   const [dueDateMonths, setDueDateMonths] = useState(12);
+
+  // Republication acknowledgment modal
+  const [showRepubModal, setShowRepubModal] = useState(false);
 
   const fetchWorkflow = useCallback(async () => {
     try {
@@ -202,13 +212,28 @@ export function SopWorkflowEditor({ workflowId, currentUserId, currentUserRole }
     }
   };
 
-  const handleApprove = async () => {
+  const handleApproveClick = () => {
+    // Se la SOP era già pubblicata in passato → mostra domanda sulla nuova conferma
+    if (wf?.publishedAt) {
+      setShowRepubModal(true);
+    } else {
+      doApprove(undefined);
+    }
+  };
+
+  const doApprove = async (requiresNewAcknowledgment: boolean | undefined) => {
+    setShowRepubModal(false);
     setActionLoading(true);
     setActionMessage(null);
     try {
       const res = await fetch(`/api/sop-workflow/${workflowId}/approve`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(
+          requiresNewAcknowledgment !== undefined
+            ? { requiresNewAcknowledgment }
+            : {}
+        ),
       });
       if (!res.ok) {
         const data = await res.json();
@@ -273,6 +298,45 @@ export function SopWorkflowEditor({ workflowId, currentUserId, currentUserRole }
     }
   };
 
+  // ─── Delegate to HOD ────────────────────────────────────────────────
+
+  const handleOpenDelegate = async () => {
+    if (!wf) return;
+    setShowDelegatePanel(true);
+    setSelectedHodId("");
+    try {
+      const res = await fetch(`/api/users?role=HOD&propertyId=${wf.property.id}&pageSize=50`);
+      if (res.ok) {
+        const json = await res.json();
+        setHodUsers((json.data || []).map((u: { id: string; name: string }) => ({ id: u.id, name: u.name })));
+      }
+    } catch { /* ignore */ }
+  };
+
+  const handleDelegate = async () => {
+    if (!selectedHodId) return;
+    setDelegateLoading(true);
+    setActionMessage(null);
+    try {
+      const res = await fetch(`/api/sop-workflow/${workflowId}/delegate-to-hod`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ hodUserId: selectedHodId }),
+      });
+      if (!res.ok) {
+        const data = await res.json();
+        throw new Error(data.error || "Errore");
+      }
+      setActionMessage({ type: "success", text: "Redazione delegata a HOD" });
+      setShowDelegatePanel(false);
+      await fetchWorkflow();
+    } catch (e) {
+      setActionMessage({ type: "error", text: e instanceof Error ? e.message : "Errore" });
+    } finally {
+      setDelegateLoading(false);
+    }
+  };
+
   // ─── Render ─────────────────────────────────────────────────────────
 
   if (loading) return <LoadingSkeleton />;
@@ -282,7 +346,8 @@ export function SopWorkflowEditor({ workflowId, currentUserId, currentUserRole }
   const isR = wf.myRole === "R";
   const isC = wf.myRole === "C";
   const isA = wf.myRole === "A";
-  const isAdminOverride = !wf.myRole && (currentUserRole === "ADMIN" || currentUserRole === "SUPER_ADMIN");
+  const isHoo = currentUserRole === "ADMIN" || currentUserRole === "SUPER_ADMIN";
+  const isAdminOverride = !wf.myRole && isHoo;
   const isInLavorazione = wf.sopStatus === "IN_LAVORAZIONE";
   const isPubblicata = wf.sopStatus === "PUBBLICATA";
   const isSubmitted = wf.submittedToC || wf.submittedToA;
@@ -322,6 +387,42 @@ export function SopWorkflowEditor({ workflowId, currentUserId, currentUserRole }
       {isInLavorazione && !isR && isSubmitted && (wf.myRole === "C" || wf.myRole === "A") && (
         <div className="px-4 py-3 text-sm font-ui bg-[#FFF3E0] border-l-4 border-[#E65100] text-[#E65100]">
           Questa bozza è attualmente sottoposta a revisione. Il testo può essere modificato solo dal responsabile operativo della procedura. Puoi comunque lasciare note.
+        </div>
+      )}
+
+      {/* ── Coinvolgi HOD — visibile a R (HM) quando non c'è C e nessun submit attivo ── */}
+      {isInLavorazione && (isR || isAdminOverride) && !wf.consulted && !wf.submittedToC && !wf.submittedToA && (currentUserRole === "HOTEL_MANAGER" || currentUserRole === "ADMIN" || currentUserRole === "SUPER_ADMIN") && (
+        <div className="bg-ivory border border-ivory-dark p-4 space-y-3">
+          <label className="flex items-center gap-2 cursor-pointer">
+            <input type="checkbox" checked={showDelegatePanel}
+              onChange={(e) => { if (e.target.checked) { handleOpenDelegate(); } else { setShowDelegatePanel(false); setSelectedHodId(""); } }}
+              className="w-4 h-4 rounded border-ivory-dark text-terracotta focus:ring-terracotta" />
+            <span className="text-sm font-ui font-medium text-charcoal">Coinvolgi HOD nella redazione</span>
+          </label>
+          <p className="text-xs font-ui text-charcoal/45">
+            {showDelegatePanel
+              ? "L'HOD sarà il Responsabile (R) della bozza, tu sarai Consultato (C)"
+              : "Sei il Responsabile (R) della bozza"
+            }
+          </p>
+          {showDelegatePanel && (
+            hodUsers.length === 0 ? (
+              <p className="text-xs font-ui text-charcoal/40">Nessun HOD assegnato a questa struttura</p>
+            ) : (
+              <>
+                <select value={selectedHodId} onChange={(e) => setSelectedHodId(e.target.value)} className="w-full">
+                  <option value="">Seleziona HOD</option>
+                  {hodUsers.map((u) => (
+                    <option key={u.id} value={u.id}>{u.name}</option>
+                  ))}
+                </select>
+                <button onClick={handleDelegate} disabled={!selectedHodId || delegateLoading}
+                  className="btn-primary !py-2.5 !px-5 disabled:opacity-50">
+                  {delegateLoading ? "Delega in corso..." : "Conferma delega"}
+                </button>
+              </>
+            )
+          )}
         </div>
       )}
 
@@ -369,11 +470,9 @@ export function SopWorkflowEditor({ workflowId, currentUserId, currentUserRole }
 
           {/* Body */}
           {wf.canEditText ? (
-            <textarea
-              value={editBody}
-              onChange={(e) => { setEditBody(e.target.value); setDirty(true); }}
-              rows={18}
-              className="w-full font-body text-charcoal leading-relaxed bg-ivory border border-ivory-dark px-4 py-3 focus:border-terracotta resize-y"
+            <SopEditor
+              content={editBody}
+              onChange={(html) => { setEditBody(html); setDirty(true); }}
               placeholder="Contenuto della procedura..."
             />
           ) : (
@@ -391,6 +490,7 @@ export function SopWorkflowEditor({ workflowId, currentUserId, currentUserRole }
           wf={wf}
           isR={isR}
           isA={isA}
+          isHoo={isHoo}
           isAdminOverride={isAdminOverride}
           dirty={dirty}
           saving={saving}
@@ -398,7 +498,7 @@ export function SopWorkflowEditor({ workflowId, currentUserId, currentUserRole }
           onSave={handleSave}
           onSubmit={handleSubmit}
           onReturn={() => setShowReturnModal(true)}
-          onApprove={handleApprove}
+          onApprove={handleApproveClick}
         />
       )}
 
@@ -444,6 +544,32 @@ export function SopWorkflowEditor({ workflowId, currentUserId, currentUserRole }
           onCancel={() => { setShowReturnModal(false); setReturnNote(""); }}
           loading={actionLoading}
         />
+      )}
+
+      {/* ── Republication acknowledgment modal ── */}
+      {showRepubModal && (
+        <div className="fixed inset-0 bg-charcoal-dark/60 flex items-center justify-center z-50 p-4">
+          <div className="bg-ivory w-full max-w-md p-6 border border-ivory-dark">
+            <h3 className="text-lg font-heading font-semibold text-charcoal-dark mb-2">Nuova versione SOP</h3>
+            <p className="text-sm font-ui text-charcoal mb-5">
+              Questa SOP era già stata pubblicata. La nuova versione richiede una nuova conferma di visualizzazione da parte degli operatori?
+            </p>
+            <div className="flex flex-col gap-2">
+              <button onClick={() => doApprove(true)}
+                className="w-full px-4 py-3 text-sm font-ui font-semibold text-white bg-terracotta hover:bg-terracotta-light transition-colors">
+                Sì, richiedi nuova conferma
+              </button>
+              <button onClick={() => doApprove(false)}
+                className="w-full px-4 py-3 text-sm font-ui font-medium text-charcoal bg-ivory-dark hover:bg-ivory-medium border border-ivory-dark transition-colors">
+                No, mantieni valida la conferma precedente
+              </button>
+              <button onClick={() => setShowRepubModal(false)}
+                className="w-full px-4 py-2 text-sm font-ui text-charcoal/50 hover:text-charcoal transition-colors">
+                Annulla
+              </button>
+            </div>
+          </div>
+        </div>
       )}
     </div>
   );
@@ -618,10 +744,11 @@ function ReviewDueDateSection({ wf, isA, editing, dueDateMonths, onEdit, onCance
   );
 }
 
-function ActionBar({ wf, isR, isA, isAdminOverride, dirty, saving, actionLoading, onSave, onSubmit, onReturn, onApprove }: {
+function ActionBar({ wf, isR, isA, isHoo, isAdminOverride, dirty, saving, actionLoading, onSave, onSubmit, onReturn, onApprove }: {
   wf: SopWorkflowData;
   isR: boolean;
   isA: boolean;
+  isHoo: boolean;
   isAdminOverride: boolean;
   dirty: boolean;
   saving: boolean;
@@ -631,19 +758,18 @@ function ActionBar({ wf, isR, isA, isAdminOverride, dirty, saving, actionLoading
   onReturn: () => void;
   onApprove: () => void;
 }) {
-  // Solo ADMIN/SUPER_ADMIN possono approvare/pubblicare (anche se A nel RACI)
-  const canApprovePublish = (isA || isAdminOverride) && (wf.accountable.role === "ADMIN" || wf.accountable.role === "SUPER_ADMIN");
-
   return (
     <div className="flex items-center gap-3 flex-wrap bg-white border border-ivory-dark px-5 py-4">
-      {/* R actions */}
+      {/* Save — visibile a chiunque possa modificare il testo (R, C, A, ADMIN override) */}
+      {wf.canEditText && (
+        <button onClick={onSave} disabled={saving || !dirty} className="btn-primary !py-2.5 !px-5">
+          {saving ? "Salvataggio..." : "Salva bozza"}
+        </button>
+      )}
+
+      {/* Submit buttons — solo R */}
       {isR && (
         <>
-          <button onClick={onSave} disabled={saving || !dirty} className="btn-primary !py-2.5 !px-5">
-            {saving ? "Salvataggio..." : "Salva bozza"}
-          </button>
-
-          {/* Submit buttons — only for R */}
           {wf.consulted && !wf.submittedToC && (
             <button onClick={() => onSubmit("C")} disabled={actionLoading} className="btn-outline !py-2.5 !px-5">
               Sottoponi a C
@@ -662,27 +788,17 @@ function ActionBar({ wf, isR, isA, isAdminOverride, dirty, saving, actionLoading
         </>
       )}
 
-      {/* A actions (or ADMIN/SUPER_ADMIN override) — when submitted to A, or always for admin override */}
-      {canApprovePublish && wf.submittedToA && (
+      {/* HOO (ADMIN/SUPER_ADMIN) — pubblica direttamente in qualsiasi fase */}
+      {isHoo && (
         <>
           <button onClick={onApprove} disabled={actionLoading} className="btn-primary !py-2.5 !px-5 !bg-sage hover:!bg-sage-dark">
-            Approva e pubblica
+            {wf.submittedToA ? "Approva e pubblica" : "Pubblica direttamente"}
           </button>
-          <button onClick={onReturn} disabled={actionLoading} className="btn-outline !py-2.5 !px-5 !border-alert-red !text-alert-red hover:!bg-alert-red hover:!text-white">
-            Restituisci
-          </button>
-        </>
-      )}
-
-      {/* ADMIN/SUPER_ADMIN override — approve/return even without submittedToA */}
-      {isAdminOverride && !wf.submittedToA && (
-        <>
-          <button onClick={onApprove} disabled={actionLoading} className="btn-primary !py-2.5 !px-5 !bg-sage hover:!bg-sage-dark">
-            Approva e pubblica
-          </button>
-          <button onClick={onReturn} disabled={actionLoading} className="btn-outline !py-2.5 !px-5 !border-alert-red !text-alert-red hover:!bg-alert-red hover:!text-white">
-            Restituisci
-          </button>
+          {wf.submittedToA && (
+            <button onClick={onReturn} disabled={actionLoading} className="btn-outline !py-2.5 !px-5 !border-alert-red !text-alert-red hover:!bg-alert-red hover:!text-white">
+              Restituisci
+            </button>
+          )}
         </>
       )}
 
@@ -764,6 +880,7 @@ function PublishedActions({ contentId, workflowId, onRefresh }: { contentId: str
   const router = useRouter();
   const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [showReopenModal, setShowReopenModal] = useState(false);
+  const [showArchiveModal, setShowArchiveModal] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
 
@@ -790,12 +907,31 @@ function PublishedActions({ contentId, workflowId, onRefresh }: { contentId: str
     } finally { setLoading(false); }
   };
 
+  const handleArchive = async () => {
+    setLoading(true);
+    setError("");
+    try {
+      const res = await fetch(`/api/sop-workflow/${workflowId}/archive`, { method: "POST" });
+      if (res.ok) {
+        await onRefresh();
+        setShowArchiveModal(false);
+      } else {
+        const json = await res.json();
+        setError(json.error || "Errore nell'archiviazione");
+      }
+    } finally { setLoading(false); }
+  };
+
   return (
     <>
       <div className="flex items-center gap-3 bg-white border border-ivory-dark px-5 py-4">
         <button onClick={() => setShowReopenModal(true)}
           className="btn-primary !py-2.5 !px-5">
           Modifica
+        </button>
+        <button onClick={() => setShowArchiveModal(true)}
+          className="btn-outline !py-2.5 !px-5">
+          Archivia
         </button>
         <button onClick={() => setShowDeleteModal(true)}
           className="btn-outline !py-2.5 !px-5 !border-alert-red !text-alert-red hover:!bg-alert-red hover:!text-white">
@@ -819,6 +955,28 @@ function PublishedActions({ contentId, workflowId, onRefresh }: { contentId: str
               <button onClick={handleReopen} disabled={loading}
                 className="px-4 py-2 text-sm font-ui font-medium text-white bg-terracotta hover:bg-terracotta-light disabled:opacity-50">
                 {loading ? "..." : "Riapri"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Modale archivia */}
+      {showArchiveModal && (
+        <div className="fixed inset-0 bg-charcoal-dark/60 flex items-center justify-center z-50 p-4">
+          <div className="bg-ivory w-full max-w-md p-6 border border-ivory-dark">
+            <h3 className="text-lg font-heading font-semibold text-charcoal-dark mb-2">Archivia SOP</h3>
+            <p className="text-sm font-ui text-charcoal mb-4">
+              La SOP non sarà più visibile nelle viste operative. Resterà consultabile nello storico.
+            </p>
+            {error && (
+              <p className="text-sm font-ui text-alert-red mb-4">{error}</p>
+            )}
+            <div className="flex justify-end gap-2">
+              <button onClick={() => setShowArchiveModal(false)} className="px-4 py-2 text-sm font-ui text-charcoal hover:bg-ivory-dark">Annulla</button>
+              <button onClick={handleArchive} disabled={loading}
+                className="px-4 py-2 text-sm font-ui font-medium text-white bg-charcoal hover:bg-charcoal-dark disabled:opacity-50">
+                {loading ? "..." : "Archivia"}
               </button>
             </div>
           </div>

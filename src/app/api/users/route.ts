@@ -29,9 +29,12 @@ export async function GET(request: NextRequest) {
   if (!parsed.success) return NextResponse.json({ error: "Parametri non validi" }, { status: 400 });
 
   const { role, propertyId, page, pageSize } = parsed.data;
+  const isActiveParam = params.isActive;
 
   const where: Record<string, unknown> = {};
   if (role) where.role = role;
+  if (isActiveParam === "true") where.isActive = true;
+  else if (isActiveParam === "false") where.isActive = false;
 
   // HOTEL_MANAGER: accesso in sola lettura, limitato alle property assegnate
   if (isHM) {

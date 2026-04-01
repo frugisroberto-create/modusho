@@ -1,8 +1,9 @@
 "use client";
 
 import Link from "next/link";
-import { usePathname, useRouter } from "next/navigation";
+import { usePathname } from "next/navigation";
 import { signOut } from "next-auth/react";
+import { useState } from "react";
 
 interface HooProperty {
   id: string;
@@ -18,7 +19,7 @@ interface HooHeaderProps {
   onPropertyChange: (id: string) => void;
 }
 
-const HOO_NAV_ITEMS: { href: string; label: string; minRole?: string; adminOnly?: boolean; hmHodOnly?: boolean }[] = [
+const HOO_NAV_ITEMS: { href: string; label: string; minRole?: string; adminOnly?: boolean }[] = [
   { href: "/dashboard", label: "Home", adminOnly: true },
   { href: "/hoo-sop", label: "SOP" },
   { href: "/library", label: "Documenti", minRole: "HOTEL_MANAGER" },
@@ -31,16 +32,17 @@ const ROLE_LEVEL: Record<string, number> = {
   OPERATOR: 0, HOD: 1, HOTEL_MANAGER: 2, ADMIN: 3, SUPER_ADMIN: 4,
 };
 
-export function HooHeader({ userName, userRole, properties, currentPropertyId, onPropertyChange }: HooHeaderProps) {
-  const pathname = usePathname();
-  const router = useRouter();
+const ROLE_LABEL: Record<string, string> = {
+  SUPER_ADMIN: "HOO",
+  ADMIN: "HOO",
+  HOTEL_MANAGER: "Hotel Manager",
+  HOD: "HOD",
+  OPERATOR: "Operatore",
+};
 
-  const handlePropertySelect = (propertyId: string) => {
-    onPropertyChange(propertyId);
-    if (propertyId) {
-      router.push(`/?propertyId=${propertyId}`);
-    }
-  };
+export function HooHeader({ userName, userRole }: HooHeaderProps) {
+  const pathname = usePathname();
+  const [menuOpen, setMenuOpen] = useState(false);
 
   const isHoo = userRole === "ADMIN" || userRole === "SUPER_ADMIN";
   const visibleNav = HOO_NAV_ITEMS.filter((item) => {
@@ -48,6 +50,8 @@ export function HooHeader({ userName, userRole, properties, currentPropertyId, o
     if (!item.minRole) return true;
     return (ROLE_LEVEL[userRole] ?? 0) >= (ROLE_LEVEL[item.minRole] ?? 0);
   });
+
+  const initials = userName.split(" ").map(n => n[0]).join("").slice(0, 2);
 
   return (
     <header className="bg-terracotta sticky top-0 z-50">
@@ -77,36 +81,39 @@ export function HooHeader({ userName, userRole, properties, currentPropertyId, o
             </nav>
           </div>
 
-          <div className="flex items-center gap-4">
-            {/* Property selector */}
-            {properties.length > 1 && (
-              <select
-                value={currentPropertyId}
-                onChange={(e) => handlePropertySelect(e.target.value)}
-                className="text-[11px] font-ui border border-white/20 px-2 py-1 bg-white/10 text-white/90 focus:outline-none max-w-[160px] truncate"
-                style={{ borderRadius: 0 }}
-              >
-                <option value="" className="text-charcoal">Tutte le strutture</option>
-                {properties.map((p) => (
-                  <option key={p.id} value={p.id} className="text-charcoal">{p.code} — {p.name}</option>
-                ))}
-              </select>
-            )}
-
-            <Link href="/"
-              className="text-sm font-ui font-medium text-white/80 hover:text-white bg-white/10 px-3 py-1.5 transition-colors">
-              Vista Hotel
-            </Link>
-            <div className="flex items-center gap-2.5 text-white/85 text-[13px] font-ui">
-              <div className="w-7 h-7 rounded-full bg-white/20 flex items-center justify-center text-xs font-semibold text-white">
-                {userName.split(" ").map(n => n[0]).join("").slice(0, 2)}
+          {/* User menu */}
+          <div className="relative">
+            <button onClick={() => setMenuOpen(!menuOpen)}
+              className="flex items-center gap-2 text-white/85 hover:text-white transition-colors py-1">
+              <div className="w-7 h-7 rounded-full bg-white/20 flex items-center justify-center text-[10px] font-ui font-bold text-white">
+                {initials}
               </div>
-              <span className="hidden sm:inline">{userName}</span>
-            </div>
-            <button onClick={() => signOut({ callbackUrl: "/login" })}
-              className="text-sm text-white/60 hover:text-white px-2 py-1 font-ui transition-colors">
-              Esci
+              <span className="hidden sm:inline text-[13px] font-ui">{userName}</span>
+              <svg className={`w-3 h-3 text-white/50 transition-transform ${menuOpen ? "rotate-180" : ""}`}
+                fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+              </svg>
             </button>
+
+            {menuOpen && (
+              <>
+                <div className="fixed inset-0 z-40" onClick={() => setMenuOpen(false)} />
+                <div className="absolute right-0 top-full mt-1 w-52 bg-white border border-ivory-dark z-50 py-1 shadow-lg">
+                  <div className="px-4 py-3 border-b border-ivory-dark">
+                    <p className="text-sm font-ui font-medium text-charcoal-dark">{userName}</p>
+                    <p className="text-[11px] font-ui text-charcoal/50 mt-0.5">{ROLE_LABEL[userRole] || userRole}</p>
+                  </div>
+                  <Link href="/" onClick={() => setMenuOpen(false)}
+                    className="block px-4 py-2 text-sm font-ui text-charcoal hover:bg-ivory transition-colors">
+                    Vista Hotel
+                  </Link>
+                  <button onClick={() => signOut({ callbackUrl: "/login" })}
+                    className="w-full text-left px-4 py-2 text-sm font-ui text-charcoal/60 hover:bg-ivory hover:text-charcoal transition-colors">
+                    Esci
+                  </button>
+                </div>
+              </>
+            )}
           </div>
         </div>
       </div>

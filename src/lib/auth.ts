@@ -52,6 +52,7 @@ export const authOptions: NextAuthOptions = {
   callbacks: {
     async jwt({ token, user }) {
       if (user) {
+        // Primo login: popola il token dal DB
         token.id = user.id;
         token.email = user.email!;
         token.name = user.name!;
@@ -59,6 +60,29 @@ export const authOptions: NextAuthOptions = {
         token.canView = user.canView;
         token.canEdit = user.canEdit;
         token.canApprove = user.canApprove;
+      } else if (token.id) {
+        // Rinnovo token: aggiorna ruolo e permessi dal DB
+        try {
+          const dbUser = await prisma.user.findUnique({
+            where: { id: token.id as string },
+            select: { role: true, canView: true, canEdit: true, canApprove: true, isActive: true, name: true },
+          });
+          if (!dbUser || !dbUser.isActive) {
+            // Utente disattivato o eliminato: segna come invalido
+            token.role = "OPERATOR";
+            token.canView = false;
+            token.canEdit = false;
+            token.canApprove = false;
+            return token;
+          }
+          token.role = dbUser.role;
+          token.name = dbUser.name;
+          token.canView = dbUser.canView;
+          token.canEdit = dbUser.canEdit;
+          token.canApprove = dbUser.canApprove;
+        } catch {
+          // Errore DB: mantieni i dati esistenti nel token
+        }
       }
       return token;
     },

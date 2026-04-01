@@ -94,10 +94,16 @@ export function getRaciRole(userId: string, wf: SopWorkflowInfo): RaciRole | nul
 
 // ─── Permission Checks ────────────────────────────────────────────────
 
-/** Only R can edit text, and only while IN_LAVORAZIONE */
-export function canEditText(userId: string, wf: SopWorkflowInfo): boolean {
+/** Anyone involved (R/C/A) or ADMIN/SUPER_ADMIN can edit while IN_LAVORAZIONE,
+ *  as long as the draft has NOT been submitted to A. */
+export function canEditText(userId: string, wf: SopWorkflowInfo, userRole?: string): boolean {
   if (wf.sopStatus !== "IN_LAVORAZIONE") return false;
-  return userId === wf.responsibleId;
+  if (wf.submittedToA) return false;
+  if (userId === wf.responsibleId) return true;
+  if (userId === wf.consultedId) return true;
+  if (userId === wf.accountableId) return true;
+  if (userRole === "ADMIN" || userRole === "SUPER_ADMIN") return true;
+  return false;
 }
 
 /** Only R can manage (add/remove/reorder) attachments while IN_LAVORAZIONE */

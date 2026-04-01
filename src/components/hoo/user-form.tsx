@@ -19,6 +19,7 @@ interface AssignmentEntry {
 interface UserFormProps {
   mode: "create" | "edit";
   userId?: string;
+  onSuccess?: () => void;
   initialData?: {
     name: string;
     email: string;
@@ -52,7 +53,7 @@ const CONTENT_TYPE_LABELS: Record<ContentTypeOption, string> = {
   DOCUMENT: "Documenti",
 };
 
-export function UserForm({ mode, userId, initialData }: UserFormProps) {
+export function UserForm({ mode, userId, onSuccess, initialData }: UserFormProps) {
   const router = useRouter();
 
   // Sezione 1 — Anagrafica
@@ -263,14 +264,13 @@ export function UserForm({ mode, userId, initialData }: UserFormProps) {
     setLoading(true);
     try {
       const payload: Record<string, unknown> = {
-        name, role,
+        name, email, role,
         canView: true, canEdit, canApprove,
         propertyAssignments: realAssignments,
         contentTypes,
       };
 
       if (mode === "create") {
-        payload.email = email;
         payload.password = password;
       }
       if (mode === "edit") {
@@ -293,8 +293,11 @@ export function UserForm({ mode, userId, initialData }: UserFormProps) {
         if (mode === "create") {
           const json = await res.json();
           router.push(`/users/${json.data.id}`);
+        } else if (onSuccess) {
+          onSuccess();
+          return; // evita setLoading(false) dopo che il parent ha smontato il form
         } else {
-          router.push("/users");
+          router.push(`/users/${userId}`);
         }
         router.refresh();
       } else {
@@ -320,8 +323,7 @@ export function UserForm({ mode, userId, initialData }: UserFormProps) {
           <div>
             <label className="block text-sm font-ui font-medium text-charcoal mb-1.5">Email</label>
             <input type="email" value={email} onChange={(e) => setEmail(e.target.value)}
-              disabled={mode === "edit"}
-              className="w-full disabled:opacity-50 disabled:cursor-not-allowed" placeholder="email@hotel.com" />
+              className="w-full" placeholder="email@hotel.com" />
           </div>
         </div>
         {mode === "create" && (

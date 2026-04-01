@@ -1,7 +1,6 @@
 "use client";
 
 import { useState, useEffect, useCallback } from "react";
-import { useSession } from "next-auth/react";
 import Link from "next/link";
 import { useOperatorContext } from "./operator-shell";
 
@@ -26,9 +25,7 @@ interface BookListProps {
 }
 
 export function BookList({ contentType, basePath, title }: BookListProps) {
-  const { currentPropertyId } = useOperatorContext();
-  const { data: session } = useSession();
-  const userRole = session?.user?.role || "OPERATOR";
+  const { currentPropertyId, userRole } = useOperatorContext();
   const needsDeptFilter = contentType === "STANDARD_BOOK" && (userRole === "OPERATOR" || userRole === "HOD");
   const canCreate = (userRole === "ADMIN" || userRole === "SUPER_ADMIN") && HOO_CREATE_PATHS[contentType];
 

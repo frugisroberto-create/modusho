@@ -2,14 +2,13 @@
 
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
-import { useSession } from "next-auth/react";
+import { useHooContext } from "@/components/hoo/hoo-shell";
 
 interface Property { id: string; name: string; code: string; departments: { id: string; name: string; code: string }[] }
 
 export default function NewDocumentPage() {
   const router = useRouter();
-  const { data: session } = useSession();
-  const userRole = session?.user?.role || "";
+  const { userRole } = useHooContext();
   const isHoo = userRole === "ADMIN" || userRole === "SUPER_ADMIN";
 
   const [title, setTitle] = useState("");

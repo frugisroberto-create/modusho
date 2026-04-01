@@ -1,7 +1,6 @@
 "use client";
 
 import { useState, useEffect, useCallback, useRef } from "react";
-import { useSession } from "next-auth/react";
 import { useOperatorContext } from "@/components/operator/operator-shell";
 import { ExportPdfButton } from "@/components/shared/export-pdf-button";
 
@@ -11,9 +10,7 @@ interface MemoItem {
 }
 
 export default function MemoListPage() {
-  const { currentPropertyId } = useOperatorContext();
-  const { data: session } = useSession();
-  const userRole = session?.user?.role || "OPERATOR";
+  const { currentPropertyId, userRole } = useOperatorContext();
   const canCreate = ["HOD", "HOTEL_MANAGER", "ADMIN", "SUPER_ADMIN"].includes(userRole);
 
   const [memos, setMemos] = useState<MemoItem[]>([]);

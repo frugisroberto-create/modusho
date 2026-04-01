@@ -28,6 +28,7 @@ interface WorkflowItem {
   responsible: { id: string; name: string; role: string };
   consulted: { id: string; name: string; role: string } | null;
   accountable: { id: string; name: string; role: string };
+  isImported?: boolean;
 }
 
 const WF_BADGE = "text-[9px] font-ui font-bold uppercase tracking-wider px-1.5 py-0.5 bg-mauve/15 text-mauve";
@@ -113,6 +114,11 @@ export default function ApprovalsPage() {
                     {item.submittedToC && item.submittedToA && <span className={WF_BADGE}>Sottoposta a C e A</span>}
                     {item.submittedToC && !item.submittedToA && <span className={WF_BADGE}>Sottoposta a C</span>}
                     {!item.submittedToC && item.submittedToA && <span className={WF_BADGE}>Sottoposta ad A</span>}
+                    {item.isImported && (
+                      <span className="text-[9px] font-ui font-bold uppercase tracking-wider px-1.5 py-0.5 bg-[#E3F2FD] text-[#1565C0]">
+                        Importata
+                      </span>
+                    )}
                     {item.code && <span className="text-[11px] font-ui font-semibold text-terracotta">{item.code}</span>}
                     <span className="text-[11px] font-ui text-charcoal/45">{item.property.code}</span>
                     {item.department && <span className="text-[11px] font-ui text-charcoal/45">{item.department.name}</span>}

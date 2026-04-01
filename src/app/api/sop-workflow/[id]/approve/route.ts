@@ -3,16 +3,20 @@ import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { canApprove, calculateReviewDueDate } from "@/lib/sop-workflow";
+import { z } from "zod/v4";
 
 type RouteParams = { params: Promise<{ id: string }> };
 
+const approveBodySchema = z.object({
+  requiresNewAcknowledgment: z.boolean().optional(),
+});
+
 /**
- * POST: Approvazione finale da A.
- * - Solo A puo' approvare
- * - Solo quando submittedToA = true
- * - Approvazione = pubblicazione (non esiste passaggio separato)
+ * POST: Approvazione finale / pubblicazione diretta.
+ * - ADMIN/SUPER_ADMIN possono pubblicare in qualsiasi fase
+ * - A puo' approvare quando submittedToA = true
+ * - Se la SOP era gia' pubblicata in precedenza, accetta requiresNewAcknowledgment
  * - Imposta reviewDueDate
- * - Il documento esce dal ciclo di lavorazione
  */
 export async function POST(request: NextRequest, { params }: RouteParams) {
   const session = await getServerSession(authOptions);
@@ -22,6 +26,10 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
 
   const { id } = await params;
   const userId = session.user.id;
+
+  const reqBody = await request.json().catch(() => ({}));
+  const parsed = approveBodySchema.safeParse(reqBody);
+  const requiresNewAcknowledgment = parsed.success ? parsed.data.requiresNewAcknowledgment : undefined;
 
   const wf = await prisma.sopWorkflow.findUnique({
     where: { id },
@@ -49,12 +57,30 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
     }, { status: 403 });
   }
 
+  // Determina se e' una ripubblicazione (la SOP era gia' stata pubblicata in passato)
+  const content = await prisma.content.findUnique({
+    where: { id: wf.contentId },
+    select: { publishedAt: true, version: true },
+  });
+  const isRepublication = content?.publishedAt !== null;
+
   const now = new Date();
   const reviewDueDate = calculateReviewDueDate(now, wf.reviewDueMonths);
 
-  await prisma.$transaction([
+  // Decidi il flag requiresNewAcknowledgment:
+  // - prima pubblicazione: sempre true (gli operatori devono confermare)
+  // - ripubblicazione: usa il valore fornito dal client, default true
+  const newAckFlag = isRepublication
+    ? (requiresNewAcknowledgment ?? true)
+    : true;
+
+  // Se ripubblicazione con requiresNewAck=true, incrementa version per invalidare i SopViewRecord precedenti
+  // e pulisci i ContentAcknowledgment legacy per coerenza con "pending reads"
+  const shouldIncrementVersion = isRepublication && newAckFlag;
+
+  await prisma.$transaction(async (tx) => {
     // 1. SopWorkflow → PUBBLICATA
-    prisma.sopWorkflow.update({
+    await tx.sopWorkflow.update({
       where: { id: wf.id },
       data: {
         sopStatus: "PUBBLICATA",
@@ -66,45 +92,59 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
         submittedToAById: null,
         reviewDueDate,
         reviewDueDateSetById: userId,
+        requiresNewAcknowledgment: newAckFlag,
       },
-    }),
-    // 2. Content → PUBLISHED
-    prisma.content.update({
+    });
+    // 2. Content → PUBLISHED (incrementa version se serve nuova conferma)
+    await tx.content.update({
       where: { id: wf.contentId },
       data: {
         status: "PUBLISHED",
         publishedAt: now,
         updatedById: userId,
+        ...(shouldIncrementVersion ? { version: { increment: 1 } } : {}),
       },
-    }),
+    });
     // 3. ContentStatusHistory
-    prisma.contentStatusHistory.create({
+    await tx.contentStatusHistory.create({
       data: {
         contentId: wf.contentId,
         fromStatus: "DRAFT",
         toStatus: "PUBLISHED",
         changedById: userId,
-        note: "Approvazione finale e pubblicazione",
+        note: isRepublication
+          ? `Nuova versione pubblicata — ${newAckFlag ? "richiede nuova conferma" : "conferma precedente mantenuta"}`
+          : "Approvazione finale e pubblicazione",
       },
-    }),
+    });
     // 4. Evento APPROVED
-    prisma.sopWorkflowEvent.create({
+    await tx.sopWorkflowEvent.create({
       data: {
         sopWorkflowId: wf.id,
         eventType: "APPROVED",
         actorId: userId,
       },
-    }),
+    });
     // 5. Evento PUBLISHED
-    prisma.sopWorkflowEvent.create({
+    await tx.sopWorkflowEvent.create({
       data: {
         sopWorkflowId: wf.id,
         eventType: "PUBLISHED",
         actorId: userId,
-        metadata: { reviewDueDate: reviewDueDate.toISOString() },
+        metadata: {
+          reviewDueDate: reviewDueDate.toISOString(),
+          isRepublication,
+          requiresNewAcknowledgment: newAckFlag,
+        },
       },
-    }),
-  ]);
+    });
+    // 6. Se ripubblicazione con nuova conferma, pulisci ContentAcknowledgment legacy
+    if (shouldIncrementVersion) {
+      await tx.contentAcknowledgment.deleteMany({
+        where: { contentId: wf.contentId },
+      });
+    }
+  });
 
   return NextResponse.json({
     data: {
@@ -112,6 +152,8 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
       published: true,
       sopStatus: "PUBBLICATA",
       reviewDueDate,
+      isRepublication,
+      requiresNewAcknowledgment: newAckFlag,
     },
   });
 }

@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect, useCallback } from "react";
-import { useSession } from "next-auth/react";
+import { useHooContext } from "@/components/hoo/hoo-shell";
 import Link from "next/link";
 
 interface SopWorkflowItem {
@@ -21,6 +21,7 @@ interface SopWorkflowItem {
   responsible: { id: string; name: string; role: string };
   consulted: { id: string; name: string; role: string } | null;
   accountable: { id: string; name: string; role: string };
+  isImported?: boolean;
 }
 
 const STATUS_LABELS: Record<string, string> = {
@@ -38,8 +39,7 @@ const STATUS_COLORS: Record<string, string> = {
 const WF_BADGE = "text-[9px] font-ui font-bold uppercase tracking-wider px-1.5 py-0.5 bg-mauve/15 text-mauve";
 
 export default function HooSopListPage() {
-  const { data: session } = useSession();
-  const userRole = session?.user?.role;
+  const { userRole } = useHooContext();
   const isHoo = userRole === "ADMIN" || userRole === "SUPER_ADMIN";
 
   const [items, setItems] = useState<SopWorkflowItem[]>([]);
@@ -47,6 +47,8 @@ export default function HooSopListPage() {
   const [page, setPage] = useState(1);
   const [loading, setLoading] = useState(true);
   const [statusFilter, setStatusFilter] = useState("");
+  const [search, setSearch] = useState("");
+  const [searchInput, setSearchInput] = useState("");
   const pageSize = 20;
 
   const fetchSops = useCallback(async () => {
@@ -54,22 +56,24 @@ export default function HooSopListPage() {
     const params = new URLSearchParams({ page: page.toString(), pageSize: pageSize.toString() });
     if (statusFilter) {
       params.set("sopStatus", statusFilter);
-    } else if (isHoo) {
-      // HOO: escludi IN_LAVORAZIONE dalla lista SOP (visibili in Approvazioni)
-      params.set("excludeStatus", "IN_LAVORAZIONE");
+    }
+    if (search) {
+      params.set("search", search);
     }
     try {
       const res = await fetch(`/api/sop-workflow?${params}`);
       if (res.ok) {
         const json = await res.json();
-        setItems(json.data);
-        setTotal(json.meta.total);
+        setItems(json.data || []);
+        setTotal(json.meta?.total || 0);
+      } else {
+        console.error("SOP fetch failed:", res.status, await res.text().catch(() => ""));
       }
     } finally { setLoading(false); }
-  }, [page, statusFilter, isHoo]);
+  }, [page, statusFilter, search]);
 
   useEffect(() => { fetchSops(); }, [fetchSops]);
-  useEffect(() => { setPage(1); }, [statusFilter]);
+  useEffect(() => { setPage(1); }, [statusFilter, search]);
 
   const totalPages = Math.ceil(total / pageSize);
 
@@ -77,19 +81,46 @@ export default function HooSopListPage() {
     <div className="max-w-5xl space-y-4">
       <div className="flex items-center justify-between">
         <h1 className="text-xl font-heading font-medium text-charcoal-dark">SOP</h1>
-        <Link href="/hoo-sop/new" className="btn-primary">Nuova SOP</Link>
+        <div className="flex items-center gap-3">
+          {isHoo && (
+            <Link href="/sop-import" className="btn-outline text-xs px-4 py-2">
+              Importa SOP
+            </Link>
+          )}
+          <Link href="/hoo-sop/new" className="btn-primary">Nuova SOP</Link>
+        </div>
       </div>
 
-      {/* Filtro stato — solo i 3 stati del modello RACI */}
-      <div>
-        <label className="block text-[11px] font-ui uppercase tracking-wider text-charcoal/45 mb-1">Stato</label>
-        <select value={statusFilter} onChange={(e) => setStatusFilter(e.target.value)}
-          className="text-sm border border-ivory-dark px-3 py-2 bg-white font-ui">
-          <option value="">{isHoo ? "Pubblicate e archiviate" : "Tutti gli stati"}</option>
-          {!isHoo && <option value="IN_LAVORAZIONE">In lavorazione</option>}
-          <option value="PUBBLICATA">Pubblicata</option>
-          <option value="ARCHIVIATA">Archiviata</option>
-        </select>
+      {/* Filtri */}
+      <div className="flex items-end gap-4 flex-wrap">
+        <div className="flex-1 min-w-[200px]">
+          <label className="block text-[11px] font-ui uppercase tracking-wider text-charcoal/45 mb-1">Cerca</label>
+          <form onSubmit={(e) => { e.preventDefault(); setSearch(searchInput); }} className="flex">
+            <input type="text" value={searchInput}
+              onChange={(e) => setSearchInput(e.target.value)}
+              placeholder="Titolo o codice SOP..."
+              className="flex-1 text-sm border border-ivory-dark px-3 py-2 bg-white font-ui border-r-0" />
+            <button type="submit" className="px-4 py-2 text-xs font-ui font-semibold uppercase tracking-wider bg-terracotta text-white hover:bg-terracotta-light transition-colors">
+              Cerca
+            </button>
+          </form>
+        </div>
+        <div>
+          <label className="block text-[11px] font-ui uppercase tracking-wider text-charcoal/45 mb-1">Stato</label>
+          <select value={statusFilter} onChange={(e) => setStatusFilter(e.target.value)}
+            className="text-sm border border-ivory-dark px-3 py-2 bg-white font-ui">
+            <option value="">Tutti gli stati</option>
+            <option value="IN_LAVORAZIONE">In lavorazione</option>
+            <option value="PUBBLICATA">Pubblicata</option>
+            <option value="ARCHIVIATA">Archiviata</option>
+          </select>
+        </div>
+        {search && (
+          <button onClick={() => { setSearch(""); setSearchInput(""); }}
+            className="text-xs font-ui text-charcoal/50 hover:text-charcoal py-2 transition-colors">
+            Annulla ricerca
+          </button>
+        )}
       </div>
 
       {/* Lista */}
@@ -117,6 +148,11 @@ export default function HooSopListPage() {
                   )}
                   {item.sopStatus === "IN_LAVORAZIONE" && !item.submittedToC && item.submittedToA && (
                     <span className={WF_BADGE}>Sottoposta ad A</span>
+                  )}
+                  {item.isImported && (
+                    <span className="text-[9px] font-ui font-bold uppercase tracking-wider px-1.5 py-0.5 bg-[#E3F2FD] text-[#1565C0]">
+                      Importata
+                    </span>
                   )}
                   {item.needsReview && (
                     <span className="text-[9px] font-ui font-bold uppercase tracking-wider px-1.5 py-0.5 bg-alert-yellow/15 text-alert-yellow">

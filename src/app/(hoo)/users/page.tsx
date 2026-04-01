@@ -49,7 +49,9 @@ export default function UsersPage() {
   const [loading, setLoading] = useState(true);
   const [roleFilter, setRoleFilter] = useState("");
   const [propertyFilter, setPropertyFilter] = useState("");
+  const [activeFilter, setActiveFilter] = useState("active");
   const [properties, setProperties] = useState<Property[]>([]);
+  const [togglingId, setTogglingId] = useState<string | null>(null);
   const pageSize = 20;
 
   useEffect(() => {
@@ -65,14 +67,28 @@ export default function UsersPage() {
     const params = new URLSearchParams({ page: page.toString(), pageSize: pageSize.toString() });
     if (roleFilter) params.set("role", roleFilter);
     if (propertyFilter) params.set("propertyId", propertyFilter);
+    if (activeFilter === "active") params.set("isActive", "true");
+    else if (activeFilter === "inactive") params.set("isActive", "false");
     try {
       const res = await fetch(`/api/users?${params}`);
       if (res.ok) { const json = await res.json(); setUsers(json.data); setTotal(json.meta.total); }
     } finally { setLoading(false); }
-  }, [page, roleFilter, propertyFilter]);
+  }, [page, roleFilter, propertyFilter, activeFilter]);
 
   useEffect(() => { fetchUsers(); }, [fetchUsers]);
-  useEffect(() => { setPage(1); }, [roleFilter, propertyFilter]);
+  useEffect(() => { setPage(1); }, [roleFilter, propertyFilter, activeFilter]);
+
+  const handleToggleActive = async (userId: string, currentActive: boolean) => {
+    setTogglingId(userId);
+    try {
+      const res = await fetch(`/api/users/${userId}`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ isActive: !currentActive }),
+      });
+      if (res.ok) fetchUsers();
+    } finally { setTogglingId(null); }
+  };
 
   const totalPages = Math.ceil(total / pageSize);
 
@@ -97,6 +113,11 @@ export default function UsersPage() {
           <option value="">Tutte le strutture</option>
           {properties.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
         </select>
+        <select value={activeFilter} onChange={(e) => setActiveFilter(e.target.value)} className="text-sm font-ui">
+          <option value="active">Attivi</option>
+          <option value="inactive">Disattivati</option>
+          <option value="all">Tutti</option>
+        </select>
       </div>
 
       {/* Tabella */}
@@ -115,7 +136,7 @@ export default function UsersPage() {
                 <th className="px-4 py-3">Strutture</th>
                 <th className="px-4 py-3">Reparti</th>
                 <th className="px-4 py-3">Contenuti</th>
-                <th className="px-4 py-3 w-8"></th>
+                <th className="px-4 py-3 text-right">Azioni</th>
               </tr>
             </thead>
             <tbody>
@@ -159,7 +180,21 @@ export default function UsersPage() {
                       </div>
                     </td>
                     <td className="px-4 py-3">
-                      {!u.isActive && <span className="w-2 h-2 inline-block rounded-full bg-alert-red" title="Disattivato" />}
+                      <div className="flex items-center justify-end gap-2">
+                        <Link href={`/users/${u.id}`}
+                          className="px-2.5 py-1 text-[11px] font-ui font-semibold uppercase tracking-wider text-terracotta border border-terracotta/30 hover:bg-terracotta hover:text-white transition-colors">
+                          Modifica
+                        </Link>
+                        <button onClick={() => handleToggleActive(u.id, u.isActive)}
+                          disabled={togglingId === u.id}
+                          className={`px-2.5 py-1 text-[11px] font-ui font-semibold uppercase tracking-wider border transition-colors disabled:opacity-50 ${
+                            u.isActive
+                              ? "text-alert-red border-alert-red/30 hover:bg-alert-red hover:text-white"
+                              : "text-sage border-sage/30 hover:bg-sage hover:text-white"
+                          }`}>
+                          {togglingId === u.id ? "..." : u.isActive ? "Disattiva" : "Riattiva"}
+                        </button>
+                      </div>
                     </td>
                   </tr>
                 );

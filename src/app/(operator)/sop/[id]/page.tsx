@@ -3,6 +3,7 @@ import { getSessionUser } from "@/lib/session";
 import { prisma } from "@/lib/prisma";
 import { checkAccess } from "@/lib/rbac";
 import { AcknowledgeButton } from "@/components/operator/acknowledge-button";
+import { SopViewTracker } from "@/components/operator/sop-view-tracker";
 import { ContentActions } from "@/components/hoo/content-actions";
 import { ContentTimeline } from "@/components/shared/content-timeline";
 import { ExportPdfButton } from "@/components/shared/export-pdf-button";
@@ -21,6 +22,14 @@ export default async function SopDetailPage({ params }: Props) {
       property: { select: { id: true, name: true, code: true } },
       department: { select: { id: true, name: true, code: true } },
       createdBy: { select: { name: true } },
+      sopWorkflow: { select: { requiresNewAcknowledgment: true } },
+      sopViewRecords: {
+        where: { userId: user.id },
+        orderBy: { contentVersion: "desc" },
+        take: 10,
+        select: { contentVersion: true, viewedAt: true, acknowledgedAt: true },
+      },
+      // Mantieni anche ContentAcknowledgment per backward compatibility
       acknowledgments: { where: { userId: user.id }, select: { acknowledgedAt: true }, take: 1 },
     },
   });
@@ -30,11 +39,26 @@ export default async function SopDetailPage({ params }: Props) {
   const hasAccess = await checkAccess(user.id, "OPERATOR", content.propertyId, content.departmentId ?? undefined);
   if (!hasAccess) notFound();
 
-  const acknowledged = content.acknowledgments.length > 0;
-  const acknowledgedAt = content.acknowledgments[0]?.acknowledgedAt?.toISOString() ?? null;
+  // Version-aware acknowledgment status per SOP
+  const currentVersion = content.version;
+  const requiresNewAck = content.sopWorkflow?.requiresNewAcknowledgment ?? true;
+  const currentVersionRecord = content.sopViewRecords.find(r => r.contentVersion === currentVersion);
+  const acknowledgedCurrentVersion = currentVersionRecord?.acknowledgedAt != null;
+
+  // Se requiresNewAck=false, vale anche una conferma su qualsiasi versione precedente
+  const anyPreviousAck = content.sopViewRecords.find(r => r.acknowledgedAt != null);
+  const acknowledged = acknowledgedCurrentVersion || (!requiresNewAck && anyPreviousAck != null);
+  const acknowledgedAt = acknowledgedCurrentVersion
+    ? currentVersionRecord!.acknowledgedAt!.toISOString()
+    : (!requiresNewAck && anyPreviousAck != null)
+      ? anyPreviousAck.acknowledgedAt!.toISOString()
+      : null;
 
   return (
     <div className="max-w-3xl mx-auto py-6">
+      {/* Registra view fire-and-forget */}
+      <SopViewTracker contentId={content.id} />
+
       <nav className="flex items-center gap-2 text-sm font-ui text-sage-light mb-6">
         <Link href="/sop" className="hover:text-terracotta transition-colors">SOP</Link>
         <span className="text-ivory-dark">/</span>
@@ -59,7 +83,7 @@ export default async function SopDetailPage({ params }: Props) {
         </div>
         <div className="mt-3 flex items-center gap-2">
           <ExportPdfButton contentId={content.id} />
-          <ContentActions contentId={content.id} contentStatus={content.status} userRole={user.role} isFeatured={content.isFeatured} />
+          <ContentActions contentId={content.id} contentType={content.type} contentStatus={content.status} userRole={user.role} isFeatured={content.isFeatured} />
         </div>
       </div>
 
@@ -70,7 +94,12 @@ export default async function SopDetailPage({ params }: Props) {
 
       {(user.role === "OPERATOR") && (
         <div className="border-t border-ivory-dark pt-6">
-          <AcknowledgeButton contentId={content.id} acknowledged={acknowledged} acknowledgedAt={acknowledgedAt} />
+          <AcknowledgeButton
+            contentId={content.id}
+            acknowledged={acknowledged}
+            acknowledgedAt={acknowledgedAt}
+            useSopEndpoint
+          />
         </div>
       )}
 

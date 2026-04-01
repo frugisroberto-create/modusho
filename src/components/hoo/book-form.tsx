@@ -31,11 +31,14 @@ export function BookForm({ mode, contentType, backPath, contentId, initialData, 
       if (res.ok) {
         const json = await res.json();
         setProperties(json.data);
-        if (!propertyId && json.data.length > 0) setPropertyId(json.data[0].id);
+        if (!initialData?.propertyId && json.data.length > 0) {
+          setPropertyId(json.data[0].id);
+        }
       }
     }
     fetchProps();
-  }, [propertyId]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   const handleSubmit = async (publish: boolean) => {
     if (!title.trim() || !body.trim() || !propertyId) { setError("Titolo, contenuto e struttura obbligatori"); return; }
