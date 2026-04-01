@@ -3,6 +3,7 @@
 import { createContext, useCallback, useContext, useEffect, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import { OperatorHeader } from "./operator-header";
+import { PushPermissionBanner } from "@/components/shared/push-permission-banner";
 
 interface Property {
   id: string;
@@ -69,6 +70,7 @@ export function OperatorShell({
         <main className="max-w-7xl mx-auto px-4 sm:px-6 pb-16 md:pb-0">
           {children}
         </main>
+        <PushPermissionBanner />
       </div>
     </OperatorContext.Provider>
   );

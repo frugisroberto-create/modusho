@@ -3,6 +3,7 @@ import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { canApprove, calculateReviewDueDate } from "@/lib/sop-workflow";
+import { sendSopPublishedPush } from "@/lib/push-notification";
 import { z } from "zod/v4";
 
 type RouteParams = { params: Promise<{ id: string }> };
@@ -60,7 +61,7 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
   // Determina se e' una ripubblicazione (la SOP era gia' stata pubblicata in passato)
   const content = await prisma.content.findUnique({
     where: { id: wf.contentId },
-    select: { publishedAt: true, version: true },
+    select: { publishedAt: true, version: true, title: true },
   });
   const isRepublication = content?.publishedAt !== null;
 
@@ -145,6 +146,15 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
       });
     }
   });
+
+  // Push notification best-effort — dopo la transazione, non bloccante
+  sendSopPublishedPush({
+    contentId: wf.contentId,
+    contentTitle: content?.title || "",
+    actorId: userId,
+    isRepublication,
+    requiresNewAcknowledgment: newAckFlag,
+  }).catch(() => {});
 
   return NextResponse.json({
     data: {

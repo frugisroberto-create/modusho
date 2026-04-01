@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
+import { incrementAckCount } from "@/components/shared/push-permission-banner";
 
 interface AcknowledgeButtonProps {
   contentId: string;
@@ -42,6 +43,7 @@ export function AcknowledgeButton({ contentId, acknowledged, acknowledgedAt, use
         const json = await res.json();
         setDone(true);
         setDoneAt(json.data.acknowledgedAt);
+        incrementAckCount();
         router.refresh();
       }
     } finally { setLoading(false); }

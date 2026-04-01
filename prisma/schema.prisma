@@ -113,6 +113,7 @@ model User {
   sopTextVersions      SopTextVersion[]       @relation("SopTextVersionSavedBy")
   sopWorkflowEvents    SopWorkflowEvent[]     @relation("SopWorkflowEventActor")
   sopViewRecords       SopViewRecord[]        @relation("SopViewRecordUser")
+  pushSubscriptions    PushSubscription[]     @relation("PushSubscriptionUser")
 
   @@index([role])
   @@index([email])
@@ -492,4 +493,19 @@ model SopViewRecord {
   @@index([contentId])
   @@index([userId])
   @@index([contentId, contentVersion])
+}
+
+// ─── Push Subscription (PWA) ──────────────────────────────────────────
+
+model PushSubscription {
+  id        String   @id @default(cuid())
+  userId    String
+  endpoint  String   @unique
+  p256dh    String
+  auth      String
+  createdAt DateTime @default(now())
+
+  user User @relation("PushSubscriptionUser", fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
 }
