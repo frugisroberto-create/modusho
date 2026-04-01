@@ -1,6 +1,7 @@
-import type { Metadata } from "next";
+import type { Metadata, Viewport } from "next";
 import { Playfair_Display, Inter, Cardo } from "next/font/google";
 import { Providers } from "@/components/providers";
+import { ServiceWorkerRegistrar } from "@/components/service-worker-registrar";
 import "./globals.css";
 
 const playfair = Playfair_Display({
@@ -25,9 +26,23 @@ const cardo = Cardo({
   display: "swap",
 });
 
+export const viewport: Viewport = {
+  width: "device-width",
+  initialScale: 1,
+};
+
 export const metadata: Metadata = {
   title: "ModusHO",
   description: "Sistema di governance operativa - HO Collection",
+  manifest: "/manifest.json",
+  appleWebApp: {
+    capable: true,
+    statusBarStyle: "default",
+    title: "ModusHO",
+  },
+  other: {
+    "mobile-web-app-capable": "yes",
+  },
 };
 
 export default function RootLayout({
@@ -39,6 +54,7 @@ export default function RootLayout({
     <html lang="it" className={`${playfair.variable} ${inter.variable} ${cardo.variable}`}>
       <body className="antialiased">
         <Providers>{children}</Providers>
+        <ServiceWorkerRegistrar />
       </body>
     </html>
   );

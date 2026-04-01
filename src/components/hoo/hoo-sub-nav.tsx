@@ -21,7 +21,7 @@ const SUB_NAV_ITEMS: { href: string; label: string; minRole?: string }[] = [
   { href: "/approvals", label: "Approvazioni", minRole: "HOD" },
   { href: "/users", label: "Gestione utenti", minRole: "ADMIN" },
   { href: "/properties", label: "Strutture", minRole: "ADMIN" },
-  { href: "/reports", label: "Report", minRole: "HOD" },
+  { href: "/reports", label: "Report", minRole: "HOTEL_MANAGER" },
 ];
 
 const ROLE_LEVEL: Record<string, number> = {

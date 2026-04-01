@@ -111,9 +111,9 @@ export default function ApprovalsPage() {
                     <span className="text-[10px] font-ui font-bold uppercase tracking-wider px-2 py-0.5 bg-[#FFF3E0] text-[#E65100]">
                       In lavorazione
                     </span>
-                    {item.submittedToC && item.submittedToA && <span className={WF_BADGE}>Sottoposta a C e A</span>}
-                    {item.submittedToC && !item.submittedToA && <span className={WF_BADGE}>Sottoposta a C</span>}
-                    {!item.submittedToC && item.submittedToA && <span className={WF_BADGE}>Sottoposta ad A</span>}
+                    {item.submittedToC && item.submittedToA && <span className={WF_BADGE}>Sottoposta a HM e HOO</span>}
+                    {item.submittedToC && !item.submittedToA && <span className={WF_BADGE}>Sottoposta a HM</span>}
+                    {!item.submittedToC && item.submittedToA && <span className={WF_BADGE}>Sottoposta a HOO</span>}
                     {item.isImported && (
                       <span className="text-[9px] font-ui font-bold uppercase tracking-wider px-1.5 py-0.5 bg-[#E3F2FD] text-[#1565C0]">
                         Importata

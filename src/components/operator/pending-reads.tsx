@@ -50,9 +50,9 @@ export function PendingReads() {
 
   if (loading) {
     return (
-      <section className="space-y-4">
-        <h2 className="text-xl font-heading font-medium text-charcoal-dark">Da prendere visione</h2>
-        <div className="space-y-0">{[1, 2].map((i) => <div key={i} className="h-20 skeleton" />)}</div>
+      <section>
+        <h2 className="text-xl font-heading font-medium text-charcoal-dark mb-4">Da prendere visione</h2>
+        <div className="space-y-0">{[1, 2].map((i) => <div key={i} className="h-16 skeleton" />)}</div>
       </section>
     );
   }
@@ -60,10 +60,10 @@ export function PendingReads() {
   if (items.length === 0) return null;
 
   return (
-    <section className="space-y-4">
-      <div className="flex items-center gap-3">
+    <section>
+      <div className="flex items-center gap-3 mb-4">
         <h2 className="text-xl font-heading font-medium text-charcoal-dark">Da prendere visione</h2>
-        <span className="flex items-center justify-center w-6 h-6 rounded-full bg-alert-red text-white text-xs font-ui font-bold">
+        <span className="flex items-center justify-center w-6 h-6 rounded-full bg-alert-red text-white text-[10px] font-ui font-bold">
           {items.length}
         </span>
       </div>

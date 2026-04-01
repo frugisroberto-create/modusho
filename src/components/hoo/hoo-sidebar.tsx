@@ -62,7 +62,7 @@ function SidebarContent({ userName, userRole, userRoleLabel, pathname, onNavClic
       </nav>
 
       <div className="border-t border-white/10 px-5 py-3">
-        <Link href="/" className="flex items-center gap-2 text-sm font-ui text-white/60 hover:text-white transition-colors">
+        <Link href="/?view=hotel" className="flex items-center gap-2 text-sm font-ui text-white/60 hover:text-white transition-colors">
           <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M10 19l-7-7m0 0l7-7m-7 7h18" />
           </svg>
@@ -82,7 +82,7 @@ function SidebarContent({ userName, userRole, userRoleLabel, pathname, onNavClic
       <div className="border-t border-white/10 px-5 py-4">
         <p className="text-sm font-ui font-medium truncate text-white/90">{userName}</p>
         <p className="text-xs font-ui text-white/50 mt-0.5">{userRoleLabel}</p>
-        <button onClick={() => signOut({ callbackUrl: "/login" })}
+        <button onClick={() => signOut({ redirect: false }).then(() => { window.location.href = "/login"; })}
           className="mt-2.5 text-xs font-ui text-white/40 hover:text-white/70 transition-colors">
           Esci
         </button>

@@ -46,7 +46,7 @@ export default async function StandardBookDetailPage({ params }: Props) {
         </div>
       </div>
 
-      <article className="prose prose-gray max-w-none mb-8 bg-ivory-medium border border-ivory-dark  p-6 font-body"
+      <article className="prose prose-gray max-w-none mb-8 bg-ivory-medium border border-ivory-dark p-4 sm:p-6 font-body"
         dangerouslySetInnerHTML={{ __html: content.body }} />
 
       {user.role === "OPERATOR" && (<div className="border-t border-ivory-dark pt-6">

@@ -177,7 +177,7 @@ export function SopWorkflowEditor({ workflowId, currentUserId, currentUserRole }
         const data = await res.json();
         throw new Error(data.error || "Errore");
       }
-      const labelMap = { C: "C (Consulted)", A: "A (Accountable)", C_AND_A: "C e A" };
+      const labelMap = { C: "HM", A: "HOO", C_AND_A: "HM e HOO" };
       setActionMessage({ type: "success", text: `Bozza sottoposta a ${labelMap[target]}` });
       await fetchWorkflow();
     } catch (e) {
@@ -652,11 +652,11 @@ function WorkflowStatusBanner({ wf }: { wf: SopWorkflowData }) {
 
   const parts: string[] = [];
   if (wf.submittedToC && wf.submittedToA) {
-    parts.push("Sottoposta a C e A");
+    parts.push("Sottoposta a HM e HOO");
   } else if (wf.submittedToC) {
-    parts.push("Sottoposta a C");
+    parts.push("Sottoposta a HM");
   } else if (wf.submittedToA) {
-    parts.push("Sottoposta ad A");
+    parts.push("Sottoposta a HOO");
   }
 
   if (parts.length === 0) {
@@ -672,12 +672,12 @@ function WorkflowStatusBanner({ wf }: { wf: SopWorkflowData }) {
       {parts.join(" — ")}
       {wf.submittedToCAt && (
         <span className="ml-2 text-xs font-normal text-mauve/70">
-          (C dal {new Date(wf.submittedToCAt).toLocaleDateString("it-IT")})
+          (HM dal {new Date(wf.submittedToCAt).toLocaleDateString("it-IT")})
         </span>
       )}
       {wf.submittedToAAt && (
         <span className="ml-2 text-xs font-normal text-mauve/70">
-          (A dal {new Date(wf.submittedToAAt).toLocaleDateString("it-IT")})
+          (HOO dal {new Date(wf.submittedToAAt).toLocaleDateString("it-IT")})
         </span>
       )}
     </div>
@@ -772,17 +772,17 @@ function ActionBar({ wf, isR, isA, isHoo, isAdminOverride, dirty, saving, action
         <>
           {wf.consulted && !wf.submittedToC && (
             <button onClick={() => onSubmit("C")} disabled={actionLoading} className="btn-outline !py-2.5 !px-5">
-              Sottoponi a C
+              Sottoponi a HM
             </button>
           )}
           {!wf.submittedToA && (
             <button onClick={() => onSubmit("A")} disabled={actionLoading} className="btn-outline !py-2.5 !px-5">
-              Sottoponi ad A
+              Sottoponi a HOO
             </button>
           )}
           {wf.consulted && !wf.submittedToC && !wf.submittedToA && (
             <button onClick={() => onSubmit("C_AND_A")} disabled={actionLoading} className="btn-outline !py-2.5 !px-5">
-              Sottoponi a C e A
+              Sottoponi a HM e HOO
             </button>
           )}
         </>
@@ -1157,9 +1157,9 @@ const EVENT_LABELS: Record<string, string> = {
   ATTACHMENT_ADDED: "Allegato aggiunto",
   ATTACHMENT_REMOVED: "Allegato rimosso",
   ATTACHMENT_REPLACED: "Allegato sostituito",
-  SUBMITTED_TO_C: "Sottoposta a C",
-  SUBMITTED_TO_A: "Sottoposta ad A",
-  SUBMITTED_TO_C_AND_A: "Sottoposta a C e A",
+  SUBMITTED_TO_C: "Sottoposta a HM",
+  SUBMITTED_TO_A: "Sottoposta a HOO",
+  SUBMITTED_TO_C_AND_A: "Sottoposta a HM e HOO",
   RETURNED_BY_A: "Restituita da A",
   APPROVED: "Approvata",
   PUBLISHED: "Pubblicata",

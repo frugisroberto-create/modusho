@@ -124,6 +124,11 @@
     animation: skeleton-pulse 1.5s ease-in-out infinite;
     border-radius: 0;
   }
+
+  /* Safe area per bottom nav su iPhone */
+  .safe-bottom {
+    padding-bottom: env(safe-area-inset-bottom, 0px);
+  }
 }
 
 @keyframes skeleton-pulse {

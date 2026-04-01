@@ -127,7 +127,7 @@ export function ContentList({ contentType, detailPath, title, description, creat
           {description && <p className="text-[13px] font-ui text-charcoal/50 mt-1">{description}</p>}
         </div>
         {canCreate && createPath && (
-          <Link href={createPath} className="btn-primary">
+          <Link href={createPath} className="btn-primary hidden md:inline-block">
             {createLabel || "Nuovo"}
           </Link>
         )}
@@ -180,7 +180,7 @@ export function ContentList({ contentType, detailPath, title, description, creat
               <Link key={item.id} href={`/${detailPath}/${item.id}`}
                 className={`flex items-center gap-4 px-5 py-4 hover:bg-ivory transition-colors ${index < items.length - 1 ? "border-b border-ivory-medium" : ""}`}>
                 <div className="flex-1 min-w-0">
-                  <div className="flex items-center gap-2 mb-1">
+                  <div className="flex flex-wrap items-center gap-1.5 sm:gap-2 mb-1">
                     <span className={`text-[10px] font-ui font-bold uppercase tracking-[0.15em] px-2 py-0.5 ${badge.cls}`}>{badge.label}</span>
                     {item.department && <span className="text-[11px] font-ui text-charcoal/45">{item.department.name}</span>}
                     {!item.acknowledged ? (
@@ -208,7 +208,7 @@ export function ContentList({ contentType, detailPath, title, description, creat
       )}
 
       {totalPages > 1 && (
-        <div className="flex items-center justify-between pt-2">
+        <div className="flex flex-col sm:flex-row items-center justify-between gap-2 pt-2">
           <p className="text-sm font-ui text-charcoal/45">{total} risultat{total === 1 ? "o" : "i"} — Pagina {page} di {totalPages}</p>
           <div className="flex gap-2">
             <button onClick={() => setPage((p) => Math.max(1, p - 1))} disabled={page <= 1}

@@ -103,11 +103,11 @@ export function HooHeader({ userName, userRole }: HooHeaderProps) {
                     <p className="text-sm font-ui font-medium text-charcoal-dark">{userName}</p>
                     <p className="text-[11px] font-ui text-charcoal/50 mt-0.5">{ROLE_LABEL[userRole] || userRole}</p>
                   </div>
-                  <Link href="/" onClick={() => setMenuOpen(false)}
+                  <Link href="/?view=hotel" onClick={() => setMenuOpen(false)}
                     className="block px-4 py-2 text-sm font-ui text-charcoal hover:bg-ivory transition-colors">
                     Vista Hotel
                   </Link>
-                  <button onClick={() => signOut({ callbackUrl: "/login" })}
+                  <button onClick={() => signOut({ redirect: false }).then(() => { window.location.href = "/login"; })}
                     className="w-full text-left px-4 py-2 text-sm font-ui text-charcoal/60 hover:bg-ivory hover:text-charcoal transition-colors">
                     Esci
                   </button>

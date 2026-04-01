@@ -4,6 +4,7 @@ import { prisma } from "@/lib/prisma";
 import { checkAccess } from "@/lib/rbac";
 import { ContentActions } from "@/components/hoo/content-actions";
 import { ContentTimeline } from "@/components/shared/content-timeline";
+import { SopViewRegistry } from "@/components/shared/sop-view-registry";
 import { AttachmentUploader } from "@/components/shared/attachment-uploader";
 import { ExportPdfButton } from "@/components/shared/export-pdf-button";
 import Link from "next/link";
@@ -79,6 +80,10 @@ export default async function HooSopDetailPage({ params }: Props) {
         dangerouslySetInnerHTML={{ __html: content.body }} />
 
       <AttachmentUploader contentId={content.id} canEdit={content.status !== "ARCHIVED"} />
+
+      {content.status === "PUBLISHED" && (
+        <SopViewRegistry contentId={content.id} />
+      )}
 
       <ContentTimeline contentId={content.id} />
     </div>

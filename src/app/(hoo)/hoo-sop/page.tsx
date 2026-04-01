@@ -141,13 +141,13 @@ export default function HooSopListPage() {
                     {STATUS_LABELS[item.sopStatus]}
                   </span>
                   {item.sopStatus === "IN_LAVORAZIONE" && item.submittedToC && item.submittedToA && (
-                    <span className={WF_BADGE}>Sottoposta a C e A</span>
+                    <span className={WF_BADGE}>Sottoposta a HM e HOO</span>
                   )}
                   {item.sopStatus === "IN_LAVORAZIONE" && item.submittedToC && !item.submittedToA && (
-                    <span className={WF_BADGE}>Sottoposta a C</span>
+                    <span className={WF_BADGE}>Sottoposta a HM</span>
                   )}
                   {item.sopStatus === "IN_LAVORAZIONE" && !item.submittedToC && item.submittedToA && (
-                    <span className={WF_BADGE}>Sottoposta ad A</span>
+                    <span className={WF_BADGE}>Sottoposta a HOO</span>
                   )}
                   {item.isImported && (
                     <span className="text-[9px] font-ui font-bold uppercase tracking-wider px-1.5 py-0.5 bg-[#E3F2FD] text-[#1565C0]">

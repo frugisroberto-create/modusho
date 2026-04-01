@@ -50,21 +50,21 @@ export default async function DocumentDetailPage({ params }: Props) {
           <span className="text-xs font-ui text-sage-light">v{content.version}</span>
         </div>
         <h1 className="text-2xl font-heading font-semibold text-charcoal-dark">{content.title}</h1>
-        <div className="flex items-center gap-3 mt-2 text-sm font-ui text-sage-light">
+        <div className="flex flex-wrap items-center gap-2 sm:gap-3 mt-2 text-sm font-ui text-sage-light">
           <span className="text-terracotta font-medium">{content.property.name}</span>
           <span>Autore: {content.createdBy.name}</span>
           {content.publishedAt && (
             <span>Pubblicato il {new Date(content.publishedAt).toLocaleDateString("it-IT")}</span>
           )}
         </div>
-        <div className="mt-3 flex items-center gap-2">
+        <div className="mt-3 hidden md:flex items-center gap-2">
           <ExportPdfButton contentId={content.id} />
           <ContentActions contentId={content.id} contentType={content.type} contentStatus={content.status} userRole={user.role} isFeatured={content.isFeatured} />
         </div>
       </div>
 
       <article
-        className="prose prose-gray max-w-none mb-8 bg-ivory-medium border border-ivory-dark  p-6 font-body"
+        className="prose prose-gray max-w-none mb-8 bg-ivory-medium border border-ivory-dark p-4 sm:p-6 font-body"
         dangerouslySetInnerHTML={{ __html: content.body }}
       />
 

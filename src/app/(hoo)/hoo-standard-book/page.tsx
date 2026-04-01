@@ -20,9 +20,11 @@ const STATUS_BADGE: Record<string, string> = {
 export default function HooStandardBookListPage() {
   const { userRole } = useHooContext();
   const canCreate = userRole === "ADMIN" || userRole === "SUPER_ADMIN";
-  const canEdit = canCreate; // solo chi può creare può anche editare
+  const canEdit = canCreate;
   const [items, setItems] = useState<ContentItem[]>([]);
   const [loading, setLoading] = useState(true);
+  const [deleting, setDeleting] = useState<string | null>(null);
+  const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
 
   const fetchItems = useCallback(async () => {
     setLoading(true);
@@ -33,6 +35,19 @@ export default function HooStandardBookListPage() {
   }, []);
 
   useEffect(() => { fetchItems(); }, [fetchItems]);
+
+  const handleDelete = async (id: string) => {
+    setDeleting(id);
+    try {
+      const res = await fetch(`/api/content/${id}`, { method: "DELETE" });
+      if (res.ok) {
+        setItems(prev => prev.filter(i => i.id !== id));
+      }
+    } finally {
+      setDeleting(null);
+      setConfirmDeleteId(null);
+    }
+  };
 
   return (
     <div className="space-y-5">
@@ -51,9 +66,9 @@ export default function HooStandardBookListPage() {
       ) : (
         <div className="bg-white border border-ivory-dark">
           {items.map((item, idx) => (
-            <Link key={item.id} href={canEdit ? `/hoo-standard-book/${item.id}/edit` : `/standard-book/${item.id}`}
+            <div key={item.id}
               className={`flex items-center justify-between p-4 hover:bg-ivory transition-colors ${idx < items.length - 1 ? "border-b border-ivory-medium" : ""}`}>
-              <div>
+              <Link href={canEdit ? `/hoo-standard-book/${item.id}/edit` : `/standard-book/${item.id}`} className="flex-1 min-w-0">
                 <div className="flex items-center gap-2 mb-1">
                   <span className={`text-[10px] font-ui font-bold uppercase tracking-wider px-2 py-0.5 ${STATUS_BADGE[item.status] || "bg-ivory-dark text-charcoal"}`}>{item.status}</span>
                   <span className="text-[11px] font-ui text-charcoal/45">{item.property.code}</span>
@@ -61,11 +76,33 @@ export default function HooStandardBookListPage() {
                   {!item.department && <span className="text-[11px] font-ui text-charcoal/35 italic">Trasversale</span>}
                 </div>
                 <h3 className="font-ui font-medium text-charcoal-dark text-sm">{item.title}</h3>
-              </div>
-              <svg className="w-5 h-5 text-charcoal/30 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M9 5l7 7-7 7" />
-              </svg>
-            </Link>
+              </Link>
+              {canEdit && (
+                <div className="flex items-center gap-2 shrink-0 ml-4">
+                  <Link href={`/hoo-standard-book/${item.id}/edit`}
+                    className="px-3 py-1.5 text-[11px] font-ui font-semibold text-terracotta border border-terracotta hover:bg-terracotta hover:text-white transition-colors">
+                    Modifica
+                  </Link>
+                  {confirmDeleteId === item.id ? (
+                    <div className="flex items-center gap-1.5">
+                      <button onClick={() => handleDelete(item.id)} disabled={deleting === item.id}
+                        className="px-3 py-1.5 text-[11px] font-ui font-semibold text-white bg-alert-red hover:bg-alert-red/90 transition-colors disabled:opacity-50">
+                        {deleting === item.id ? "..." : "Conferma"}
+                      </button>
+                      <button onClick={() => setConfirmDeleteId(null)}
+                        className="px-2 py-1.5 text-[11px] font-ui text-charcoal/50 hover:text-charcoal transition-colors">
+                        No
+                      </button>
+                    </div>
+                  ) : (
+                    <button onClick={() => setConfirmDeleteId(item.id)}
+                      className="px-3 py-1.5 text-[11px] font-ui font-medium text-alert-red border border-alert-red/30 hover:bg-alert-red hover:text-white transition-colors">
+                      Elimina
+                    </button>
+                  )}
+                </div>
+              )}
+            </div>
           ))}
         </div>
       )}
