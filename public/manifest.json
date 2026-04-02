@@ -4,9 +4,15 @@
   "description": "Sistema di governance operativa - HO Collection",
   "start_url": "/",
   "display": "standalone",
-  "background_color": "#FAF9F5",
+  "background_color": "#964733",
   "theme_color": "#964733",
   "icons": [
+    {
+      "src": "/icons/app-icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any"
+    },
     {
       "src": "/icons/icon-192.svg",
       "sizes": "192x192",

@@ -124,60 +124,27 @@ export async function sendSopPublishedPush(params: {
 async function resolveTargetUserIds(contentId: string, excludeUserId: string): Promise<string[]> {
   const content = await prisma.content.findUnique({
     where: { id: contentId },
-    select: {
-      propertyId: true,
-      departmentId: true,
-      targetAudience: {
-        select: { targetType: true, targetRole: true, targetDepartmentId: true, targetUserId: true },
-      },
-    },
+    select: { propertyId: true, departmentId: true },
   });
 
   if (!content) return [];
 
-  const targets = content.targetAudience;
-  const userIds = new Set<string>();
-
-  if (targets.length === 0) {
-    // Nessun ContentTarget definito → nessuna notifica push
-    console.warn(`[push] Content ${contentId}: nessun ContentTarget definito, push non inviata`);
-    return [];
-  }
-
-  for (const target of targets) {
-    if (target.targetType === "USER" && target.targetUserId) {
-      userIds.add(target.targetUserId);
-    }
-
-    if (target.targetType === "DEPARTMENT" && target.targetDepartmentId) {
-      const users = await prisma.user.findMany({
-        where: {
-          isActive: true,
-          propertyAssignments: {
-            some: {
-              propertyId: content.propertyId,
-              OR: [{ departmentId: target.targetDepartmentId }, { departmentId: null }],
-            },
-          },
+  // Tutti gli utenti attivi della property (tutti i ruoli), escluso chi pubblica
+  const users = await prisma.user.findMany({
+    where: {
+      isActive: true,
+      id: { not: excludeUserId },
+      propertyAssignments: {
+        some: {
+          propertyId: content.propertyId,
+          ...(content.departmentId
+            ? { OR: [{ departmentId: content.departmentId }, { departmentId: null }] }
+            : {}),
         },
-        select: { id: true },
-      });
-      users.forEach((u) => userIds.add(u.id));
-    }
+      },
+    },
+    select: { id: true },
+  });
 
-    if (target.targetType === "ROLE" && target.targetRole) {
-      const users = await prisma.user.findMany({
-        where: {
-          isActive: true,
-          role: target.targetRole as never,
-          propertyAssignments: { some: { propertyId: content.propertyId } },
-        },
-        select: { id: true },
-      });
-      users.forEach((u) => userIds.add(u.id));
-    }
-  }
-
-  userIds.delete(excludeUserId);
-  return Array.from(userIds);
+  return users.map((u) => u.id);
 }
