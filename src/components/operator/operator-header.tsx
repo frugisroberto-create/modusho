@@ -64,7 +64,7 @@ export function OperatorHeader({
             {/* Brand */}
             <Link href="/" className="shrink-0 mr-6 md:mr-10">
               <span className="font-heading text-white text-[15px] sm:text-[17px] tracking-[0.3em] font-normal">
-                MODUSHO
+                ModusHO
               </span>
             </Link>
 

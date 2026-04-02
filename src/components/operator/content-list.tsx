@@ -3,12 +3,13 @@
 import { useState, useEffect, useCallback, useRef } from "react";
 import Link from "next/link";
 import { useOperatorContext } from "./operator-shell";
+import { MobileHide } from "@/components/mobile-hide";
 
 interface ContentItem {
   id: string; code: string | null; type: string; title: string; publishedAt: string | null;
   department: { id: string; name: string; code: string } | null;
   property: { id: string; name: string; code: string };
-  acknowledged: boolean; acknowledgedAt: string | null;
+  acknowledged: boolean | null; acknowledgedAt: string | null;
 }
 
 interface Department { id: string; name: string; code: string }
@@ -87,7 +88,7 @@ export function ContentList({ contentType, detailPath, title, description, creat
           setItems(json.data.map((r: { id: string; title: string; type: string; snippet: string }) => ({
             id: r.id, code: null, type: r.type, title: r.title,
             publishedAt: null, department: null, property: { id: "", name: "", code: "" },
-            acknowledged: true, acknowledgedAt: null,
+            acknowledged: null, acknowledgedAt: null,
           })));
           setTotal(json.meta.total);
         }
@@ -127,9 +128,11 @@ export function ContentList({ contentType, detailPath, title, description, creat
           {description && <p className="text-[13px] font-ui text-charcoal/50 mt-1">{description}</p>}
         </div>
         {canCreate && createPath && (
-          <Link href={createPath} className="btn-primary hidden md:inline-block">
-            {createLabel || "Nuovo"}
-          </Link>
+          <MobileHide>
+            <Link href={createPath} className="btn-primary">
+              {createLabel || "Nuovo"}
+            </Link>
+          </MobileHide>
         )}
       </div>
 
@@ -183,9 +186,10 @@ export function ContentList({ contentType, detailPath, title, description, creat
                   <div className="flex flex-wrap items-center gap-1.5 sm:gap-2 mb-1">
                     <span className={`text-[10px] font-ui font-bold uppercase tracking-[0.15em] px-2 py-0.5 ${badge.cls}`}>{badge.label}</span>
                     {item.department && <span className="text-[11px] font-ui text-charcoal/45">{item.department.name}</span>}
-                    {!item.acknowledged ? (
+                    {item.acknowledged === false && (
                       <span className="text-[10px] font-ui font-bold uppercase tracking-wider px-2 py-0.5 bg-terracotta/10 text-terracotta">Da leggere</span>
-                    ) : (
+                    )}
+                    {item.acknowledged === true && (
                       <span className="text-[10px] font-ui uppercase tracking-wider px-2 py-0.5 bg-[#E8F5E9] text-[#2E7D32]">Letto</span>
                     )}
                   </div>

@@ -47,6 +47,7 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
       accountableId: true,
       submittedToC: true,
       submittedToA: true,
+      content: { select: { status: true } },
     },
   });
 
@@ -54,22 +55,40 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
     return NextResponse.json({ error: "SOP non trovata" }, { status: 404 });
   }
 
+  const wfInfo = {
+    contentStatus: wf.content.status,
+    responsibleId: wf.responsibleId,
+    consultedId: wf.consultedId,
+    accountableId: wf.accountableId,
+    submittedToC: wf.submittedToC,
+    submittedToA: wf.submittedToA,
+  };
+
   const userRole = session.user.role;
-  if (userRole !== "SUPER_ADMIN" && userRole !== "ADMIN" && !canReturn(userId, wf)) {
+  if (userRole !== "SUPER_ADMIN" && userRole !== "ADMIN" && !canReturn(userId, wfInfo)) {
     return NextResponse.json({
-      error: "Solo A puo' restituire, e solo quando la bozza e' sottoposta ad A",
+      error: "Solo A (da REVIEW_ADMIN) o C/HM (da REVIEW_HM) possono restituire",
     }, { status: 403 });
   }
 
+  const previousStatus = wf.content.status;
+
+  // Determine which flags to clear based on who returns
+  const isReturnFromHM = previousStatus === "REVIEW_HM";
+  const flagUpdate: Record<string, unknown> = isReturnFromHM
+    ? { submittedToC: false, submittedToCAt: null, submittedToCById: null,
+        submittedToA: false, submittedToAAt: null, submittedToAById: null }
+    : { submittedToA: false, submittedToAAt: null, submittedToAById: null };
+
   await prisma.$transaction([
-    // Spegni flag verso A
     prisma.sopWorkflow.update({
       where: { id: wf.id },
-      data: {
-        submittedToA: false,
-        submittedToAAt: null,
-        submittedToAById: null,
-      },
+      data: flagUpdate,
+    }),
+    // Content.status → RETURNED (visivamente distinto da DRAFT)
+    prisma.content.update({
+      where: { id: wf.contentId },
+      data: { status: "RETURNED", updatedById: userId },
     }),
     // Evento workflow con nota obbligatoria
     prisma.sopWorkflowEvent.create({
@@ -78,6 +97,16 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
         eventType: "RETURNED_BY_A",
         actorId: userId,
         note,
+      },
+    }),
+    // ContentStatusHistory: track the real transition
+    prisma.contentStatusHistory.create({
+      data: {
+        contentId: wf.contentId,
+        fromStatus: previousStatus,
+        toStatus: "RETURNED",
+        changedById: userId,
+        note: `Restituita: ${note}`,
       },
     }),
     // Nota nel contenuto (ContentNote) per tracciabilita' completa

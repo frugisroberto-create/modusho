@@ -9,7 +9,7 @@ interface SopActivity {
   id: string;
   title: string;
   code: string | null;
-  sopStatus: string;
+  contentStatus: string;
   myRole: "R" | "C" | "A" | null;
   submittedToC: boolean;
   submittedToA: boolean;
@@ -20,7 +20,7 @@ interface ApiItem {
   id: string;
   code: string | null;
   title: string;
-  sopStatus: string;
+  contentStatus: string;
   myRole: "R" | "C" | "A" | null;
   submittedToC: boolean;
   submittedToA: boolean;
@@ -68,14 +68,14 @@ export function SopActivities() {
     if (isOperator || isMobile) { setLoading(false); return; }
     setLoading(true);
     try {
-      const res = await fetch(`/api/sop-workflow?sopStatus=IN_LAVORAZIONE&pageSize=10`);
+      const res = await fetch(`/api/sop-workflow?contentStatus=DRAFT&pageSize=10`);
       if (res.ok) {
         const json = await res.json();
         const mapped: SopActivity[] = (json.data || []).map((w: ApiItem) => ({
           id: w.id,
           title: w.title,
           code: w.code,
-          sopStatus: w.sopStatus,
+          contentStatus: w.contentStatus,
           myRole: w.myRole,
           submittedToC: w.submittedToC,
           submittedToA: w.submittedToA,

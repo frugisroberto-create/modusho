@@ -43,6 +43,7 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
       submittedToC: true,
       textVersionCount: true,
       consultedConfirmedVersion: true,
+      content: { select: { status: true } },
     },
   });
 
@@ -55,8 +56,9 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
     return NextResponse.json({ error: "Solo il consultato (C) puo' confermare la consultazione" }, { status: 403 });
   }
 
-  // Deve essere IN_LAVORAZIONE
-  if (wf.sopStatus !== "IN_LAVORAZIONE") {
+  // Deve essere in stato draft (non pubblicata/archiviata)
+  const draftStatuses = ["DRAFT", "REVIEW_HM", "REVIEW_ADMIN", "RETURNED"];
+  if (!draftStatuses.includes(wf.content.status)) {
     return NextResponse.json({ error: "La SOP non e' in lavorazione" }, { status: 400 });
   }
 

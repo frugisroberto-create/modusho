@@ -59,7 +59,7 @@ export default async function PrintContentPage({ params }: Props) {
             {content.code && <span className="print-code">{content.code}</span>}
           </div>
           <div className="print-header-right">
-            <span className="print-brand">MODUSHO</span>
+            <span className="print-brand">ModusHO</span>
           </div>
         </header>
 
@@ -216,10 +216,15 @@ const PRINT_STYLES = `
   }
 
   @media print {
-    body { background: white !important; }
-    body > * { display: none !important; }
-    body > :last-child { display: block !important; }
-    .print-document { padding: 0; max-width: none; box-shadow: none; }
+    html, body { background: white !important; margin: 0 !important; padding: 0 !important; }
+    /* Hide everything */
+    header, nav, footer, aside, [class*="shell"], [class*="header"], [class*="nav"] { display: none !important; }
+    /* Show only the print document */
+    .print-document {
+      padding: 0 !important; max-width: none !important; box-shadow: none !important;
+      margin: 0 !important;
+    }
+    .print-actions { display: none !important; }
   }
 
   @media screen {

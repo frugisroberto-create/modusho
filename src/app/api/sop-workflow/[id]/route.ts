@@ -56,15 +56,26 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
     return NextResponse.json({ error: "SOP non trovata" }, { status: 404 });
   }
 
+  // Build wfInfo for permission checks
+  const wfInfo = {
+    contentStatus: wf.content.status,
+    responsibleId: wf.responsibleId,
+    consultedId: wf.consultedId,
+    accountableId: wf.accountableId,
+    submittedToC: wf.submittedToC,
+    submittedToA: wf.submittedToA,
+  };
+
   // Visibilita' bozza: R/C/A oppure ADMIN/SUPER_ADMIN possono vedere la bozza
   const userRole = session.user.role;
-  if (wf.sopStatus === "IN_LAVORAZIONE") {
-    if (userRole !== "SUPER_ADMIN" && userRole !== "ADMIN" && !canViewDraft(userId, wf)) {
+  const contentStatus = wf.content.status;
+  if (contentStatus !== "PUBLISHED" && contentStatus !== "ARCHIVED") {
+    if (userRole !== "SUPER_ADMIN" && userRole !== "ADMIN" && !canViewDraft(userId, wfInfo)) {
       return NextResponse.json({ error: "Non hai accesso a questa bozza" }, { status: 403 });
     }
   }
 
-  const myRole = getRaciRole(userId, wf);
+  const myRole = getRaciRole(userId, wfInfo);
 
   return NextResponse.json({
     data: {
@@ -73,8 +84,8 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
       code: wf.content.code,
       title: wf.content.title,
       body: wf.content.body,
-      sopStatus: wf.sopStatus,
       contentStatus: wf.content.status,
+      sopStatus: wf.sopStatus, // legacy
       myRole,
       submittedToC: wf.submittedToC,
       submittedToCAt: wf.submittedToCAt,
@@ -82,10 +93,10 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
       submittedToAAt: wf.submittedToAAt,
       reviewDueDate: wf.reviewDueDate,
       reviewDueMonths: wf.reviewDueMonths,
-      needsReview: needsReview({ sopStatus: wf.sopStatus, reviewDueDate: wf.reviewDueDate }),
+      needsReview: needsReview({ contentStatus: wf.content.status, reviewDueDate: wf.reviewDueDate }),
       lastSavedAt: wf.lastSavedAt,
       textVersionCount: wf.textVersionCount,
-      canEditText: canEditText(userId, wf, userRole),
+      canEditText: canEditText(userId, wfInfo, userRole),
       property: wf.content.property,
       department: wf.content.department,
       createdBy: wf.content.createdBy,
@@ -140,6 +151,7 @@ export async function PUT(request: NextRequest, { params }: RouteParams) {
       submittedToC: true,
       submittedToA: true,
       textVersionCount: true,
+      content: { select: { status: true } },
     },
   });
 
@@ -147,11 +159,13 @@ export async function PUT(request: NextRequest, { params }: RouteParams) {
     return NextResponse.json({ error: "SOP non trovata" }, { status: 404 });
   }
 
+  const wfInfo = { ...wf, contentStatus: wf.content.status };
+
   // Solo R puo' modificare il testo (o ADMIN/SUPER_ADMIN pre-submit)
   const userRole = session.user.role;
-  if (!canEditText(userId, wf, userRole)) {
+  if (!canEditText(userId, wfInfo, userRole)) {
     // Messaggio specifico per C/A quando la bozza e' sottoposta
-    if (isInvolved(userId, wf) && (wf.submittedToC || wf.submittedToA)) {
+    if (isInvolved(userId, wfInfo) && (wf.submittedToC || wf.submittedToA)) {
       return NextResponse.json({
         error: "Questa bozza e' attualmente sottoposta a revisione. Il testo puo' essere modificato solo dal responsabile operativo della procedura. Puoi comunque lasciare note.",
       }, { status: 403 });
@@ -183,9 +197,17 @@ export async function PUT(request: NextRequest, { params }: RouteParams) {
     });
 
     // 2. Aggiorna Content.body/title come snapshot corrente
+    // Se era in REVIEW_HM e R salva, torna a DRAFT (la consultazione è revocata)
+    // Se era RETURNED e R salva, torna a DRAFT (ha iniziato a lavorarci)
+    const contentUpdateData: Record<string, unknown> = { title, body, updatedById: userId, version: newVersionNumber };
+    if (wf.content.status === "REVIEW_HM" && wf.submittedToC) {
+      contentUpdateData.status = "DRAFT";
+    } else if (wf.content.status === "RETURNED") {
+      contentUpdateData.status = "DRAFT";
+    }
     await tx.content.update({
       where: { id: wf.contentId },
-      data: { title, body, updatedById: userId, version: newVersionNumber },
+      data: contentUpdateData,
     });
 
     // 3. Aggiorna SopWorkflow

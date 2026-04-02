@@ -60,7 +60,7 @@ export function HooHeader({ userName, userRole }: HooHeaderProps) {
           <div className="flex items-center gap-10">
             <Link href={isHoo ? "/dashboard" : "/hoo-sop"} className="shrink-0">
               <span className="font-heading text-white text-base tracking-[0.25em] font-normal">
-                MODUSHO
+                ModusHO
               </span>
             </Link>
             <nav className="hidden md:flex gap-7">

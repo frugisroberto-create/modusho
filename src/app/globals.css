@@ -114,6 +114,21 @@
   }
   .btn-outline:hover { background: #964733; color: white; }
 
+  .btn-outline-sm {
+    background: transparent;
+    color: #964733;
+    border: 1px solid #964733;
+    border-radius: 0;
+    font-family: var(--font-ui);
+    font-size: 11px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    padding: 6px 14px;
+    transition: all 0.2s;
+  }
+  .btn-outline-sm:hover { background: #964733; color: white; }
+
   .badge-sop { background: #EDE7F6; color: #5E35B1; }
   .badge-document { background: #E3F2FD; color: #1565C0; }
   .badge-memo { background: #FFF3E0; color: #E65100; }

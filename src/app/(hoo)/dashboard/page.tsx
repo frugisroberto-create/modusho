@@ -43,7 +43,10 @@ export default function GovernanceDashboardPage() {
   const [loading, setLoading] = useState(true);
   const [period, setPeriod] = useState<PeriodPreset>("month");
   const [propertyFilter, setPropertyFilter] = useState("");
+  const [departmentFilter, setDepartmentFilter] = useState("");
+  const [departments, setDepartments] = useState<{ id: string; name: string }[]>([]);
   const [expandedProperty, setExpandedProperty] = useState<string | null>(null);
+  const [dismissedAlerts, setDismissedAlerts] = useState<Set<number>>(new Set());
 
   const getPeriodDates = useCallback((p: PeriodPreset) => {
     const to = new Date();
@@ -59,25 +62,49 @@ export default function GovernanceDashboardPage() {
     const { from, to } = getPeriodDates(period);
     const params = new URLSearchParams({ from, to });
     if (propertyFilter) params.set("propertyId", propertyFilter);
+    if (departmentFilter) params.set("departmentId", departmentFilter);
     try {
       const res = await fetch(`/api/dashboard?${params}`);
       if (res.ok) { const json = await res.json(); setData(json.data); }
     } finally { setLoading(false); }
-  }, [period, propertyFilter, getPeriodDates]);
+  }, [period, propertyFilter, departmentFilter, getPeriodDates]);
 
   useEffect(() => { fetchDashboard(); }, [fetchDashboard]);
+
+  // Auto-select property when only one is available (e.g. HM)
+  useEffect(() => {
+    if (data && data.header.properties.length === 1 && !propertyFilter) {
+      setPropertyFilter(data.header.properties[0].id);
+    }
+  }, [data, propertyFilter]);
+
+  // Fetch departments when property changes
+  useEffect(() => {
+    if (!propertyFilter) { setDepartments([]); setDepartmentFilter(""); return; }
+    setDepartmentFilter("");
+    (async () => {
+      const res = await fetch(`/api/properties/${propertyFilter}/departments`);
+      if (res.ok) { const json = await res.json(); setDepartments(json.data); }
+    })();
+  }, [propertyFilter]);
 
   if (loading && !data) {
     return <div className="space-y-4">{[1,2,3].map(i => <div key={i} className="h-32 skeleton" />)}</div>;
   }
   if (!data) return <p className="text-sage-light font-ui">Errore nel caricamento della dashboard</p>;
 
-  const allAlerts = [
+  const allAlertsRaw = [
     ...data.alerts.stalledReviewAdmin, ...data.alerts.stalledReviewHm,
     ...data.alerts.stalledDraft, ...data.alerts.inactiveHotels,
     ...data.alerts.emptyDepts, ...data.alerts.highReturnHotels,
     ...data.alerts.lowAckContents,
-  ];
+  ].filter((alert) => {
+    if (!departmentFilter) return true;
+    // Filter alerts that have a department field
+    if (alert.department === undefined) return true; // alerts without dept (e.g. inactive hotels) pass through
+    return alert.department === null || alert.department === departments.find(d => d.id === departmentFilter)?.name;
+  });
+  const allAlerts = allAlertsRaw.filter((_, i) => !dismissedAlerts.has(i));
 
   const periodLabels: Record<PeriodPreset, string> = { week: "Settimana", month: "Mese", quarter: "Trimestre" };
 
@@ -104,6 +131,12 @@ export default function GovernanceDashboardPage() {
             {data.header.properties.map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}
           </select>
         )}
+        <select value={departmentFilter} onChange={(e) => setDepartmentFilter(e.target.value)}
+          className="text-sm font-ui border border-ivory-dark px-3 py-1.5 bg-ivory"
+          disabled={departments.length === 0}>
+          <option value="">Tutti i reparti</option>
+          {departments.map((d) => <option key={d.id} value={d.id}>{d.name}</option>)}
+        </select>
       </div>
 
       {/* ══════════════════════════════════════════════════════════════════
@@ -144,13 +177,13 @@ export default function GovernanceDashboardPage() {
         <section id="critical-alerts">
           <h2 className="text-lg font-heading font-semibold text-charcoal-dark mb-3">Alert critici</h2>
           <div className="space-y-2">
-            {allAlerts.map((alert, i) => {
+            {allAlertsRaw.map((alert, i) => {
+              if (dismissedAlerts.has(i)) return null;
               const borderColor = alert.severity === "critical" ? "border-l-alert-red" : alert.severity === "warning" ? "border-l-alert-yellow" : "border-l-sage-light";
-              const href = alert.title ? `/approvals/${alert.id}` : `/properties/${alert.id}`;
               return (
-                <Link key={`${alert.id}-${i}`} href={href}
-                  className={`flex items-center justify-between px-5 py-3.5 bg-white border border-ivory-dark border-l-4 ${borderColor} hover:bg-ivory/50 transition-colors`}>
-                  <div className="flex items-center gap-3">
+                <div key={`${alert.id}-${i}`}
+                  className={`flex items-center justify-between px-5 py-3.5 bg-white border border-ivory-dark border-l-4 ${borderColor}`}>
+                  <div className="flex items-center gap-3 flex-1 min-w-0">
                     <svg className={`w-4 h-4 shrink-0 ${alert.severity === "critical" ? "text-alert-red" : alert.severity === "warning" ? "text-alert-yellow" : "text-sage-light"}`}
                       fill="none" stroke="currentColor" viewBox="0 0 24 24">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L4.082 16.5c-.77.833.192 2.5 1.732 2.5z" />
@@ -160,8 +193,15 @@ export default function GovernanceDashboardPage() {
                       {alert.property && <span className="text-xs font-ui text-sage-light ml-2">{alert.property}</span>}
                     </div>
                   </div>
-                  <span className="text-sm font-ui text-charcoal shrink-0">{alert.message}</span>
-                </Link>
+                  <span className="text-sm font-ui text-charcoal shrink-0 mr-3">{alert.message}</span>
+                  <button onClick={() => setDismissedAlerts(prev => new Set([...prev, i]))}
+                    className="shrink-0 w-6 h-6 flex items-center justify-center text-charcoal/30 hover:text-charcoal/60 transition-colors"
+                    title="Nascondi alert">
+                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                    </svg>
+                  </button>
+                </div>
               );
             })}
           </div>

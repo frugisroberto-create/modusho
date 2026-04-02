@@ -44,6 +44,7 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
       submittedToC: true,
       submittedToA: true,
       reviewDueMonths: true,
+      content: { select: { status: true } },
     },
   });
 
@@ -52,16 +53,37 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
   }
 
   const userRole = session.user.role;
-  if (userRole !== "SUPER_ADMIN" && userRole !== "ADMIN" && !canApprove(userId, wf)) {
+
+  const wfInfo = {
+    contentStatus: wf.content.status,
+    responsibleId: wf.responsibleId,
+    consultedId: wf.consultedId,
+    accountableId: wf.accountableId,
+    submittedToC: wf.submittedToC,
+    submittedToA: wf.submittedToA,
+  };
+
+  // La SOP deve essere in uno stato di lavorazione (non già pubblicata/archiviata)
+  const draftStatuses = ["DRAFT", "REVIEW_HM", "REVIEW_ADMIN", "RETURNED"];
+  if (!draftStatuses.includes(wf.content.status)) {
     return NextResponse.json({
-      error: "Solo A puo' approvare, e solo quando la bozza e' sottoposta ad A",
+      error: "La SOP non è in stato di lavorazione",
+    }, { status: 400 });
+  }
+
+  // Utenti con canApprove possono pubblicare direttamente da qualsiasi stato draft
+  // Altri ruoli (A) possono approvare solo da REVIEW_ADMIN con submittedToA=true
+  const userCanApprove = session.user.canApprove;
+  if (!userCanApprove && !canApprove(userId, wfInfo)) {
+    return NextResponse.json({
+      error: "Non hai permessi per approvare questa SOP",
     }, { status: 403 });
   }
 
   // Determina se e' una ripubblicazione (la SOP era gia' stata pubblicata in passato)
   const content = await prisma.content.findUnique({
     where: { id: wf.contentId },
-    select: { publishedAt: true, version: true, title: true },
+    select: { publishedAt: true, version: true, title: true, status: true },
   });
   const isRepublication = content?.publishedAt !== null;
 
@@ -110,7 +132,7 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
     await tx.contentStatusHistory.create({
       data: {
         contentId: wf.contentId,
-        fromStatus: "DRAFT",
+        fromStatus: content?.status ?? "DRAFT",
         toStatus: "PUBLISHED",
         changedById: userId,
         note: isRepublication
@@ -139,9 +161,14 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
         },
       },
     });
-    // 6. Se ripubblicazione con nuova conferma, pulisci ContentAcknowledgment legacy
+    // 6. Se ripubblicazione con nuova conferma, pulisci acknowledgment e view record
     if (shouldIncrementVersion) {
       await tx.contentAcknowledgment.deleteMany({
+        where: { contentId: wf.contentId },
+      });
+      // Reset anche i SopViewRecord delle versioni precedenti con acknowledgment
+      // così gli operatori risultano correttamente "da confermare" nella nuova versione
+      await tx.sopViewRecord.deleteMany({
         where: { contentId: wf.contentId },
       });
     }

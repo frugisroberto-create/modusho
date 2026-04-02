@@ -29,6 +29,7 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
       accountableId: true,
       submittedToC: true,
       submittedToA: true,
+      content: { select: { status: true } },
     },
   });
 
@@ -36,8 +37,17 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
     return NextResponse.json({ error: "SOP non trovata" }, { status: 404 });
   }
 
+  const wfInfo = {
+    contentStatus: wf.content.status,
+    responsibleId: wf.responsibleId,
+    consultedId: wf.consultedId,
+    accountableId: wf.accountableId,
+    submittedToC: wf.submittedToC,
+    submittedToA: wf.submittedToA,
+  };
+
   const userRole = session.user.role;
-  if (userRole !== "SUPER_ADMIN" && userRole !== "ADMIN" && !isInvolved(userId, wf)) {
+  if (userRole !== "SUPER_ADMIN" && userRole !== "ADMIN" && !isInvolved(userId, wfInfo)) {
     return NextResponse.json({ error: "Non hai accesso agli eventi di questa SOP" }, { status: 403 });
   }
 

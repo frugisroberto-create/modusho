@@ -24,6 +24,11 @@ export default withAuth(
       return NextResponse.redirect(new URL("/login", req.url));
     }
 
+    // Utente con canView=false non può accedere a nessuna pagina (disattivato)
+    if (token.canView === false) {
+      return NextResponse.redirect(new URL("/unauthorized", req.url));
+    }
+
     // 1. Cestino: solo SUPER_ADMIN
     if (pathname.startsWith("/content/deleted")) {
       if (ROLE_HIERARCHY[userRole] < ROLE_HIERARCHY.SUPER_ADMIN) {
@@ -45,9 +50,9 @@ export default withAuth(
       }
     }
 
-    // 4a. Dashboard: solo ADMIN+ (HM/HOD vanno a /hoo-sop)
+    // 4a. Dashboard: HM+ (overview operativa)
     if (pathname.startsWith("/dashboard")) {
-      if (ROLE_HIERARCHY[userRole] < ROLE_HIERARCHY.ADMIN) {
+      if (ROLE_HIERARCHY[userRole] < ROLE_HIERARCHY.HOTEL_MANAGER) {
         return NextResponse.redirect(new URL("/hoo-sop", req.url));
       }
     }

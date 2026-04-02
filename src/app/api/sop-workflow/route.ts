@@ -25,12 +25,33 @@ export async function GET(request: NextRequest) {
   const params = Object.fromEntries(request.nextUrl.searchParams);
   const page = Math.max(1, parseInt(params.page || "1", 10));
   const pageSize = Math.min(50, Math.max(1, parseInt(params.pageSize || "20", 10)));
-  const statusFilter = params.sopStatus as "IN_LAVORAZIONE" | "PUBBLICATA" | "ARCHIVIATA" | undefined;
-  const excludeStatus = params.excludeStatus as "IN_LAVORAZIONE" | "PUBBLICATA" | "ARCHIVIATA" | undefined;
+  // Support both legacy sopStatus param and new contentStatus param
+  const rawStatus = params.contentStatus || params.sopStatus;
+  const statusFilter = rawStatus as string | undefined;
+  const excludeStatusRaw = params.excludeContentStatus || params.excludeStatus;
+  const excludeStatus = excludeStatusRaw as string | undefined;
+
+  // Map legacy sopStatus values to Content.status
+  const SOP_TO_CONTENT_STATUS: Record<string, string> = {
+    IN_LAVORAZIONE: "DRAFT",
+    PUBBLICATA: "PUBLISHED",
+    ARCHIVIATA: "ARCHIVED",
+  };
+  const mapStatus = (s: string) => SOP_TO_CONTENT_STATUS[s] || s;
   const search = (params.search || "").trim();
+
+  const propertyId = params.propertyId as string | undefined;
+  const departmentId = params.departmentId as string | undefined;
 
   // SUPER_ADMIN e ADMIN vedono tutti i workflow; HOD/HM solo quelli dove sono R/C/A
   const contentFilter: Record<string, unknown> = { isDeleted: false };
+
+  if (propertyId) {
+    contentFilter.propertyId = propertyId;
+  }
+  if (departmentId) {
+    contentFilter.departmentId = departmentId;
+  }
 
   if (search) {
     contentFilter.OR = [
@@ -51,10 +72,22 @@ export async function GET(request: NextRequest) {
     ];
   }
 
+  // Filter by Content.status (source of truth), not sopStatus
   if (statusFilter) {
-    where.sopStatus = statusFilter;
+    const mapped = mapStatus(statusFilter);
+    // DRAFT filter should include all working states
+    if (mapped === "DRAFT") {
+      (contentFilter as Record<string, unknown>).status = { in: ["DRAFT", "REVIEW_HM", "REVIEW_ADMIN", "RETURNED"] };
+    } else {
+      (contentFilter as Record<string, unknown>).status = mapped;
+    }
   } else if (excludeStatus) {
-    where.sopStatus = { not: excludeStatus };
+    const mapped = mapStatus(excludeStatus);
+    if (mapped === "DRAFT") {
+      (contentFilter as Record<string, unknown>).status = { notIn: ["DRAFT", "REVIEW_HM", "REVIEW_ADMIN", "RETURNED"] };
+    } else {
+      (contentFilter as Record<string, unknown>).status = { not: mapped };
+    }
   }
 
   const [workflows, total] = await Promise.all([
@@ -79,6 +112,7 @@ export async function GET(request: NextRequest) {
             id: true,
             code: true,
             title: true,
+            status: true,
             version: true,
             property: { select: { id: true, name: true, code: true } },
             department: { select: { id: true, name: true, code: true } },
@@ -93,7 +127,7 @@ export async function GET(request: NextRequest) {
           take: 1,
         },
       },
-      orderBy: [{ sopStatus: "asc" }, { updatedAt: "desc" }],
+      orderBy: [{ updatedAt: "desc" }],
       skip: (page - 1) * pageSize,
       take: pageSize,
     }),
@@ -111,14 +145,15 @@ export async function GET(request: NextRequest) {
       contentId: wf.content.id,
       code: wf.content.code,
       title: wf.content.title,
-      sopStatus: wf.sopStatus,
+      contentStatus: wf.content.status,
+      sopStatus: wf.sopStatus, // legacy — do not use for new logic
       myRole,
       submittedToC: wf.submittedToC,
       submittedToCAt: wf.submittedToCAt,
       submittedToA: wf.submittedToA,
       submittedToAAt: wf.submittedToAAt,
       reviewDueDate: wf.reviewDueDate,
-      needsReview: needsReview({ sopStatus: wf.sopStatus, reviewDueDate: wf.reviewDueDate }),
+      needsReview: needsReview({ contentStatus: wf.content.status, reviewDueDate: wf.reviewDueDate }),
       lastSavedAt: wf.lastSavedAt,
       textVersionCount: wf.textVersionCount,
       property: wf.content.property,
@@ -348,7 +383,8 @@ export async function POST(request: NextRequest) {
       id: result.workflow.id,
       contentId: result.content.id,
       code: sopCode,
-      sopStatus: "IN_LAVORAZIONE",
+      contentStatus: "DRAFT",
+      sopStatus: "IN_LAVORAZIONE", // legacy sync
       responsible: raciAssignment.responsibleId,
       consulted: raciAssignment.consultedId,
       accountable: raciAssignment.accountableId,

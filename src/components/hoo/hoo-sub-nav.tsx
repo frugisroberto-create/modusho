@@ -17,7 +17,7 @@ interface HooSubNavProps {
 }
 
 const SUB_NAV_ITEMS: { href: string; label: string; minRole?: string }[] = [
-  { href: "/dashboard", label: "Dashboard", minRole: "ADMIN" },
+  { href: "/dashboard", label: "Overview", minRole: "HOTEL_MANAGER" },
   { href: "/approvals", label: "Approvazioni", minRole: "HOD" },
   { href: "/users", label: "Gestione utenti", minRole: "ADMIN" },
   { href: "/properties", label: "Strutture", minRole: "ADMIN" },
@@ -55,7 +55,7 @@ export function HooSubNav({ userRole, properties, currentPropertyId, onPropertyC
             );
           })}
         </nav>
-        {properties.length > 1 && (
+        {properties.length > 1 && pathname === "/" && (
           <select
             value={currentPropertyId}
             onChange={(e) => onPropertyChange(e.target.value)}

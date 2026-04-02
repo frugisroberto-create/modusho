@@ -18,9 +18,9 @@ export default async function HooLayout({
     redirect("/");
   }
 
-  // Carica le property accessibili
+  // Carica le property accessibili — solo SUPER_ADMIN vede tutto
   let properties;
-  if (user.role === "SUPER_ADMIN" || user.role === "ADMIN") {
+  if (user.role === "SUPER_ADMIN") {
     properties = await prisma.property.findMany({
       where: { isActive: true },
       select: { id: true, name: true, code: true },

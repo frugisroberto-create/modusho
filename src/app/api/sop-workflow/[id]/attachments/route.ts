@@ -32,6 +32,7 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
       accountableId: true,
       submittedToC: true,
       submittedToA: true,
+      content: { select: { status: true } },
     },
   });
 
@@ -39,10 +40,20 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
     return NextResponse.json({ error: "SOP non trovata" }, { status: 404 });
   }
 
-  // Durante IN_LAVORAZIONE, R/C/A oppure ADMIN/SUPER_ADMIN vedono gli allegati
+  const wfInfo = {
+    contentStatus: wf.content.status,
+    responsibleId: wf.responsibleId,
+    consultedId: wf.consultedId,
+    accountableId: wf.accountableId,
+    submittedToC: wf.submittedToC,
+    submittedToA: wf.submittedToA,
+  };
+
+  // Durante lavorazione, R/C/A oppure ADMIN/SUPER_ADMIN vedono gli allegati
+  const draftStatuses = ["DRAFT", "REVIEW_HM", "REVIEW_ADMIN", "RETURNED"];
   const userRole = session.user.role;
-  if (wf.sopStatus === "IN_LAVORAZIONE") {
-    if (userRole !== "SUPER_ADMIN" && userRole !== "ADMIN" && !canViewAttachments(userId, wf)) {
+  if (draftStatuses.includes(wf.content.status)) {
+    if (userRole !== "SUPER_ADMIN" && userRole !== "ADMIN" && !canViewAttachments(userId, wfInfo)) {
       return NextResponse.json({ error: "Non hai accesso agli allegati di questa bozza" }, { status: 403 });
     }
   }
@@ -112,6 +123,7 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
       accountableId: true,
       submittedToC: true,
       submittedToA: true,
+      content: { select: { status: true } },
     },
   });
 
@@ -119,8 +131,17 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
     return NextResponse.json({ error: "SOP non trovata" }, { status: 404 });
   }
 
+  const postWfInfo = {
+    contentStatus: wf.content.status,
+    responsibleId: wf.responsibleId,
+    consultedId: wf.consultedId,
+    accountableId: wf.accountableId,
+    submittedToC: wf.submittedToC,
+    submittedToA: wf.submittedToA,
+  };
+
   const postUserRole = session.user.role;
-  if (postUserRole !== "SUPER_ADMIN" && postUserRole !== "ADMIN" && !canManageAttachments(userId, wf)) {
+  if (postUserRole !== "SUPER_ADMIN" && postUserRole !== "ADMIN" && !canManageAttachments(userId, postWfInfo)) {
     return NextResponse.json({ error: "Solo il responsabile (R) puo' gestire gli allegati" }, { status: 403 });
   }
 
@@ -194,6 +215,7 @@ export async function DELETE(request: NextRequest, { params }: RouteParams) {
       accountableId: true,
       submittedToC: true,
       submittedToA: true,
+      content: { select: { status: true } },
     },
   });
 
@@ -201,8 +223,17 @@ export async function DELETE(request: NextRequest, { params }: RouteParams) {
     return NextResponse.json({ error: "SOP non trovata" }, { status: 404 });
   }
 
+  const delWfInfo = {
+    contentStatus: wf.content.status,
+    responsibleId: wf.responsibleId,
+    consultedId: wf.consultedId,
+    accountableId: wf.accountableId,
+    submittedToC: wf.submittedToC,
+    submittedToA: wf.submittedToA,
+  };
+
   const delUserRole = session.user.role;
-  if (delUserRole !== "SUPER_ADMIN" && delUserRole !== "ADMIN" && !canManageAttachments(userId, wf)) {
+  if (delUserRole !== "SUPER_ADMIN" && delUserRole !== "ADMIN" && !canManageAttachments(userId, delWfInfo)) {
     return NextResponse.json({ error: "Solo il responsabile (R) puo' gestire gli allegati" }, { status: 403 });
   }
 

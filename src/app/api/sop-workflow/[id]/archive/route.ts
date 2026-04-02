@@ -32,6 +32,7 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
       id: true,
       contentId: true,
       sopStatus: true,
+      content: { select: { status: true } },
     },
   });
 
@@ -39,7 +40,7 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
     return NextResponse.json({ error: "SOP non trovata" }, { status: 404 });
   }
 
-  if (wf.sopStatus !== "PUBBLICATA") {
+  if (wf.content.status !== "PUBLISHED") {
     return NextResponse.json({ error: "Solo le SOP pubblicate possono essere archiviate" }, { status: 400 });
   }
 

@@ -81,7 +81,7 @@ export async function PUT(
   // Aggiorna memo
   if (expiresAt !== undefined || isPinned !== undefined) {
     await prisma.memo.update({
-      where: { id: memoId },
+      where: { id: memo.id },
       data: {
         ...(expiresAt !== undefined && { expiresAt: expiresAt ? new Date(expiresAt) : null }),
         ...(isPinned !== undefined && { isPinned }),

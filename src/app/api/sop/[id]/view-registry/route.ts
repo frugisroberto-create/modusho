@@ -67,7 +67,9 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
   });
 
   // Costruisci la mappa per utente
-  const registry = targetUsers.map((u) => {
+  // Exclude the current user from the registry
+  const userId = session.user.id;
+  const registry = targetUsers.filter((u) => u.id !== userId).map((u) => {
     // Trova il record per la versione corrente
     const currentRecord = viewRecords.find(
       (r) => r.userId === u.id && r.contentVersion === currentVersion
@@ -92,7 +94,7 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
       status = "acknowledged";
     } else if (requiresNewAck && anyAckRecord && !acknowledgedCurrentVersion) {
       status = "needs_reack";
-    } else if (viewedCurrentVersion || lastViewRecord) {
+    } else if (viewedCurrentVersion) {
       status = "viewed";
     } else {
       status = "not_viewed";

@@ -3,6 +3,7 @@ import { getSessionUser } from "@/lib/session";
 import { prisma } from "@/lib/prisma";
 import { checkAccess } from "@/lib/rbac";
 import { ContentActions } from "@/components/hoo/content-actions";
+import { ValidityBadge } from "@/components/shared/validity-badge";
 import { ContentTimeline } from "@/components/shared/content-timeline";
 import { SopViewRegistry } from "@/components/shared/sop-view-registry";
 import { AttachmentUploader } from "@/components/shared/attachment-uploader";
@@ -27,6 +28,7 @@ export default async function HooSopDetailPage({ params }: Props) {
       department: { select: { id: true, name: true, code: true } },
       createdBy: { select: { name: true } },
       updatedBy: { select: { name: true } },
+      sopWorkflow: { select: { reviewDueDate: true } },
     },
   });
 
@@ -62,6 +64,9 @@ export default async function HooSopDetailPage({ params }: Props) {
             <span className="text-xs font-ui text-charcoal/45">{content.property.code}</span>
             {content.department && <span className="text-xs font-ui text-charcoal/45">{content.department.name}</span>}
             <span className="text-xs font-ui text-charcoal/45">v{content.version}</span>
+            {content.status === "PUBLISHED" && content.sopWorkflow?.reviewDueDate && (
+              <ValidityBadge reviewDueDate={content.sopWorkflow.reviewDueDate.toISOString()} showDate />
+            )}
           </div>
           <h1 className="text-2xl font-heading font-semibold text-charcoal-dark">{content.title}</h1>
           <div className="flex gap-3 mt-2 text-sm font-ui text-charcoal/45">

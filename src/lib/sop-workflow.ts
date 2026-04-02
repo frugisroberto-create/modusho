@@ -8,7 +8,7 @@
  * - Review lifecycle
  */
 
-import { Role, SopStatus } from "@prisma/client";
+import { Role, ContentStatus } from "@prisma/client";
 
 // ─── Types ────────────────────────────────────────────────────────────
 
@@ -20,14 +20,20 @@ export interface RaciAssignment {
   accountableId: string;
 }
 
-/** Minimal workflow shape used by permission checks (avoids full DB model dependency) */
+/** Minimal workflow shape used by permission checks.
+ *  contentStatus is the single source of truth for SOP state. */
 export interface SopWorkflowInfo {
-  sopStatus: SopStatus;
+  contentStatus: ContentStatus;
   responsibleId: string;
   consultedId: string | null;
   accountableId: string;
   submittedToC: boolean;
   submittedToA: boolean;
+}
+
+/** Helper: is the SOP in a draft/working state? (not yet published or archived) */
+function isDraft(status: ContentStatus): boolean {
+  return status === "DRAFT" || status === "REVIEW_HM" || status === "REVIEW_ADMIN" || status === "RETURNED";
 }
 
 // ─── RACI Role Resolution ─────────────────────────────────────────────
@@ -97,7 +103,7 @@ export function getRaciRole(userId: string, wf: SopWorkflowInfo): RaciRole | nul
 /** Anyone involved (R/C/A) or ADMIN/SUPER_ADMIN can edit while IN_LAVORAZIONE,
  *  as long as the draft has NOT been submitted to A. */
 export function canEditText(userId: string, wf: SopWorkflowInfo, userRole?: string): boolean {
-  if (wf.sopStatus !== "IN_LAVORAZIONE") return false;
+  if (!isDraft(wf.contentStatus)) return false;
   if (wf.submittedToA) return false;
   if (userId === wf.responsibleId) return true;
   if (userId === wf.consultedId) return true;
@@ -108,38 +114,44 @@ export function canEditText(userId: string, wf: SopWorkflowInfo, userRole?: stri
 
 /** Only R can manage (add/remove/reorder) attachments while IN_LAVORAZIONE */
 export function canManageAttachments(userId: string, wf: SopWorkflowInfo): boolean {
-  if (wf.sopStatus !== "IN_LAVORAZIONE") return false;
+  if (!isDraft(wf.contentStatus)) return false;
   return userId === wf.responsibleId;
 }
 
 /** R, C, A can view attachments while IN_LAVORAZIONE */
 export function canViewAttachments(userId: string, wf: SopWorkflowInfo): boolean {
-  if (wf.sopStatus !== "IN_LAVORAZIONE") return false;
+  if (!isDraft(wf.contentStatus)) return false;
   return isInvolved(userId, wf);
 }
 
 /** Only involved actors (R/C/A) can add notes while IN_LAVORAZIONE */
 export function canAddNote(userId: string, wf: SopWorkflowInfo): boolean {
-  if (wf.sopStatus !== "IN_LAVORAZIONE") return false;
+  if (!isDraft(wf.contentStatus)) return false;
   return isInvolved(userId, wf);
 }
 
-/** R can submit to C and/or A */
+/** R can submit to C and/or A — from DRAFT or RETURNED (not already in review) */
 export function canSubmit(userId: string, wf: SopWorkflowInfo): boolean {
-  if (wf.sopStatus !== "IN_LAVORAZIONE") return false;
+  if (wf.contentStatus !== "DRAFT" && wf.contentStatus !== "RETURNED") return false;
   return userId === wf.responsibleId;
 }
 
-/** Only A can return, and only when submitted to A */
+/** A can return from REVIEW_ADMIN, C (HM) can return from REVIEW_HM */
 export function canReturn(userId: string, wf: SopWorkflowInfo): boolean {
-  if (wf.sopStatus !== "IN_LAVORAZIONE") return false;
-  if (!wf.submittedToA) return false;
-  return userId === wf.accountableId;
+  // A returns from REVIEW_ADMIN
+  if (wf.contentStatus === "REVIEW_ADMIN" && wf.submittedToA && userId === wf.accountableId) {
+    return true;
+  }
+  // C (HM) returns from REVIEW_HM
+  if (wf.contentStatus === "REVIEW_HM" && wf.submittedToC && userId === wf.consultedId) {
+    return true;
+  }
+  return false;
 }
 
-/** Only A can approve, and only when submitted to A */
+/** Only A can approve, and only when in REVIEW_ADMIN (submitted to A) */
 export function canApprove(userId: string, wf: SopWorkflowInfo): boolean {
-  if (wf.sopStatus !== "IN_LAVORAZIONE") return false;
+  if (wf.contentStatus !== "REVIEW_ADMIN") return false;
   if (!wf.submittedToA) return false;
   return userId === wf.accountableId;
 }
@@ -151,17 +163,46 @@ export function canModifyReviewDueDate(userId: string, wf: SopWorkflowInfo): boo
 
 /** Can the user view this draft? Only R, C, A */
 export function canViewDraft(userId: string, wf: SopWorkflowInfo): boolean {
-  if (wf.sopStatus !== "IN_LAVORAZIONE") return false;
+  if (!isDraft(wf.contentStatus)) return false;
   return isInvolved(userId, wf);
 }
 
 // ─── Review Lifecycle ──────────────────────────────────────────────────
 
 /** Check if a published SOP needs review (review due date exceeded) */
-export function needsReview(wf: { sopStatus: SopStatus; reviewDueDate: Date | null }): boolean {
-  if (wf.sopStatus !== "PUBBLICATA") return false;
+export function needsReview(wf: { contentStatus: ContentStatus; reviewDueDate: Date | null }): boolean {
+  if (wf.contentStatus !== "PUBLISHED") return false;
   if (!wf.reviewDueDate) return false;
   return new Date() > wf.reviewDueDate;
+}
+
+/** Stato di validità temporale della SOP */
+export type ValidityStatus = "VALID" | "EXPIRING" | "EXPIRED" | "UNKNOWN";
+
+/** Calcola lo stato di validità di una SOP pubblicata */
+export function getValidityStatus(reviewDueDate: Date | string | null): ValidityStatus {
+  if (!reviewDueDate) return "UNKNOWN";
+  const due = new Date(reviewDueDate);
+  const now = new Date();
+  const thirtyDaysBefore = new Date(due);
+  thirtyDaysBefore.setDate(thirtyDaysBefore.getDate() - 30);
+
+  if (now >= due) return "EXPIRED";
+  if (now >= thirtyDaysBefore) return "EXPIRING";
+  return "VALID";
+}
+
+/** Formatta la scadenza in modo leggibile */
+export function formatExpiryInfo(reviewDueDate: Date | string | null): string {
+  if (!reviewDueDate) return "";
+  const due = new Date(reviewDueDate);
+  const now = new Date();
+  const diffMs = due.getTime() - now.getTime();
+  const diffDays = Math.ceil(diffMs / (1000 * 60 * 60 * 24));
+
+  if (diffDays < 0) return `Scaduta il ${due.toLocaleDateString("it-IT")}`;
+  if (diffDays <= 30) return `Scade tra ${diffDays} giorni`;
+  return `Scade il ${due.toLocaleDateString("it-IT")}`;
 }
 
 /** Calculate review due date from a reference date */

@@ -32,6 +32,7 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
       accountableId: true,
       submittedToC: true,
       submittedToA: true,
+      content: { select: { status: true } },
     },
   });
 
@@ -39,9 +40,18 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
     return NextResponse.json({ error: "SOP non trovata" }, { status: 404 });
   }
 
+  const wfInfo = {
+    contentStatus: wf.content.status,
+    responsibleId: wf.responsibleId,
+    consultedId: wf.consultedId,
+    accountableId: wf.accountableId,
+    submittedToC: wf.submittedToC,
+    submittedToA: wf.submittedToA,
+  };
+
   // R/C/A oppure ADMIN/SUPER_ADMIN possono vedere le note della bozza
   const userRole = session.user.role;
-  if (userRole !== "SUPER_ADMIN" && userRole !== "ADMIN" && !isInvolved(userId, wf)) {
+  if (userRole !== "SUPER_ADMIN" && userRole !== "ADMIN" && !isInvolved(userId, wfInfo)) {
     return NextResponse.json({ error: "Non hai accesso alle note di questa bozza" }, { status: 403 });
   }
 
@@ -102,6 +112,7 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
       accountableId: true,
       submittedToC: true,
       submittedToA: true,
+      content: { select: { status: true } },
     },
   });
 
@@ -109,8 +120,17 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
     return NextResponse.json({ error: "SOP non trovata" }, { status: 404 });
   }
 
+  const noteWfInfo = {
+    contentStatus: wf.content.status,
+    responsibleId: wf.responsibleId,
+    consultedId: wf.consultedId,
+    accountableId: wf.accountableId,
+    submittedToC: wf.submittedToC,
+    submittedToA: wf.submittedToA,
+  };
+
   const noteUserRole = session.user.role;
-  if (noteUserRole !== "SUPER_ADMIN" && noteUserRole !== "ADMIN" && !canAddNote(userId, wf)) {
+  if (noteUserRole !== "SUPER_ADMIN" && noteUserRole !== "ADMIN" && !canAddNote(userId, noteWfInfo)) {
     return NextResponse.json({ error: "Non puoi aggiungere note a questa bozza" }, { status: 403 });
   }
 

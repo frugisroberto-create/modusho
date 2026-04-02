@@ -167,10 +167,12 @@ export async function DELETE(
   const user = await prisma.user.findUnique({ where: { id }, select: { id: true, role: true } });
   if (!user) return NextResponse.json({ error: "Utente non trovato" }, { status: 404 });
 
-  // Check if user is R/C/A in active workflows
+  // Check if user is R/C/A in active workflows (draft/working state)
   const activeWorkflows = await prisma.sopWorkflow.count({
     where: {
-      sopStatus: "IN_LAVORAZIONE",
+      content: {
+        status: { in: ["DRAFT", "REVIEW_HM", "REVIEW_ADMIN", "RETURNED"] },
+      },
       OR: [
         { responsibleId: id },
         { consultedId: id },

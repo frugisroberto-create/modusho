@@ -3,11 +3,13 @@ import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { getAccessiblePropertyIds, checkAccess, canUserManageContentType } from "@/lib/rbac";
+import { sendContentPublishedPush } from "@/lib/push-notification";
 import { z } from "zod/v4";
 
 const memoQuerySchema = z.object({
   propertyId: z.string(),
   includeExpired: z.enum(["true", "false"]).optional(),
+  status: z.enum(["PUBLISHED", "ARCHIVED"]).optional(),
   page: z.coerce.number().int().min(1).default(1),
   pageSize: z.coerce.number().int().min(1).max(50).default(20),
 });
@@ -28,7 +30,7 @@ export async function GET(request: NextRequest) {
     );
   }
 
-  const { propertyId, includeExpired, page, pageSize } = parsed.data;
+  const { propertyId, includeExpired, status, page, pageSize } = parsed.data;
   const userId = session.user.id;
 
   // RBAC
@@ -40,7 +42,7 @@ export async function GET(request: NextRequest) {
   const now = new Date();
   const where: Record<string, unknown> = {
     propertyId,
-    content: { status: "PUBLISHED" as const },
+    content: { status: (status || "PUBLISHED") as "PUBLISHED" | "ARCHIVED" },
   };
 
   // Admin può vedere anche i memo scaduti
@@ -59,6 +61,12 @@ export async function GET(request: NextRequest) {
             body: true,
             publishedAt: true,
             createdBy: { select: { name: true } },
+            isFeatured: true,
+            acknowledgments: {
+              where: { userId },
+              select: { acknowledgedAt: true },
+              take: 1,
+            },
           },
         },
       },
@@ -79,6 +87,9 @@ export async function GET(request: NextRequest) {
       author: m.content.createdBy.name,
       isPinned: m.isPinned,
       expiresAt: m.expiresAt,
+      isFeatured: m.content.isFeatured,
+      acknowledged: m.content.acknowledgments.length > 0,
+      acknowledgedAt: m.content.acknowledgments[0]?.acknowledgedAt ?? null,
     })),
     meta: { page, pageSize, total },
   });
@@ -148,6 +159,14 @@ export async function POST(request: NextRequest) {
       changedById: userId,
     },
   });
+
+  // Push notification best-effort
+  sendContentPublishedPush({
+    contentId: content.id,
+    contentTitle: title,
+    contentType: "MEMO",
+    actorId: userId,
+  }).catch(() => {});
 
   return NextResponse.json({ data: { id: content.id } }, { status: 201 });
 }

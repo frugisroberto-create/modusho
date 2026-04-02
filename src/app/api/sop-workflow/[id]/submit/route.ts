@@ -42,6 +42,8 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
       accountableId: true,
       submittedToC: true,
       submittedToA: true,
+      contentId: true,
+      content: { select: { id: true, status: true } },
     },
   });
 
@@ -49,7 +51,16 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
     return NextResponse.json({ error: "SOP non trovata" }, { status: 404 });
   }
 
-  if (!canSubmit(userId, wf)) {
+  const wfInfo = {
+    contentStatus: wf.content.status,
+    responsibleId: wf.responsibleId,
+    consultedId: wf.consultedId,
+    accountableId: wf.accountableId,
+    submittedToC: wf.submittedToC,
+    submittedToA: wf.submittedToA,
+  };
+
+  if (!canSubmit(userId, wfInfo)) {
     return NextResponse.json({ error: "Solo il responsabile (R) puo' sottoporre la bozza" }, { status: 403 });
   }
 
@@ -62,16 +73,22 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
   const updateData: Record<string, unknown> = {};
   let eventType: "SUBMITTED_TO_C" | "SUBMITTED_TO_A" | "SUBMITTED_TO_C_AND_A";
 
+  // Determine the new Content.status based on submit target
+  // C = HM (REVIEW_HM), A = HOO (REVIEW_ADMIN), C_AND_A = first step is HM (REVIEW_HM)
+  let newContentStatus: "REVIEW_HM" | "REVIEW_ADMIN";
+
   if (target === "C") {
     updateData.submittedToC = true;
     updateData.submittedToCAt = now;
     updateData.submittedToCById = userId;
     eventType = "SUBMITTED_TO_C";
+    newContentStatus = "REVIEW_HM";
   } else if (target === "A") {
     updateData.submittedToA = true;
     updateData.submittedToAAt = now;
     updateData.submittedToAById = userId;
     eventType = "SUBMITTED_TO_A";
+    newContentStatus = "REVIEW_ADMIN";
   } else {
     updateData.submittedToC = true;
     updateData.submittedToCAt = now;
@@ -80,12 +97,18 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
     updateData.submittedToAAt = now;
     updateData.submittedToAById = userId;
     eventType = "SUBMITTED_TO_C_AND_A";
+    newContentStatus = "REVIEW_HM";
   }
 
   await prisma.$transaction([
     prisma.sopWorkflow.update({
       where: { id: wf.id },
       data: updateData,
+    }),
+    // Update Content.status to reflect the review state
+    prisma.content.update({
+      where: { id: wf.content.id },
+      data: { status: newContentStatus },
     }),
     prisma.sopWorkflowEvent.create({
       data: {
@@ -94,9 +117,21 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
         actorId: userId,
       },
     }),
+    // ContentStatusHistory: track the real transition
+    prisma.contentStatusHistory.create({
+      data: {
+        contentId: wf.content.id,
+        fromStatus: wf.content.status,
+        toStatus: newContentStatus,
+        changedById: userId,
+        note: target === "C" ? "Sottoposta a Hotel Manager" :
+              target === "A" ? "Sottoposta per approvazione finale" :
+              "Sottoposta a Hotel Manager e HOO",
+      },
+    }),
   ]);
 
   return NextResponse.json({
-    data: { submitted: target, at: now },
+    data: { submitted: target, at: now, contentStatus: newContentStatus },
   });
 }

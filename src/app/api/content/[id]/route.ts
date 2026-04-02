@@ -5,6 +5,7 @@ import { prisma } from "@/lib/prisma";
 import { checkAccess, canUserManageContentType } from "@/lib/rbac";
 import { changeContentStatus } from "@/lib/content-status";
 import { getSubmitTargetStatus } from "@/lib/content-workflow";
+import { sendContentPublishedPush } from "@/lib/push-notification";
 import { z } from "zod/v4";
 
 export async function GET(
@@ -122,7 +123,7 @@ export async function PUT(
 
   const content = await prisma.content.findUnique({
     where: { id, isDeleted: false },
-    select: { id: true, status: true, propertyId: true, departmentId: true, type: true, version: true, title: true, body: true },
+    select: { id: true, status: true, propertyId: true, departmentId: true, type: true, version: true, title: true, body: true, publishedAt: true },
   });
 
   if (!content) {
@@ -268,6 +269,17 @@ export async function PUT(
       changedById: userId,
       note: noteMap[targetStatus] || `Inviata a ${targetStatus}`,
     });
+
+    // Push notification best-effort per pubblicazione diretta
+    if (targetStatus === "PUBLISHED") {
+      sendContentPublishedPush({
+        contentId: id,
+        contentTitle: updated.title,
+        contentType: content.type,
+        actorId: userId,
+        isRepublication: content.publishedAt !== null,
+      }).catch(() => {});
+    }
   }
 
   return NextResponse.json({ data: { id: updated.id, status: updated.status, version: updated.version } });

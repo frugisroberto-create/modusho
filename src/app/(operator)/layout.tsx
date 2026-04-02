@@ -16,9 +16,9 @@ export default async function OperatorLayout({
   const dbUser = await prisma.user.findUnique({ where: { id: user.id }, select: { id: true } });
   if (!dbUser) redirect("/api/auth/signout");
 
-  // SUPER_ADMIN e ADMIN vedono tutte le property attive
+  // Solo SUPER_ADMIN vede tutte le property attive; ADMIN vede solo le assegnate
   let properties;
-  if (user.role === "SUPER_ADMIN" || user.role === "ADMIN") {
+  if (user.role === "SUPER_ADMIN") {
     properties = await prisma.property.findMany({
       where: { isActive: true },
       select: { id: true, name: true, code: true, tagline: true },

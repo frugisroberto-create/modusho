@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
+import { Prisma } from "@prisma/client";
 import { getAccessiblePropertyIds } from "@/lib/rbac";
 import { z } from "zod/v4";
 
@@ -9,6 +10,7 @@ const querySchema = z.object({
   from: z.string().optional(),
   to: z.string().optional(),
   propertyId: z.string().optional(),
+  departmentId: z.string().optional(),
 });
 
 export async function GET(request: NextRequest) {
@@ -17,7 +19,7 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({ error: "Non autenticato" }, { status: 401 });
   }
 
-  if (session.user.role !== "ADMIN" && session.user.role !== "SUPER_ADMIN") {
+  if (session.user.role !== "HOTEL_MANAGER" && session.user.role !== "ADMIN" && session.user.role !== "SUPER_ADMIN") {
     return NextResponse.json({ error: "Accesso negato" }, { status: 403 });
   }
 
@@ -27,7 +29,7 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({ error: "Parametri non validi" }, { status: 400 });
   }
 
-  const { from, to, propertyId } = parsed.data;
+  const { from, to, propertyId, departmentId } = parsed.data;
   const userId = session.user.id;
 
   // Period defaults
@@ -44,7 +46,10 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({ error: "Nessuna property accessibile" }, { status: 403 });
   }
 
-  const propertyFilter = { propertyId: { in: filteredPropertyIds } };
+  const propertyFilter: Record<string, unknown> = { propertyId: { in: filteredPropertyIds } };
+  if (departmentId) {
+    propertyFilter.departmentId = departmentId;
+  }
 
   // --- SEZIONE 1: Header sintetico ---
   const [pendingApprovalCount, properties] = await Promise.all([
@@ -52,7 +57,7 @@ export async function GET(request: NextRequest) {
       where: { ...propertyFilter, isDeleted: false, status: "REVIEW_ADMIN", type: "SOP" },
     }),
     prisma.property.findMany({
-      where: { id: { in: filteredPropertyIds }, isActive: true },
+      where: { id: { in: accessiblePropertyIds }, isActive: true },
       select: { id: true, name: true, code: true },
     }),
   ]);
@@ -100,6 +105,11 @@ export async function GET(request: NextRequest) {
     };
   });
 
+  // Department filter for raw queries
+  const deptCondition = departmentId
+    ? Prisma.sql`AND c."departmentId" = ${departmentId}`
+    : Prisma.empty;
+
   // --- SEZIONE 3: Alert critici ---
   // SOP ferme in REVIEW_HM > 5 giorni
   const stalledReviewHm = await prisma.$queryRaw<
@@ -113,6 +123,7 @@ export async function GET(request: NextRequest) {
     JOIN "ContentStatusHistory" h ON h."contentId" = c.id
     WHERE c.status = 'REVIEW_HM' AND c."isDeleted" = false AND c.type = 'SOP'
       AND c."propertyId" = ANY(${filteredPropertyIds})
+      ${deptCondition}
       AND h.id = (SELECT h2.id FROM "ContentStatusHistory" h2 WHERE h2."contentId" = c.id ORDER BY h2."changedAt" DESC LIMIT 1)
       AND h."changedAt" < NOW() - INTERVAL '5 days'
   `;
@@ -129,6 +140,7 @@ export async function GET(request: NextRequest) {
     JOIN "ContentStatusHistory" h ON h."contentId" = c.id
     WHERE c.status = 'REVIEW_ADMIN' AND c."isDeleted" = false AND c.type = 'SOP'
       AND c."propertyId" = ANY(${filteredPropertyIds})
+      ${deptCondition}
       AND h.id = (SELECT h2.id FROM "ContentStatusHistory" h2 WHERE h2."contentId" = c.id ORDER BY h2."changedAt" DESC LIMIT 1)
       AND h."changedAt" < NOW() - INTERVAL '3 days'
   `;
@@ -145,6 +157,7 @@ export async function GET(request: NextRequest) {
     JOIN "ContentStatusHistory" h ON h."contentId" = c.id
     WHERE c.status = 'DRAFT' AND c."isDeleted" = false AND c.type = 'SOP'
       AND c."propertyId" = ANY(${filteredPropertyIds})
+      ${deptCondition}
       AND h.id = (SELECT h2.id FROM "ContentStatusHistory" h2 WHERE h2."contentId" = c.id ORDER BY h2."changedAt" DESC LIMIT 1)
       AND h."changedAt" < NOW() - INTERVAL '10 days'
   `;
@@ -155,6 +168,7 @@ export async function GET(request: NextRequest) {
     FROM "ContentStatusHistory" h
     JOIN "Content" c ON c.id = h."contentId"
     WHERE c."propertyId" = ANY(${filteredPropertyIds})
+      ${deptCondition}
       AND h."changedAt" > NOW() - INTERVAL '14 days'
   `;
   const activePropertyIds = new Set(propertiesWithRecentActivity.map((p) => p.propertyId));
@@ -166,6 +180,7 @@ export async function GET(request: NextRequest) {
     FROM "Content" c
     WHERE c.type = 'SOP' AND c.status = 'PUBLISHED' AND c."isDeleted" = false
       AND c."propertyId" = ANY(${filteredPropertyIds})
+      ${deptCondition}
       AND c."departmentId" IS NOT NULL
   `;
   const publishedDeptIds = new Set(deptsWithPublished.map((d) => d.departmentId));
@@ -185,6 +200,7 @@ export async function GET(request: NextRequest) {
     JOIN "Property" p ON p.id = c."propertyId"
     WHERE h."toStatus" = 'RETURNED'
       AND c."propertyId" = ANY(${filteredPropertyIds})
+      ${deptCondition}
       AND h."changedAt" BETWEEN ${periodFrom} AND ${periodTo}
     GROUP BY c."propertyId", p.name
     HAVING COUNT(*) > 3
@@ -214,6 +230,7 @@ export async function GET(request: NextRequest) {
     ) total_ops ON true
     WHERE c.status = 'PUBLISHED' AND c."isDeleted" = false AND c.type IN ('SOP', 'DOCUMENT')
       AND c."propertyId" = ANY(${filteredPropertyIds})
+      ${deptCondition}
       AND total_ops.cnt > 0
       AND (ack.cnt::numeric / total_ops.cnt) < 0.5
     ORDER BY "ackRate" ASC
@@ -282,6 +299,7 @@ export async function GET(request: NextRequest) {
     JOIN "Content" c ON c.id = pub."contentId"
     WHERE pub."toStatus" = 'PUBLISHED'
       AND c."propertyId" = ANY(${filteredPropertyIds})
+      ${deptCondition}
       AND c.type = 'SOP'
   `;
 
@@ -297,6 +315,7 @@ export async function GET(request: NextRequest) {
       AND h2."changedAt" > h1."changedAt"
     JOIN "Content" c ON c.id = h1."contentId"
     WHERE c."propertyId" = ANY(${filteredPropertyIds})
+      ${deptCondition}
       AND c.type = 'SOP'
       AND h1."toStatus" IN ('DRAFT', 'REVIEW_HM', 'REVIEW_ADMIN')
     GROUP BY h1."toStatus"
@@ -305,8 +324,8 @@ export async function GET(request: NextRequest) {
   // Tasso presa visione globale
   const ackStats = await prisma.$queryRaw<{ total_required: number; total_acked: number }[]>`
     SELECT
-      (SELECT COUNT(*)::int FROM "Content" c WHERE c.status = 'PUBLISHED' AND c."isDeleted" = false AND c.type IN ('SOP', 'DOCUMENT') AND c."propertyId" = ANY(${filteredPropertyIds})) as total_required,
-      (SELECT COUNT(DISTINCT ca."contentId" || '-' || ca."userId")::int FROM "ContentAcknowledgment" ca JOIN "Content" c ON c.id = ca."contentId" WHERE c."isDeleted" = false AND c."propertyId" = ANY(${filteredPropertyIds})) as total_acked
+      (SELECT COUNT(*)::int FROM "Content" c WHERE c.status = 'PUBLISHED' AND c."isDeleted" = false AND c.type IN ('SOP', 'DOCUMENT') AND c."propertyId" = ANY(${filteredPropertyIds}) ${deptCondition}) as total_required,
+      (SELECT COUNT(DISTINCT ca."contentId" || '-' || ca."userId")::int FROM "ContentAcknowledgment" ca JOIN "Content" c ON c.id = ca."contentId" WHERE c."isDeleted" = false AND c."propertyId" = ANY(${filteredPropertyIds}) ${deptCondition}) as total_acked
   `;
 
   const kpi = {

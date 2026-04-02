@@ -82,6 +82,8 @@ export function UserForm({ mode, userId, onSuccess, initialData }: UserFormProps
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   const [warnings, setWarnings] = useState<string[]>([]);
+  const [createdUserId, setCreatedUserId] = useState<string | null>(null);
+  const [createdPassword, setCreatedPassword] = useState<string | null>(null);
 
   // Fetch properties
   useEffect(() => {
@@ -292,7 +294,9 @@ export function UserForm({ mode, userId, onSuccess, initialData }: UserFormProps
       if (res.ok) {
         if (mode === "create") {
           const json = await res.json();
-          router.push(`/users/${json.data.id}`);
+          setCreatedUserId(json.data.id);
+          setCreatedPassword(password);
+          return; // Show password dialog before navigating
         } else if (onSuccess) {
           onSuccess();
           return; // evita setLoading(false) dopo che il parent ha smontato il form
@@ -308,6 +312,43 @@ export function UserForm({ mode, userId, onSuccess, initialData }: UserFormProps
       setLoading(false);
     }
   };
+
+  // Dialog post-creazione: mostra password in chiaro
+  if (createdUserId && createdPassword) {
+    return (
+      <div className="max-w-md mx-auto mt-8 space-y-6">
+        <div className="bg-[#E8F5E9] border border-[#2E7D32]/20 p-6 space-y-4">
+          <h2 className="text-base font-heading font-semibold text-[#2E7D32]">Utente creato con successo</h2>
+          <div className="space-y-3">
+            <div>
+              <label className="block text-[11px] font-ui uppercase tracking-wider text-charcoal/45 mb-1">Nome</label>
+              <p className="text-sm font-ui font-medium text-charcoal-dark">{name}</p>
+            </div>
+            <div>
+              <label className="block text-[11px] font-ui uppercase tracking-wider text-charcoal/45 mb-1">Email</label>
+              <p className="text-sm font-ui font-medium text-charcoal-dark">{email}</p>
+            </div>
+            <div>
+              <label className="block text-[11px] font-ui uppercase tracking-wider text-charcoal/45 mb-1">Password</label>
+              <div className="flex items-center gap-2 bg-white border border-ivory-dark px-3 py-2">
+                <code className="text-sm font-mono text-terracotta flex-1 select-all">{createdPassword}</code>
+                <button type="button"
+                  onClick={() => { navigator.clipboard.writeText(createdPassword); }}
+                  className="text-[11px] font-ui font-semibold uppercase tracking-wider text-charcoal/50 hover:text-terracotta transition-colors shrink-0">
+                  Copia
+                </button>
+              </div>
+              <p className="text-[11px] font-ui text-charcoal/40 mt-1">Comunica queste credenziali all&apos;utente. La password non sarà più visibile.</p>
+            </div>
+          </div>
+        </div>
+        <button onClick={() => { router.push(`/users/${createdUserId}`); router.refresh(); }}
+          className="btn-primary w-full">
+          Vai al profilo utente
+        </button>
+      </div>
+    );
+  }
 
   return (
     <div className="max-w-2xl space-y-6">

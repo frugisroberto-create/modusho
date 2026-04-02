@@ -1,7 +1,9 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useMemo } from "react";
 import { useHooContext } from "@/components/hoo/hoo-shell";
+import { ValidityBadge } from "@/components/shared/validity-badge";
+import { getValidityStatus } from "@/lib/sop-workflow";
 import Link from "next/link";
 
 interface SopWorkflowItem {
@@ -9,11 +11,13 @@ interface SopWorkflowItem {
   contentId: string;
   code: string | null;
   title: string;
-  sopStatus: "IN_LAVORAZIONE" | "PUBBLICATA" | "ARCHIVIATA";
+  contentStatus: string;
+  sopStatus?: string; // legacy
   myRole: "R" | "C" | "A" | null;
   submittedToC: boolean;
   submittedToA: boolean;
   needsReview: boolean;
+  reviewDueDate: string | null;
   lastSavedAt: string | null;
   textVersionCount: number;
   property: { id: string; name: string; code: string };
@@ -24,16 +28,24 @@ interface SopWorkflowItem {
   isImported?: boolean;
 }
 
+const DRAFT_STATUSES = ["DRAFT", "REVIEW_HM", "REVIEW_ADMIN", "RETURNED"];
+
 const STATUS_LABELS: Record<string, string> = {
-  IN_LAVORAZIONE: "In lavorazione",
-  PUBBLICATA: "Pubblicata",
-  ARCHIVIATA: "Archiviata",
+  DRAFT: "Bozza",
+  REVIEW_HM: "In revisione HM",
+  REVIEW_ADMIN: "In revisione HOO",
+  RETURNED: "Restituita",
+  PUBLISHED: "Pubblicata",
+  ARCHIVED: "Archiviata",
 };
 
 const STATUS_COLORS: Record<string, string> = {
-  IN_LAVORAZIONE: "bg-[#FFF3E0] text-[#E65100]",
-  PUBBLICATA: "bg-[#E8F5E9] text-[#2E7D32]",
-  ARCHIVIATA: "bg-ivory-dark text-charcoal/50",
+  DRAFT: "bg-[#FFF3E0] text-[#E65100]",
+  REVIEW_HM: "bg-mauve/15 text-mauve",
+  REVIEW_ADMIN: "bg-terracotta/10 text-terracotta",
+  RETURNED: "bg-[#FECACA] text-[#991B1B]",
+  PUBLISHED: "bg-[#E8F5E9] text-[#2E7D32]",
+  ARCHIVED: "bg-ivory-dark text-charcoal/50",
 };
 
 const WF_BADGE = "text-[9px] font-ui font-bold uppercase tracking-wider px-1.5 py-0.5 bg-mauve/15 text-mauve";
@@ -47,6 +59,7 @@ export default function HooSopListPage() {
   const [page, setPage] = useState(1);
   const [loading, setLoading] = useState(true);
   const [statusFilter, setStatusFilter] = useState("");
+  const [validityFilter, setValidityFilter] = useState<"" | "expiring" | "expired">("");
   const [search, setSearch] = useState("");
   const [searchInput, setSearchInput] = useState("");
   const pageSize = 20;
@@ -55,7 +68,7 @@ export default function HooSopListPage() {
     setLoading(true);
     const params = new URLSearchParams({ page: page.toString(), pageSize: pageSize.toString() });
     if (statusFilter) {
-      params.set("sopStatus", statusFilter);
+      params.set("contentStatus", statusFilter);
     }
     if (search) {
       params.set("search", search);
@@ -74,6 +87,18 @@ export default function HooSopListPage() {
 
   useEffect(() => { fetchSops(); }, [fetchSops]);
   useEffect(() => { setPage(1); }, [statusFilter, search]);
+
+  // Filtro client-side per validità
+  const filteredItems = useMemo(() => {
+    if (!validityFilter) return items;
+    return items.filter((item) => {
+      if (item.contentStatus !== "PUBLISHED" || !item.reviewDueDate) return false;
+      const status = getValidityStatus(item.reviewDueDate);
+      if (validityFilter === "expired") return status === "EXPIRED";
+      if (validityFilter === "expiring") return status === "EXPIRING";
+      return false;
+    });
+  }, [items, validityFilter]);
 
   const totalPages = Math.ceil(total / pageSize);
 
@@ -110,9 +135,18 @@ export default function HooSopListPage() {
           <select value={statusFilter} onChange={(e) => setStatusFilter(e.target.value)}
             className="text-sm border border-ivory-dark px-3 py-2 bg-white font-ui">
             <option value="">Tutti gli stati</option>
-            <option value="IN_LAVORAZIONE">In lavorazione</option>
-            <option value="PUBBLICATA">Pubblicata</option>
-            <option value="ARCHIVIATA">Archiviata</option>
+            <option value="DRAFT">In lavorazione</option>
+            <option value="PUBLISHED">Pubblicata</option>
+            <option value="ARCHIVED">Archiviata</option>
+          </select>
+        </div>
+        <div>
+          <label className="block text-[11px] font-ui uppercase tracking-wider text-charcoal/45 mb-1">Validità</label>
+          <select value={validityFilter} onChange={(e) => setValidityFilter(e.target.value as "" | "expiring" | "expired")}
+            className="text-sm border border-ivory-dark px-3 py-2 bg-white font-ui">
+            <option value="">Tutte</option>
+            <option value="expiring">In scadenza</option>
+            <option value="expired">Scadute</option>
           </select>
         </div>
         {search && (
@@ -123,30 +157,30 @@ export default function HooSopListPage() {
         )}
       </div>
 
-      {/* Lista */}
+      {/* Lista (con filtro validità client-side) */}
       {loading ? (
         <div className="space-y-2">{[1,2,3].map(i => <div key={i} className="h-16 skeleton" />)}</div>
-      ) : items.length === 0 ? (
+      ) : filteredItems.length === 0 ? (
         <p className="text-charcoal/40 text-sm font-ui py-8 text-center">
           {statusFilter ? "Nessuna SOP trovata con questo stato" : "Nessuna SOP in cui sei coinvolto"}
         </p>
       ) : (
         <div className="bg-white border border-ivory-dark">
-          {items.map((item, index) => (
-            <div key={item.id} className={`p-4 flex items-center justify-between gap-4 ${index < items.length - 1 ? "border-b border-ivory-medium" : ""}`}>
+          {filteredItems.map((item, index) => (
+            <div key={item.id} className={`p-4 flex items-center justify-between gap-4 ${index < filteredItems.length - 1 ? "border-b border-ivory-medium" : ""}`}>
               <div className="flex-1 min-w-0">
                 {/* Riga 1: stato documento + stato workflow + meta */}
                 <div className="flex items-center gap-2 mb-1 flex-wrap">
-                  <span className={`text-[10px] font-ui font-bold uppercase tracking-wider px-2 py-0.5 ${STATUS_COLORS[item.sopStatus] || ""}`}>
-                    {STATUS_LABELS[item.sopStatus]}
+                  <span className={`text-[10px] font-ui font-bold uppercase tracking-wider px-2 py-0.5 ${STATUS_COLORS[item.contentStatus] || ""}`}>
+                    {STATUS_LABELS[item.contentStatus] || item.contentStatus}
                   </span>
-                  {item.sopStatus === "IN_LAVORAZIONE" && item.submittedToC && item.submittedToA && (
+                  {DRAFT_STATUSES.includes(item.contentStatus) && item.submittedToC && item.submittedToA && (
                     <span className={WF_BADGE}>Sottoposta a HM e HOO</span>
                   )}
-                  {item.sopStatus === "IN_LAVORAZIONE" && item.submittedToC && !item.submittedToA && (
+                  {DRAFT_STATUSES.includes(item.contentStatus) && item.submittedToC && !item.submittedToA && (
                     <span className={WF_BADGE}>Sottoposta a HM</span>
                   )}
-                  {item.sopStatus === "IN_LAVORAZIONE" && !item.submittedToC && item.submittedToA && (
+                  {DRAFT_STATUSES.includes(item.contentStatus) && !item.submittedToC && item.submittedToA && (
                     <span className={WF_BADGE}>Sottoposta a HOO</span>
                   )}
                   {item.isImported && (
@@ -154,10 +188,8 @@ export default function HooSopListPage() {
                       Importata
                     </span>
                   )}
-                  {item.needsReview && (
-                    <span className="text-[9px] font-ui font-bold uppercase tracking-wider px-1.5 py-0.5 bg-alert-yellow/15 text-alert-yellow">
-                      Necessita revisione
-                    </span>
+                  {item.contentStatus === "PUBLISHED" && item.reviewDueDate && (
+                    <ValidityBadge reviewDueDate={item.reviewDueDate} />
                   )}
                   {item.code && <span className="text-[11px] font-ui font-semibold text-terracotta">{item.code}</span>}
                   <span className="text-[11px] font-ui text-charcoal/45">{item.property.code}</span>

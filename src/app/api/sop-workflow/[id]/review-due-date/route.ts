@@ -47,6 +47,7 @@ export async function PUT(request: NextRequest, { params }: RouteParams) {
       submittedToA: true,
       reviewDueDate: true,
       reviewDueMonths: true,
+      content: { select: { status: true } },
     },
   });
 
@@ -54,7 +55,16 @@ export async function PUT(request: NextRequest, { params }: RouteParams) {
     return NextResponse.json({ error: "SOP non trovata" }, { status: 404 });
   }
 
-  if (!canModifyReviewDueDate(userId, wf)) {
+  const wfInfo = {
+    contentStatus: wf.content.status,
+    responsibleId: wf.responsibleId,
+    consultedId: wf.consultedId,
+    accountableId: wf.accountableId,
+    submittedToC: wf.submittedToC,
+    submittedToA: wf.submittedToA,
+  };
+
+  if (!canModifyReviewDueDate(userId, wfInfo)) {
     return NextResponse.json({ error: "Solo A puo' modificare la scadenza di revisione" }, { status: 403 });
   }
 
@@ -69,7 +79,7 @@ export async function PUT(request: NextRequest, { params }: RouteParams) {
   if (parsed.data.reviewDueMonths) {
     updateData.reviewDueMonths = parsed.data.reviewDueMonths;
     // Se la SOP e' gia' pubblicata, ricalcola la due date
-    if (wf.sopStatus === "PUBBLICATA" && !parsed.data.reviewDueDate) {
+    if (wf.content.status === "PUBLISHED" && !parsed.data.reviewDueDate) {
       const baseDate = wf.reviewDueDate
         ? new Date(new Date().getTime()) // da oggi
         : new Date();

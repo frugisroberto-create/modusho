@@ -3,6 +3,7 @@
 import { useState, useEffect, useCallback } from "react";
 import Link from "next/link";
 import { useOperatorContext } from "./operator-shell";
+import { MobileHide } from "@/components/mobile-hide";
 
 const HOO_CREATE_PATHS: Record<string, string> = {
   STANDARD_BOOK: "/hoo-standard-book/new",
@@ -112,7 +113,7 @@ export function BookList({ contentType, basePath, title }: BookListProps) {
     <div className="py-6 space-y-5">
       <div className="flex items-center justify-between">
         <h1 className="text-xl font-heading font-semibold text-charcoal-dark">{title}</h1>
-        {canCreate && <Link href={HOO_CREATE_PATHS[contentType]} className="btn-primary hidden md:inline-block">Nuova sezione</Link>}
+        {canCreate && <MobileHide><Link href={HOO_CREATE_PATHS[contentType]} className="btn-primary">Nuova sezione</Link></MobileHide>}
       </div>
       {items.length === 0 ? (
         <p className="text-sage-light font-ui text-sm text-center py-10">Nessun contenuto disponibile</p>
@@ -145,7 +146,7 @@ export function BookList({ contentType, basePath, title }: BookListProps) {
                   </div>
                 </Link>
                 {canEdit ? (
-                  <div className="hidden md:flex items-center gap-2 shrink-0 ml-3">
+                  <MobileHide><div className="flex items-center gap-2 shrink-0 ml-3">
                     <Link href={`${HOO_EDIT_PATHS[contentType]}/${item.id}/edit`}
                       className="px-3 py-1.5 text-[11px] font-ui font-semibold text-terracotta border border-terracotta hover:bg-terracotta hover:text-white transition-colors">
                       Modifica
@@ -167,7 +168,7 @@ export function BookList({ contentType, basePath, title }: BookListProps) {
                         Elimina
                       </button>
                     )}
-                  </div>
+                  </div></MobileHide>
                 ) : (
                   <svg className="w-5 h-5 text-sage-light shrink-0 mt-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M9 5l7 7-7 7" />

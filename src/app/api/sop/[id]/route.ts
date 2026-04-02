@@ -93,17 +93,10 @@ export async function GET(
     });
   }
 
-  // Draft visibility: only R/C/A can view IN_LAVORAZIONE SOPs
-  if (wf.sopStatus === "IN_LAVORAZIONE") {
-    if (!isInvolved(userId, wf)) {
-      // OPERATOR and non-involved users cannot see drafts
-      return NextResponse.json({ error: "SOP non trovata" }, { status: 404 });
-    }
-  }
-
-  const raciRole = getRaciRole(userId, wf);
+  // Draft visibility: only R/C/A can view draft SOPs
+  const draftStatuses = ["DRAFT", "REVIEW_HM", "REVIEW_ADMIN", "RETURNED"];
   const wfInfo = {
-    sopStatus: wf.sopStatus,
+    contentStatus: content.status,
     responsibleId: wf.responsibleId,
     consultedId: wf.consultedId,
     accountableId: wf.accountableId,
@@ -111,9 +104,18 @@ export async function GET(
     submittedToA: wf.submittedToA,
   };
 
+  if (draftStatuses.includes(content.status)) {
+    if (!isInvolved(userId, wfInfo)) {
+      // OPERATOR and non-involved users cannot see drafts
+      return NextResponse.json({ error: "SOP non trovata" }, { status: 404 });
+    }
+  }
+
+  const raciRole = getRaciRole(userId, wfInfo);
+
   // Build editability message for non-R users when submitted
   let editabilityMessage: string | null = null;
-  if (wf.sopStatus === "IN_LAVORAZIONE" && (wf.submittedToC || wf.submittedToA) && raciRole !== "R") {
+  if (draftStatuses.includes(content.status) && (wf.submittedToC || wf.submittedToA) && raciRole !== "R") {
     editabilityMessage = SUBMITTED_EDIT_MESSAGE;
   }
 
@@ -146,7 +148,7 @@ export async function GET(
         lastSavedAt: wf.lastSavedAt,
         lastSavedById: wf.lastSavedById,
         textVersionCount: wf.textVersionCount,
-        needsReview: needsReview(wf),
+        needsReview: needsReview({ contentStatus: content.status, reviewDueDate: wf.reviewDueDate }),
       },
       currentUser: {
         raciRole,

@@ -37,6 +37,7 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
       responsibleId: true,
       consultedId: true,
       accountableId: true,
+      content: { select: { status: true } },
     },
   });
 
@@ -44,7 +45,7 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
     return NextResponse.json({ error: "SOP non trovata" }, { status: 404 });
   }
 
-  if (wf.sopStatus !== "PUBBLICATA") {
+  if (wf.content.status !== "PUBLISHED") {
     return NextResponse.json({ error: "Solo le SOP pubblicate possono essere riaperte" }, { status: 400 });
   }
 

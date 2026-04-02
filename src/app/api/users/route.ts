@@ -59,8 +59,26 @@ export async function GET(request: NextRequest) {
       const hmPropertyIds = hmProperties.map((p) => p.propertyId);
       where.propertyAssignments = { some: { propertyId: { in: hmPropertyIds } } };
     }
-  } else if (propertyId) {
-    where.propertyAssignments = { some: { propertyId } };
+  } else if (isAdmin) {
+    // ADMIN: scope to assigned properties (SUPER_ADMIN sees all)
+    if (userRole !== "SUPER_ADMIN") {
+      const adminProperties = await prisma.propertyAssignment.findMany({
+        where: { userId: session.user.id },
+        select: { propertyId: true },
+        distinct: ["propertyId"],
+      });
+      const adminPropertyIds = adminProperties.map((p) => p.propertyId);
+      if (propertyId) {
+        if (!adminPropertyIds.includes(propertyId)) {
+          return NextResponse.json({ error: "Accesso negato a questa struttura" }, { status: 403 });
+        }
+        where.propertyAssignments = { some: { propertyId } };
+      } else {
+        where.propertyAssignments = { some: { propertyId: { in: adminPropertyIds } } };
+      }
+    } else if (propertyId) {
+      where.propertyAssignments = { some: { propertyId } };
+    }
   }
 
   const [users, total] = await Promise.all([

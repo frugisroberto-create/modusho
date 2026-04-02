@@ -1,17 +1,23 @@
 "use client";
 
 import { useState, useEffect, useCallback, useRef } from "react";
+import { useSession } from "next-auth/react";
 import { useOperatorContext } from "@/components/operator/operator-shell";
 import { ExportPdfButton } from "@/components/shared/export-pdf-button";
+import { AcknowledgeButton } from "@/components/operator/acknowledge-button";
+import { ContentAckRegistry } from "@/components/shared/content-ack-registry";
 
 interface MemoItem {
   id: string; contentId: string; title: string; body: string;
   publishedAt: string | null; author: string; isPinned: boolean; expiresAt: string | null;
+  acknowledged: boolean; acknowledgedAt: string | null;
 }
 
 export default function MemoListPage() {
+  const { data: session } = useSession();
+  const userId = session?.user?.id || "";
   const { currentPropertyId, userRole } = useOperatorContext();
-  const canCreate = ["HOD", "HOTEL_MANAGER", "ADMIN", "SUPER_ADMIN"].includes(userRole);
+  const canCreate = ["HOTEL_MANAGER", "ADMIN", "SUPER_ADMIN"].includes(userRole);
 
   const [memos, setMemos] = useState<MemoItem[]>([]);
   const [total, setTotal] = useState(0);
@@ -19,6 +25,7 @@ export default function MemoListPage() {
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState("");
   const [searchTerm, setSearchTerm] = useState("");
+  const [expandedMemo, setExpandedMemo] = useState<string | null>(null);
   const debounceRef = useRef<NodeJS.Timeout | null>(null);
   const pageSize = 20;
 
@@ -105,9 +112,33 @@ export default function MemoListPage() {
                     {isExpired && (
                       <span className="text-[10px] font-ui uppercase tracking-wider px-2 py-0.5 bg-ivory-dark text-charcoal/50">Scaduto</span>
                     )}
+                    {!memo.acknowledged && !isExpired && (
+                      <span className="text-[10px] font-ui font-bold uppercase tracking-wider px-2 py-0.5 bg-terracotta/10 text-terracotta">Da leggere</span>
+                    )}
+                    {memo.acknowledged && (
+                      <span className="text-[10px] font-ui uppercase tracking-wider px-2 py-0.5 bg-[#E8F5E9] text-[#2E7D32]">Letto</span>
+                    )}
                   </div>
-                  <h3 className="font-ui font-medium text-charcoal-dark text-sm">{memo.title}</h3>
-                  <p className="text-[11px] font-ui text-charcoal/45 mt-0.5 line-clamp-1">{stripHtml(memo.body)}</p>
+                  <button onClick={() => setExpandedMemo(expandedMemo === memo.id ? null : memo.id)}
+                    className="font-ui font-medium text-charcoal-dark text-sm hover:text-terracotta transition-colors text-left">
+                    {memo.title}
+                  </button>
+                  {expandedMemo === memo.id ? (
+                    <>
+                      <div className="text-sm text-charcoal prose prose-sm max-w-none mt-2 p-3 bg-ivory border border-ivory-dark"
+                        dangerouslySetInnerHTML={{ __html: memo.body }} />
+                      {(userRole === "OPERATOR" || userRole === "HOD") && (
+                        <div className="mt-3">
+                          <AcknowledgeButton contentId={memo.contentId} acknowledged={memo.acknowledged} acknowledgedAt={memo.acknowledgedAt?.toString() ?? null} />
+                        </div>
+                      )}
+                      {userRole !== "OPERATOR" && (
+                        <ContentAckRegistry contentId={memo.contentId} userRole={userRole} userId={userId} propertyId={currentPropertyId} />
+                      )}
+                    </>
+                  ) : (
+                    <p className="text-[11px] font-ui text-charcoal/45 mt-0.5 line-clamp-1">{stripHtml(memo.body)}</p>
+                  )}
                   <div className="flex items-center gap-3 text-[11px] font-ui text-charcoal/45 mt-1">
                     <span>{memo.author}</span>
                     {memo.publishedAt && <span>{new Date(memo.publishedAt).toLocaleDateString("it-IT", { day: "numeric", month: "short", year: "numeric" })}</span>}

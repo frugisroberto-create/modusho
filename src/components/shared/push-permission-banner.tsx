@@ -74,7 +74,7 @@ export function PushPermissionBanner() {
     <div className="fixed bottom-16 left-0 right-0 z-40 px-4 pb-2 md:hidden">
       <div className="bg-white border border-ivory-dark shadow-lg p-4">
         <p className="text-sm font-ui text-charcoal-dark mb-3">
-          Vuoi ricevere una notifica quando ci sono nuove procedure da leggere?
+          Vuoi ricevere una notifica quando ci sono nuovi contenuti da leggere?
         </p>
         <div className="flex gap-2">
           <button onClick={handleSubscribe} disabled={subscribing}

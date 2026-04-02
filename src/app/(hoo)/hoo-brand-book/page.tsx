@@ -21,14 +21,16 @@ export default function HooBrandBookListPage() {
   const canCreate = userRole === "ADMIN" || userRole === "SUPER_ADMIN";
   const [items, setItems] = useState<ContentItem[]>([]);
   const [loading, setLoading] = useState(true);
+  const [showArchived, setShowArchived] = useState(false);
 
   const fetchItems = useCallback(async () => {
     setLoading(true);
     try {
-      const res = await fetch("/api/content?type=BRAND_BOOK&pageSize=50");
+      const status = showArchived ? "ARCHIVED" : "PUBLISHED";
+      const res = await fetch(`/api/content?type=BRAND_BOOK&status=${status}&pageSize=50`);
       if (res.ok) { const json = await res.json(); setItems(json.data); }
     } finally { setLoading(false); }
-  }, []);
+  }, [showArchived]);
 
   useEffect(() => { fetchItems(); }, [fetchItems]);
 
@@ -36,7 +38,14 @@ export default function HooBrandBookListPage() {
     <div className="space-y-5">
       <div className="flex items-center justify-between">
         <h1 className="text-xl font-heading font-medium text-charcoal-dark">Brand Book</h1>
-        {canCreate && <Link href="/hoo-brand-book/new" className="btn-primary">Nuovo Brand Book</Link>}
+        <div className="flex items-center gap-3">
+          <label className="flex items-center gap-2 px-3 py-2 border border-ivory-dark bg-white cursor-pointer">
+            <input type="checkbox" checked={showArchived} onChange={(e) => setShowArchived(e.target.checked)}
+              className="w-3.5 h-3.5 rounded border-ivory-dark text-terracotta focus:ring-terracotta" />
+            <span className="text-sm font-ui text-charcoal">Archiviati</span>
+          </label>
+          {canCreate && <Link href="/hoo-brand-book/new" className="btn-primary">Nuovo Brand Book</Link>}
+        </div>
       </div>
 
       {loading ? (

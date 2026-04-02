@@ -5,6 +5,8 @@ import { checkAccess } from "@/lib/rbac";
 import { AcknowledgeButton } from "@/components/operator/acknowledge-button";
 import { ContentActions } from "@/components/hoo/content-actions";
 import { ContentTimeline } from "@/components/shared/content-timeline";
+import { ContentAckRegistry } from "@/components/shared/content-ack-registry";
+import { AttachmentUploader } from "@/components/shared/attachment-uploader";
 import { ExportPdfButton } from "@/components/shared/export-pdf-button";
 import Link from "next/link";
 
@@ -58,7 +60,6 @@ export default async function DocumentDetailPage({ params }: Props) {
           )}
         </div>
         <div className="mt-3 hidden md:flex items-center gap-2">
-          <ExportPdfButton contentId={content.id} />
           <ContentActions contentId={content.id} contentType={content.type} contentStatus={content.status} userRole={user.role} isFeatured={content.isFeatured} />
         </div>
       </div>
@@ -68,13 +69,17 @@ export default async function DocumentDetailPage({ params }: Props) {
         dangerouslySetInnerHTML={{ __html: content.body }}
       />
 
-      {(user.role === "OPERATOR") && (
+      <AttachmentUploader contentId={content.id} canEdit={false} />
+
+      {(user.role === "OPERATOR" || user.role === "HOD") && (
         <div className="border-t border-ivory-dark pt-6">
           <AcknowledgeButton contentId={content.id} acknowledged={acknowledged} acknowledgedAt={acknowledgedAt} />
         </div>
       )}
 
-      {user.role !== "OPERATOR" && <ContentTimeline contentId={content.id} />}
+      {user.role !== "OPERATOR" && (
+        <ContentAckRegistry contentId={content.id} userRole={user.role} userId={user.id} propertyId={content.propertyId} />
+      )}
     </div>
   );
 }

@@ -3,6 +3,7 @@ import { getSessionUser } from "@/lib/session";
 import { SearchBar } from "@/components/operator/search-bar";
 import { PendingReads } from "@/components/operator/pending-reads";
 import { SopActivities } from "@/components/operator/sop-activities";
+import { SopExpiryAlert } from "@/components/operator/sop-expiry-alert";
 import { LatestByType } from "@/components/operator/latest-by-type";
 import { PropertyName } from "@/components/operator/property-name";
 
@@ -36,6 +37,9 @@ export default async function OperatorHome({ searchParams }: Props) {
 
         {/* BLOCCO 4: Attività SOP — solo HOD/HM/HOO, non operatore */}
         <SopActivities />
+
+        {/* Alert scadenza SOP — solo HOD/HM/HOO desktop */}
+        <SopExpiryAlert />
 
         {/* BLOCCO 5: Ultimi contenuti — 3 pannelli */}
         <LatestByType />

@@ -4,6 +4,7 @@ import { authOptions } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { checkAccess } from "@/lib/rbac";
 import { changeContentStatus } from "@/lib/content-status";
+import { sendContentPublishedPush } from "@/lib/push-notification";
 import { z } from "zod/v4";
 
 const reviewSchema = z.object({
@@ -48,10 +49,13 @@ export async function POST(
     );
   }
 
-  // Carica il contenuto
+  // Carica il contenuto (con SopWorkflow se è una SOP)
   const content = await prisma.content.findUnique({
     where: { id: contentId, isDeleted: false },
-    select: { id: true, status: true, propertyId: true, departmentId: true, type: true },
+    select: {
+      id: true, status: true, propertyId: true, departmentId: true, type: true, title: true,
+      sopWorkflow: { select: { id: true } },
+    },
   });
 
   if (!content) {
@@ -80,11 +84,11 @@ export async function POST(
         note: note || "Approvato dall'Hotel Manager, inoltrato per approvazione finale",
       });
     } else {
-      // RETURNED → torna a DRAFT
+      // RETURNED → stato RETURNED (R riprende il lavoro)
       await changeContentStatus({
         contentId,
         fromStatus: "REVIEW_HM",
-        toStatus: "DRAFT",
+        toStatus: "RETURNED",
         changedById: userId,
         note,
       });
@@ -104,12 +108,20 @@ export async function POST(
         changedById: userId,
         note,
       });
+
+      // Push notification best-effort
+      sendContentPublishedPush({
+        contentId,
+        contentTitle: content.title,
+        contentType: content.type,
+        actorId: userId,
+      }).catch(() => {});
     } else {
-      // RETURNED → torna a DRAFT
+      // RETURNED → stato RETURNED (R riprende il lavoro)
       await changeContentStatus({
         contentId,
         fromStatus: "REVIEW_ADMIN",
-        toStatus: "DRAFT",
+        toStatus: "RETURNED",
         changedById: userId,
         note,
       });
@@ -119,6 +131,60 @@ export async function POST(
       { error: `Impossibile fare review di un contenuto in stato ${content.status}` },
       { status: 400 }
     );
+  }
+
+  // Sync RACI flags and create workflow events for SOP content
+  if (content.type === "SOP" && content.sopWorkflow) {
+    const wfId = content.sopWorkflow.id;
+    if (content.status === "REVIEW_HM" && action === "APPROVED") {
+      // HM approves → forwarded to REVIEW_ADMIN: clear C flag, create event
+      await prisma.sopWorkflow.update({
+        where: { id: wfId },
+        data: { submittedToC: false, submittedToCAt: null, submittedToCById: null },
+      });
+      await prisma.sopWorkflowEvent.create({
+        data: { sopWorkflowId: wfId, eventType: "SUBMITTED_TO_A", actorId: userId, note: note || null },
+      });
+    } else if (content.status === "REVIEW_HM" && action === "RETURNED") {
+      // HM returns → DRAFT: clear both C and A flags, create event + note
+      await prisma.sopWorkflow.update({
+        where: { id: wfId },
+        data: {
+          submittedToC: false, submittedToCAt: null, submittedToCById: null,
+          submittedToA: false, submittedToAAt: null, submittedToAById: null,
+        },
+      });
+      await prisma.sopWorkflowEvent.create({
+        data: { sopWorkflowId: wfId, eventType: "RETURNED_BY_A", actorId: userId, note: note || null },
+      });
+      if (note) {
+        await prisma.contentNote.create({
+          data: { contentId, authorId: userId, body: `[Restituzione HM] ${note}` },
+        });
+      }
+    } else if (content.status === "REVIEW_ADMIN" && action === "RETURNED") {
+      // A returns → DRAFT: clear A flag, create event + note
+      await prisma.sopWorkflow.update({
+        where: { id: wfId },
+        data: { submittedToA: false, submittedToAAt: null, submittedToAById: null },
+      });
+      await prisma.sopWorkflowEvent.create({
+        data: { sopWorkflowId: wfId, eventType: "RETURNED_BY_A", actorId: userId, note: note || null },
+      });
+      if (note) {
+        await prisma.contentNote.create({
+          data: { contentId, authorId: userId, body: `[Restituzione] ${note}` },
+        });
+      }
+    } else if (content.status === "REVIEW_ADMIN" && action === "APPROVED") {
+      // A approves → PUBLISHED: create event
+      await prisma.sopWorkflowEvent.create({
+        data: { sopWorkflowId: wfId, eventType: "APPROVED", actorId: userId },
+      });
+      await prisma.sopWorkflowEvent.create({
+        data: { sopWorkflowId: wfId, eventType: "PUBLISHED", actorId: userId },
+      });
+    }
   }
 
   // Crea ContentReview

@@ -42,6 +42,7 @@ export default function LibraryPage() {
   const [loading, setLoading] = useState(true);
   const [properties, setProperties] = useState<Property[]>([]);
   const [propertyFilter, setPropertyFilter] = useState("");
+  const [showArchived, setShowArchived] = useState(false);
 
   // Upload form
   const [showUpload, setShowUpload] = useState(false);
@@ -87,9 +88,9 @@ export default function LibraryPage() {
         setStaticTotal(json.meta.total);
       }
 
-      // Fetch content documents (type=DOCUMENT, published)
+      // Fetch content documents (type=DOCUMENT)
       const contentParams = new URLSearchParams({
-        type: "DOCUMENT", status: "PUBLISHED", page: page.toString(), pageSize: pageSize.toString(),
+        type: "DOCUMENT", status: showArchived ? "ARCHIVED" : "PUBLISHED", page: page.toString(), pageSize: pageSize.toString(),
       });
       if (propertyFilter) contentParams.set("propertyId", propertyFilter);
       const contentRes = await fetch(`/api/content?${contentParams}`);
@@ -99,10 +100,10 @@ export default function LibraryPage() {
         setContentTotal(json.meta.total);
       }
     } finally { setLoading(false); }
-  }, [page, propertyFilter, isHm, isHoo]);
+  }, [page, propertyFilter, showArchived, isHm, isHoo]);
 
   useEffect(() => { fetchData(); }, [fetchData]);
-  useEffect(() => { setPage(1); }, [propertyFilter]);
+  useEffect(() => { setPage(1); }, [propertyFilter, showArchived]);
 
   const handleUpload = async () => {
     const file = fileRef.current?.files?.[0];
@@ -136,74 +137,23 @@ export default function LibraryPage() {
     <div className="max-w-5xl space-y-6">
       <div className="flex items-center justify-between">
         <h1 className="text-xl font-heading font-medium text-charcoal-dark">Documenti</h1>
-        <div className="flex items-center gap-2">
-          {canCreate && (
-            <Link href="/library/new" className="btn-primary">Nuovo documento</Link>
-          )}
-          {(isHoo || isHm) && (
-            <button onClick={() => setShowUpload(!showUpload)} className="btn-outline">
-              Carica PDF
-            </button>
-          )}
-        </div>
+        {canCreate && (
+          <Link href="/library/new" className="btn-primary">Nuovo documento</Link>
+        )}
       </div>
 
-      {/* Upload PDF form */}
-      {showUpload && canCreate && (
-        <div className="bg-white border border-ivory-dark p-5 space-y-3">
-          <h3 className="text-sm font-ui font-semibold text-charcoal-dark">Carica file PDF</h3>
-          {uploadError && (
-            <div className="px-3 py-2 text-sm font-ui bg-[#FECACA] border-l-4 border-alert-red text-alert-red">{uploadError}</div>
-          )}
-          <div className="grid grid-cols-2 gap-3">
-            <div>
-              <label className="block text-xs font-ui text-charcoal/60 mb-1">Titolo</label>
-              <input type="text" value={uploadTitle} onChange={(e) => setUploadTitle(e.target.value)}
-                className="w-full px-3 py-2 border border-ivory-dark text-sm font-ui" placeholder="Titolo del documento" />
-            </div>
-            {isHoo && (
-              <div>
-                <label className="block text-xs font-ui text-charcoal/60 mb-1">Tipo</label>
-                <select value={uploadType} onChange={(e) => setUploadType(e.target.value)}
-                  className="w-full px-3 py-2 border border-ivory-dark text-sm font-ui bg-white">
-                  <option value="BRAND_BOOK">Brand Book</option>
-                  <option value="STANDARD_BOOK">Standard Book</option>
-                </select>
-              </div>
-            )}
-            <div>
-              <label className="block text-xs font-ui text-charcoal/60 mb-1">
-                Struttura{isHoo ? " (opzionale)" : ""}
-              </label>
-              <select value={uploadPropertyId} onChange={(e) => setUploadPropertyId(e.target.value)}
-                className="w-full px-3 py-2 border border-ivory-dark text-sm font-ui bg-white">
-                {isHoo && <option value="">Tutto il gruppo</option>}
-                {properties.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
-              </select>
-            </div>
-            <div>
-              <label className="block text-xs font-ui text-charcoal/60 mb-1">File PDF</label>
-              <input type="file" accept=".pdf" ref={fileRef}
-                className="w-full px-3 py-1.5 border border-ivory-dark text-sm font-ui" />
-            </div>
-          </div>
-          <div className="flex gap-2">
-            <button onClick={handleUpload} disabled={uploading || !uploadTitle.trim()}
-              className="btn-primary disabled:opacity-50">
-              {uploading ? "Caricamento..." : "Carica"}
-            </button>
-            <button onClick={() => { setShowUpload(false); setUploadError(""); }} className="btn-outline">Annulla</button>
-          </div>
-        </div>
-      )}
-
-      {/* Filtro struttura */}
-      <div className="flex gap-3">
+      {/* Filtri */}
+      <div className="flex gap-3 items-end">
         <select value={propertyFilter} onChange={(e) => setPropertyFilter(e.target.value)}
           className="text-sm font-ui border border-ivory-dark px-3 py-2 bg-white">
           {isHoo && <option value="">Tutte le strutture</option>}
           {properties.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
         </select>
+        <label className="flex items-center gap-2 px-3 py-2 border border-ivory-dark bg-white cursor-pointer">
+          <input type="checkbox" checked={showArchived} onChange={(e) => setShowArchived(e.target.checked)}
+            className="w-3.5 h-3.5 rounded border-ivory-dark text-terracotta focus:ring-terracotta" />
+          <span className="text-sm font-ui text-charcoal">Archiviati</span>
+        </label>
       </div>
 
       {loading ? (
@@ -216,7 +166,7 @@ export default function LibraryPage() {
               <h2 className="text-sm font-ui font-semibold uppercase tracking-wider text-charcoal/50 mb-2">Documenti</h2>
               <div className="bg-white border border-ivory-dark">
                 {contentDocs.map((doc, index) => (
-                  <Link key={doc.id} href={`/hoo-sop/${doc.id}`}
+                  <Link key={doc.id} href={`/documents/${doc.id}`}
                     className={`flex items-center justify-between px-5 py-4 hover:bg-ivory/50 transition-colors ${index < contentDocs.length - 1 ? "border-b border-ivory-medium" : ""}`}>
                     <div>
                       <div className="flex items-center gap-2 mb-1">

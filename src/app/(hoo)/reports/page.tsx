@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect, useCallback } from "react";
+import { useHooContext } from "@/components/hoo/hoo-shell";
 
 interface ReportData {
   period: { from: string; to: string };
@@ -22,6 +23,8 @@ interface ReportData {
 type PeriodPreset = "month" | "quarter" | "semester";
 
 export default function ReportsPage() {
+  const { userRole } = useHooContext();
+  const isHoo = userRole === "ADMIN" || userRole === "SUPER_ADMIN";
   const [data, setData] = useState<ReportData | null>(null);
   const [loading, setLoading] = useState(true);
   const [period, setPeriod] = useState<PeriodPreset>("month");
@@ -55,7 +58,7 @@ export default function ReportsPage() {
     <div className="max-w-4xl space-y-6">
       {/* Header + controlli */}
       <div className="flex items-center justify-between print:hidden">
-        <h1 className="text-xl font-bold text-gray-900">Report per Managing Director</h1>
+        <h1 className="text-xl font-bold text-gray-900">{isHoo ? "Report per Managing Director" : "Report"}</h1>
         <div className="flex gap-2">
           <div className="flex gap-1 bg-white border border-gray-200  p-0.5">
             {(["month", "quarter", "semester"] as PeriodPreset[]).map((p) => (

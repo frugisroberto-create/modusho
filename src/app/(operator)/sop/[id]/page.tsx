@@ -8,6 +8,7 @@ import { ContentActions } from "@/components/hoo/content-actions";
 import { SopViewRegistry } from "@/components/shared/sop-view-registry";
 import { ExportPdfButton } from "@/components/shared/export-pdf-button";
 import { MobileHide } from "@/components/mobile-hide";
+import { ValidityBadge } from "@/components/shared/validity-badge";
 import Link from "next/link";
 
 interface Props { params: Promise<{ id: string }> }
@@ -23,7 +24,7 @@ export default async function SopDetailPage({ params }: Props) {
       property: { select: { id: true, name: true, code: true } },
       department: { select: { id: true, name: true, code: true } },
       createdBy: { select: { name: true } },
-      sopWorkflow: { select: { requiresNewAcknowledgment: true } },
+      sopWorkflow: { select: { id: true, requiresNewAcknowledgment: true, reviewDueDate: true } },
       sopViewRecords: {
         where: { userId: user.id },
         orderBy: { contentVersion: "desc" },
@@ -85,6 +86,7 @@ export default async function SopDetailPage({ params }: Props) {
             <span className="text-xs font-ui font-medium px-2 py-0.5 rounded bg-ivory-dark text-charcoal">{content.department.name}</span>
           )}
           <span className="text-xs font-ui text-sage-light">v{content.version}</span>
+          <ValidityBadge reviewDueDate={content.sopWorkflow?.reviewDueDate?.toISOString() ?? null} showDate />
         </div>
         <h1 className="text-2xl font-heading font-semibold text-charcoal-dark">{content.title}</h1>
         <div className="flex flex-wrap items-center gap-2 sm:gap-3 mt-2 text-sm font-ui text-sage-light">
@@ -96,12 +98,13 @@ export default async function SopDetailPage({ params }: Props) {
         </div>
         {/* Export PDF + Content Actions — solo desktop, solo HOD+/HM+ */}
         <MobileHide>
-          {(canExportPdf || isFullGovernance) && (
-            <div className="mt-3 flex items-center gap-2">
-              {canExportPdf && <ExportPdfButton contentId={content.id} />}
-              {isFullGovernance && <ContentActions contentId={content.id} contentType={content.type} contentStatus={content.status} userRole={user.role} isFeatured={content.isFeatured} />}
-            </div>
-          )}
+          <div className="mt-3 flex items-center gap-2">
+            {isFullGovernance ? (
+              <ContentActions contentId={content.id} contentType={content.type} contentStatus={content.status} userRole={user.role} isFeatured={content.isFeatured} sopWorkflowId={content.sopWorkflow?.id} />
+            ) : canExportPdf ? (
+              <ExportPdfButton contentId={content.id} />
+            ) : null}
+          </div>
         </MobileHide>
       </div>
 
@@ -111,8 +114,8 @@ export default async function SopDetailPage({ params }: Props) {
         dangerouslySetInnerHTML={{ __html: content.body }}
       />
 
-      {/* ── OPERATORE e HOD: blocco personale presa visione ── */}
-      {(isOperator || isHod) && (
+      {/* ── Blocco personale presa visione — OPERATOR, HOD, HM ── */}
+      {(isOperator || isHod || user.role === "HOTEL_MANAGER") && (
         <div className="bg-white border border-ivory-dark">
           <div className="px-5 py-3 bg-ivory border-b border-ivory-dark">
             <span className="text-xs font-ui font-semibold uppercase tracking-wider text-charcoal/50">

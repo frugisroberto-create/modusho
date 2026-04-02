@@ -8,7 +8,7 @@ import { SopEditor } from "@/components/shared/sop-editor";
 // ─── Types ───────────────────────────────────────────────────────────
 
 type RaciRole = "R" | "C" | "A";
-type SopStatus = "IN_LAVORAZIONE" | "PUBBLICATA" | "ARCHIVIATA";
+type ContentStatusType = "DRAFT" | "REVIEW_HM" | "REVIEW_ADMIN" | "RETURNED" | "PUBLISHED" | "ARCHIVED";
 
 interface UserInfo {
   id: string;
@@ -22,7 +22,7 @@ interface SopWorkflowData {
   code: string | null;
   title: string;
   body: string;
-  sopStatus: SopStatus;
+  contentStatus: ContentStatusType;
   myRole: RaciRole | null;
   submittedToC: boolean;
   submittedToCAt: string | null;
@@ -78,11 +78,12 @@ interface Props {
   workflowId: string;
   currentUserId: string;
   currentUserRole: string;
+  currentUserCanApprove?: boolean;
 }
 
 // ─── Main Component ──────────────────────────────────────────────────
 
-export function SopWorkflowEditor({ workflowId, currentUserId, currentUserRole }: Props) {
+export function SopWorkflowEditor({ workflowId, currentUserId, currentUserRole, currentUserCanApprove }: Props) {
   const [wf, setWf] = useState<SopWorkflowData | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -348,8 +349,9 @@ export function SopWorkflowEditor({ workflowId, currentUserId, currentUserRole }
   const isA = wf.myRole === "A";
   const isHoo = currentUserRole === "ADMIN" || currentUserRole === "SUPER_ADMIN";
   const isAdminOverride = !wf.myRole && isHoo;
-  const isInLavorazione = wf.sopStatus === "IN_LAVORAZIONE";
-  const isPubblicata = wf.sopStatus === "PUBBLICATA";
+  const draftStatuses: ContentStatusType[] = ["DRAFT", "REVIEW_HM", "REVIEW_ADMIN", "RETURNED"];
+  const isInLavorazione = draftStatuses.includes(wf.contentStatus);
+  const isPubblicata = wf.contentStatus === "PUBLISHED";
   const isSubmitted = wf.submittedToC || wf.submittedToA;
 
   return (
@@ -492,6 +494,7 @@ export function SopWorkflowEditor({ workflowId, currentUserId, currentUserRole }
           isA={isA}
           isHoo={isHoo}
           isAdminOverride={isAdminOverride}
+          canApproveFlag={!!currentUserCanApprove}
           dirty={dirty}
           saving={saving}
           actionLoading={actionLoading}
@@ -578,23 +581,29 @@ export function SopWorkflowEditor({ workflowId, currentUserId, currentUserRole }
 // ─── Sub-components ──────────────────────────────────────────────────
 
 function SopHeader({ wf }: { wf: SopWorkflowData }) {
-  const STATUS_LABEL: Record<SopStatus, string> = {
-    IN_LAVORAZIONE: "In lavorazione",
-    PUBBLICATA: "Pubblicata",
-    ARCHIVIATA: "Archiviata",
+  const STATUS_LABEL: Record<string, string> = {
+    DRAFT: "Bozza",
+    REVIEW_HM: "In revisione HM",
+    REVIEW_ADMIN: "In revisione HOO",
+    RETURNED: "Restituita",
+    PUBLISHED: "Pubblicata",
+    ARCHIVED: "Archiviata",
   };
-  const STATUS_STYLE: Record<SopStatus, string> = {
-    IN_LAVORAZIONE: "bg-[#FFF3E0] text-[#E65100]",
-    PUBBLICATA: "bg-[#E8F5E9] text-[#2E7D32]",
-    ARCHIVIATA: "bg-ivory-dark text-charcoal/50",
+  const STATUS_STYLE: Record<string, string> = {
+    DRAFT: "bg-[#FFF3E0] text-[#E65100]",
+    REVIEW_HM: "bg-mauve/15 text-mauve",
+    REVIEW_ADMIN: "bg-terracotta/10 text-terracotta",
+    RETURNED: "bg-[#FECACA] text-[#991B1B]",
+    PUBLISHED: "bg-[#E8F5E9] text-[#2E7D32]",
+    ARCHIVED: "bg-ivory-dark text-charcoal/50",
   };
 
   return (
     <div className="space-y-4">
       {/* Row 1: status + meta */}
       <div className="flex items-center gap-2 flex-wrap">
-        <span className={`text-[10px] font-ui font-bold uppercase tracking-wider px-2 py-0.5 ${STATUS_STYLE[wf.sopStatus]}`}>
-          {STATUS_LABEL[wf.sopStatus]}
+        <span className={`text-[10px] font-ui font-bold uppercase tracking-wider px-2 py-0.5 ${STATUS_STYLE[wf.contentStatus] || ""}`}>
+          {STATUS_LABEL[wf.contentStatus] || wf.contentStatus}
         </span>
         {wf.code && <span className="text-xs font-ui font-semibold text-terracotta tracking-wide">{wf.code}</span>}
         <span className="text-xs font-ui text-charcoal/45">{wf.property.name}</span>
@@ -648,7 +657,17 @@ function RaciBadge({ label, sublabel, user, highlight }: { label: string; sublab
 }
 
 function WorkflowStatusBanner({ wf }: { wf: SopWorkflowData }) {
-  if (wf.sopStatus !== "IN_LAVORAZIONE") return null;
+  const wfDraftStatuses = ["DRAFT", "REVIEW_HM", "REVIEW_ADMIN", "RETURNED"];
+  if (!wfDraftStatuses.includes(wf.contentStatus)) return null;
+
+  // Banner specifico per SOP restituita
+  if (wf.contentStatus === "RETURNED") {
+    return (
+      <div className="px-4 py-2.5 text-sm font-ui bg-[#FECACA]/30 border-l-4 border-[#991B1B] text-[#991B1B] font-medium">
+        Questa SOP è stata restituita — rivedi le note e correggi prima di risottoporre
+      </div>
+    );
+  }
 
   const parts: string[] = [];
   if (wf.submittedToC && wf.submittedToA) {
@@ -744,11 +763,12 @@ function ReviewDueDateSection({ wf, isA, editing, dueDateMonths, onEdit, onCance
   );
 }
 
-function ActionBar({ wf, isR, isA, isHoo, isAdminOverride, dirty, saving, actionLoading, onSave, onSubmit, onReturn, onApprove }: {
+function ActionBar({ wf, isR, isA, isHoo, isAdminOverride, canApproveFlag, dirty, saving, actionLoading, onSave, onSubmit, onReturn, onApprove }: {
   wf: SopWorkflowData;
   isR: boolean;
   isA: boolean;
   isHoo: boolean;
+  canApproveFlag: boolean;
   isAdminOverride: boolean;
   dirty: boolean;
   saving: boolean;
@@ -788,8 +808,8 @@ function ActionBar({ wf, isR, isA, isHoo, isAdminOverride, dirty, saving, action
         </>
       )}
 
-      {/* HOO (ADMIN/SUPER_ADMIN) — pubblica direttamente in qualsiasi fase */}
-      {isHoo && (
+      {/* Utenti con canApprove — possono pubblicare direttamente */}
+      {(isHoo || canApproveFlag) && (
         <>
           <button onClick={onApprove} disabled={actionLoading} className="btn-primary !py-2.5 !px-5 !bg-sage hover:!bg-sage-dark">
             {wf.submittedToA ? "Approva e pubblica" : "Pubblica direttamente"}

@@ -46,7 +46,7 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
       accountableId: true,
       submittedToC: true,
       submittedToA: true,
-      content: { select: { propertyId: true, departmentId: true } },
+      content: { select: { status: true, propertyId: true, departmentId: true } },
     },
   });
 
@@ -54,7 +54,8 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
     return NextResponse.json({ error: "SOP non trovata" }, { status: 404 });
   }
 
-  if (wf.sopStatus !== "IN_LAVORAZIONE") {
+  const draftStatuses = ["DRAFT", "REVIEW_HM", "REVIEW_ADMIN", "RETURNED"];
+  if (!draftStatuses.includes(wf.content.status)) {
     return NextResponse.json({ error: "La SOP deve essere in lavorazione" }, { status: 400 });
   }
 

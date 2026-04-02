@@ -147,8 +147,14 @@ export function AttachmentUploader({ contentId, canEdit }: AttachmentUploaderPro
   };
 
   const handleOpenFile = async (attachmentId: string) => {
+    // Open window synchronously (before await) to avoid popup blocker
+    const w = window.open("about:blank", "_blank");
     const url = await getAccessUrl(attachmentId);
-    if (url) window.open(url, "_blank");
+    if (url && w) {
+      w.location.href = url;
+    } else if (w) {
+      w.close();
+    }
   };
 
   const images = attachments.filter(a => a.kind === "IMAGE");
@@ -238,7 +244,7 @@ export function AttachmentUploader({ contentId, canEdit }: AttachmentUploaderPro
                 </div>
                 <button onClick={() => handleOpenFile(doc.id)}
                   className="text-[11px] font-ui font-semibold uppercase tracking-wider text-terracotta hover:text-terracotta-light transition-colors shrink-0">
-                  Apri
+                  {doc.mimeType === "application/pdf" || doc.mimeType.startsWith("image/") ? "Apri" : "Scarica"}
                 </button>
                 {canEdit && (
                   <button onClick={() => handleDelete(doc.id)}

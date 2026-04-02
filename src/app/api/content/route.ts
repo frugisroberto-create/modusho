@@ -5,6 +5,7 @@ import { prisma } from "@/lib/prisma";
 import { getAccessiblePropertyIds, getAccessibleDepartmentIds, checkAccess, canUserManageContentType } from "@/lib/rbac";
 import { changeContentStatus } from "@/lib/content-status";
 import { getSubmitTargetStatus } from "@/lib/content-workflow";
+import { sendContentPublishedPush } from "@/lib/push-notification";
 import { z } from "zod/v4";
 
 const contentQuerySchema = z.object({
@@ -14,6 +15,7 @@ const contentQuerySchema = z.object({
   status: z.enum(["DRAFT", "REVIEW_HM", "REVIEW_ADMIN", "PUBLISHED", "RETURNED", "ARCHIVED"]).optional(),
   acknowledged: z.enum(["true", "false"]).optional(),
   featured: z.enum(["true"]).optional(),
+  excludeUpdatedBy: z.string().optional(),
   page: z.coerce.number().int().min(1).default(1),
   pageSize: z.coerce.number().int().min(1).max(50).default(20),
 });
@@ -34,7 +36,7 @@ export async function GET(request: NextRequest) {
     );
   }
 
-  const { type, propertyId, departmentId, status, acknowledged, featured, page, pageSize } = parsed.data;
+  const { type, propertyId, departmentId, status, acknowledged, featured, excludeUpdatedBy, page, pageSize } = parsed.data;
   const userId = session.user.id;
 
   // RBAC: determina property accessibili
@@ -110,6 +112,10 @@ export async function GET(request: NextRequest) {
     where.isFeatured = true;
   }
 
+  if (excludeUpdatedBy) {
+    where.updatedById = { not: excludeUpdatedBy };
+  }
+
   const orderBy = featured === "true"
     ? { featuredAt: "desc" as const }
     : { publishedAt: "desc" as const };
@@ -133,6 +139,7 @@ export async function GET(request: NextRequest) {
         targetAudience: {
           select: { targetType: true, targetRole: true, targetDepartment: { select: { name: true } } },
         },
+        updatedBy: { select: { id: true, name: true } },
         acknowledgments: {
           where: { userId },
           select: { acknowledgedAt: true },
@@ -162,6 +169,7 @@ export async function GET(request: NextRequest) {
       property: c.property,
       acknowledged: c.acknowledgments.length > 0,
       acknowledgedAt: c.acknowledgments[0]?.acknowledgedAt ?? null,
+      updatedBy: c.updatedBy,
       targetAudience: c.targetAudience,
     })),
     meta: { page, pageSize, total },
@@ -226,9 +234,15 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: "Accesso negato a questa property/reparto" }, { status: 403 });
   }
 
-  // Validazione server-side: publishDirectly solo per ADMIN/SUPER_ADMIN
-  if (publishDirectly && role !== "ADMIN" && role !== "SUPER_ADMIN") {
-    return NextResponse.json({ error: "Solo ADMIN e SUPER_ADMIN possono pubblicare direttamente" }, { status: 403 });
+  // Validazione server-side: publishDirectly
+  // SOP: solo ADMIN/SUPER_ADMIN | DOCUMENT/MEMO: anche HOTEL_MANAGER
+  if (publishDirectly) {
+    if (type === "SOP" && role !== "ADMIN" && role !== "SUPER_ADMIN") {
+      return NextResponse.json({ error: "Solo ADMIN e SUPER_ADMIN possono pubblicare SOP direttamente" }, { status: 403 });
+    }
+    if (type !== "SOP" && role !== "HOTEL_MANAGER" && role !== "ADMIN" && role !== "SUPER_ADMIN") {
+      return NextResponse.json({ error: "Non hai permessi per pubblicare direttamente" }, { status: 403 });
+    }
   }
 
   // Determina stato iniziale in base al ruolo
@@ -295,6 +309,16 @@ export async function POST(request: NextRequest) {
         note: noteMap[initialStatus] || `Inviata a ${initialStatus}`,
       },
     });
+  }
+
+  // Push notification best-effort per pubblicazione diretta
+  if (isDirectPublish) {
+    sendContentPublishedPush({
+      contentId: content.id,
+      contentTitle: title,
+      contentType: type,
+      actorId: userId,
+    }).catch(() => {});
   }
 
   return NextResponse.json({ data: { id: content.id, status: initialStatus } }, { status: 201 });

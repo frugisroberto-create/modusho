@@ -23,16 +23,18 @@ export default function HooStandardBookListPage() {
   const canEdit = canCreate;
   const [items, setItems] = useState<ContentItem[]>([]);
   const [loading, setLoading] = useState(true);
+  const [showArchived, setShowArchived] = useState(false);
   const [deleting, setDeleting] = useState<string | null>(null);
   const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
 
   const fetchItems = useCallback(async () => {
     setLoading(true);
     try {
-      const res = await fetch("/api/content?type=STANDARD_BOOK&pageSize=50");
+      const status = showArchived ? "ARCHIVED" : "PUBLISHED";
+      const res = await fetch(`/api/content?type=STANDARD_BOOK&status=${status}&pageSize=50`);
       if (res.ok) { const json = await res.json(); setItems(json.data); }
     } finally { setLoading(false); }
-  }, []);
+  }, [showArchived]);
 
   useEffect(() => { fetchItems(); }, [fetchItems]);
 
@@ -56,7 +58,14 @@ export default function HooStandardBookListPage() {
           <h1 className="text-xl font-heading font-medium text-charcoal-dark">Standard Book</h1>
           <p className="text-[13px] font-ui text-charcoal/50 mt-1">Sezioni operative per reparto</p>
         </div>
-        {canCreate && <Link href="/hoo-standard-book/new" className="btn-primary">Nuova sezione</Link>}
+        <div className="flex items-center gap-3">
+          <label className="flex items-center gap-2 px-3 py-2 border border-ivory-dark bg-white cursor-pointer">
+            <input type="checkbox" checked={showArchived} onChange={(e) => setShowArchived(e.target.checked)}
+              className="w-3.5 h-3.5 rounded border-ivory-dark text-terracotta focus:ring-terracotta" />
+            <span className="text-sm font-ui text-charcoal">Archiviati</span>
+          </label>
+          {canCreate && <Link href="/hoo-standard-book/new" className="btn-primary">Nuova sezione</Link>}
+        </div>
       </div>
 
       {loading ? (
