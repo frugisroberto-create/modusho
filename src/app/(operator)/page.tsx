@@ -24,7 +24,7 @@ export default async function OperatorHome({ searchParams }: Props) {
   return (
     <div>
       {/* ── BLOCCO 1+2: Header minimale + Search bar ── */}
-      <section className="bg-ivory flex flex-col items-center pt-14 sm:pt-20 pb-10 -mx-4 sm:-mx-6 px-4 sm:px-6">
+      <section className="relative z-10 bg-ivory flex flex-col items-center pt-14 sm:pt-20 pb-10 -mx-4 sm:-mx-6 px-4 sm:px-6">
         <PropertyName />
         <div className="w-full max-w-[520px] mt-10">
           <SearchBar />
