@@ -1,8 +1,6 @@
 "use client";
 
 import { useState, useEffect, useCallback } from "react";
-import { useIsMobile } from "@/hooks/use-is-mobile";
-
 const DISMISS_KEY = "modusho_push_dismissed";
 const ACK_COUNT_KEY = "modusho_ack_count";
 
@@ -12,29 +10,16 @@ const ACK_COUNT_KEY = "modusho_ack_count";
  * se il browser supporta push e il permesso non è stato ancora concesso/negato.
  */
 export function PushPermissionBanner() {
-  const isMobile = useIsMobile();
   const [show, setShow] = useState(false);
   const [subscribing, setSubscribing] = useState(false);
 
   useEffect(() => {
-    // Debug: log conditions
-    const checks = {
-      isMobile,
-      hasNotification: typeof window !== "undefined" && "Notification" in window,
-      hasServiceWorker: typeof navigator !== "undefined" && "serviceWorker" in navigator,
-      hasPushManager: typeof window !== "undefined" && "PushManager" in window,
-      permission: typeof window !== "undefined" && "Notification" in window ? Notification.permission : "N/A",
-      dismissed: typeof window !== "undefined" ? localStorage.getItem(DISMISS_KEY) : null,
-    };
-    console.log("[push-banner] checks:", JSON.stringify(checks));
-
-    if (!isMobile) return;
     if (!("Notification" in window) || !("serviceWorker" in navigator) || !("PushManager" in window)) return;
     if (Notification.permission !== "default") return;
     if (localStorage.getItem(DISMISS_KEY)) return;
 
     setShow(true);
-  }, [isMobile]);
+  }, []);
 
   const handleSubscribe = useCallback(async () => {
     setSubscribing(true);
