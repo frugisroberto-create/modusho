@@ -1,6 +1,7 @@
 import { redirect } from "next/navigation";
 import { getSessionUser } from "@/lib/session";
 import { SearchBar } from "@/components/operator/search-bar";
+import { FeaturedSection } from "@/components/operator/featured-section";
 import { PendingReads } from "@/components/operator/pending-reads";
 import { SopActivities } from "@/components/operator/sop-activities";
 import { SopExpiryAlert } from "@/components/operator/sop-expiry-alert";
@@ -32,7 +33,10 @@ export default async function OperatorHome({ searchParams }: Props) {
 
       {/* ── Sezioni sotto hero ── */}
       <div className="max-w-[960px] mx-auto space-y-10 pb-16">
-        {/* BLOCCO 3: Da prendere visione (condizionale) */}
+        {/* BLOCCO 3: In evidenza (prima sezione, condizionale) */}
+        <FeaturedSection />
+
+        {/* BLOCCO 4: Da prendere visione (condizionale) */}
         <PendingReads />
 
         {/* BLOCCO 4: Attività SOP — solo HOD/HM/HOO, non operatore */}
