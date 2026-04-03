@@ -43,21 +43,49 @@ export async function GET(request: NextRequest) {
   const propertyId = params.propertyId as string | undefined;
   const departmentId = params.departmentId as string | undefined;
 
+  // Full-text search: pre-filter Content IDs via PostgreSQL tsvector
+  let matchingContentIds: string[] | null = null;
+  if (search) {
+    const sanitized = search
+      .replace(/[^\w\sàèéìòùÀÈÉÌÒÙ]/g, " ")
+      .trim()
+      .split(/\s+/)
+      .filter(Boolean)
+      .map((word) => `${word}:*`)
+      .join(" & ");
+
+    if (sanitized) {
+      const matches = await prisma.$queryRaw<{ id: string }[]>`
+        SELECT c.id FROM "Content" c
+        WHERE c."isDeleted" = false
+          AND (
+            to_tsvector('italian', c.title || ' ' || c.body) @@ to_tsquery('italian', ${sanitized})
+            OR c.title ILIKE '%' || ${search} || '%'
+            OR c.code ILIKE '%' || ${search} || '%'
+          )
+      `;
+      matchingContentIds = matches.map((m) => m.id);
+    } else {
+      matchingContentIds = [];
+    }
+
+    if (matchingContentIds.length === 0) {
+      return NextResponse.json({ data: [], meta: { page, pageSize, total: 0 } });
+    }
+  }
+
   // SUPER_ADMIN e ADMIN vedono tutti i workflow; HOD/HM solo quelli dove sono R/C/A
   const contentFilter: Record<string, unknown> = { isDeleted: false };
+
+  if (matchingContentIds !== null) {
+    contentFilter.id = { in: matchingContentIds };
+  }
 
   if (propertyId) {
     contentFilter.propertyId = propertyId;
   }
   if (departmentId) {
     contentFilter.departmentId = departmentId;
-  }
-
-  if (search) {
-    contentFilter.OR = [
-      { title: { contains: search, mode: "insensitive" } },
-      { code: { contains: search, mode: "insensitive" } },
-    ];
   }
 
   const where: Record<string, unknown> = {

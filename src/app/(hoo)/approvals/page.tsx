@@ -110,6 +110,7 @@ export default function ApprovalsPage() {
         });
         if (propertyFilter) params.set("propertyId", propertyFilter);
         if (departmentFilter) params.set("departmentId", departmentFilter);
+        if (search) params.set("search", search);
         const res = await fetch(`/api/content?${params}`);
         if (res.ok) {
           const json = await res.json();
@@ -124,6 +125,7 @@ export default function ApprovalsPage() {
         });
         if (propertyFilter) params.set("propertyId", propertyFilter);
         if (departmentFilter) params.set("departmentId", departmentFilter);
+        if (search) params.set("search", search);
         const res = await fetch(`/api/content?${params}`);
         if (res.ok) {
           const json = await res.json();
@@ -192,20 +194,18 @@ export default function ApprovalsPage() {
             </label>
           </div>
         )}
-        {tab === "in_lavorazione" && (
-          <div className="flex-1 min-w-[200px]">
-            <label className="block text-[11px] font-ui uppercase tracking-wider text-charcoal/45 mb-1">Cerca</label>
-            <form onSubmit={(e) => { e.preventDefault(); setSearch(searchInput); }} className="flex">
-              <input type="text" value={searchInput} onChange={(e) => setSearchInput(e.target.value)}
-                placeholder="Titolo o codice SOP..."
-                className="flex-1 text-sm border border-ivory-dark px-3 py-2 bg-white font-ui border-r-0" />
-              <button type="submit"
-                className="px-4 py-2 text-xs font-ui font-semibold uppercase tracking-wider bg-terracotta text-white hover:bg-terracotta-light transition-colors">
-                Cerca
-              </button>
-            </form>
-          </div>
-        )}
+        <div className="flex-1 min-w-[200px]">
+          <label className="block text-[11px] font-ui uppercase tracking-wider text-charcoal/45 mb-1">Cerca</label>
+          <form onSubmit={(e) => { e.preventDefault(); setSearch(searchInput); }} className="flex">
+            <input type="text" value={searchInput} onChange={(e) => setSearchInput(e.target.value)}
+              placeholder="Cerca nel titolo e contenuto..."
+              className="flex-1 text-sm border border-ivory-dark px-3 py-2 bg-white font-ui border-r-0" />
+            <button type="submit"
+              className="px-4 py-2 text-xs font-ui font-semibold uppercase tracking-wider bg-terracotta text-white hover:bg-terracotta-light transition-colors">
+              Cerca
+            </button>
+          </form>
+        </div>
         {search && (
           <button onClick={() => { setSearch(""); setSearchInput(""); }}
             className="text-xs font-ui text-charcoal/50 hover:text-charcoal py-2 transition-colors">

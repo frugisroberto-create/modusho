@@ -16,6 +16,7 @@ const contentQuerySchema = z.object({
   acknowledged: z.enum(["true", "false"]).optional(),
   featured: z.enum(["true"]).optional(),
   excludeUpdatedBy: z.string().optional(),
+  search: z.string().max(200).optional(),
   page: z.coerce.number().int().min(1).default(1),
   pageSize: z.coerce.number().int().min(1).max(50).default(20),
 });
@@ -36,7 +37,7 @@ export async function GET(request: NextRequest) {
     );
   }
 
-  const { type, propertyId, departmentId, status, acknowledged, featured, excludeUpdatedBy, page, pageSize } = parsed.data;
+  const { type, propertyId, departmentId, status, acknowledged, featured, excludeUpdatedBy, search, page, pageSize } = parsed.data;
   const userId = session.user.id;
 
   // RBAC: determina property accessibili
@@ -114,6 +115,35 @@ export async function GET(request: NextRequest) {
 
   if (excludeUpdatedBy) {
     where.updatedById = { not: excludeUpdatedBy };
+  }
+
+  // Full-text search via PostgreSQL tsvector
+  if (search) {
+    const sanitized = search
+      .replace(/[^\w\sàèéìòùÀÈÉÌÒÙ]/g, " ")
+      .trim()
+      .split(/\s+/)
+      .filter(Boolean)
+      .map((word) => `${word}:*`)
+      .join(" & ");
+
+    if (sanitized) {
+      const matches = await prisma.$queryRaw<{ id: string }[]>`
+        SELECT c.id FROM "Content" c
+        WHERE c."isDeleted" = false
+          AND (
+            to_tsvector('italian', c.title || ' ' || c.body) @@ to_tsquery('italian', ${sanitized})
+            OR c.title ILIKE '%' || ${search} || '%'
+          )
+      `;
+      const matchingIds = matches.map((m) => m.id);
+      if (matchingIds.length === 0) {
+        return NextResponse.json({ data: [], meta: { page, pageSize, total: 0 } });
+      }
+      where.id = { in: matchingIds };
+    } else {
+      return NextResponse.json({ data: [], meta: { page, pageSize, total: 0 } });
+    }
   }
 
   const orderBy = featured === "true"
