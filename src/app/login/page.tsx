@@ -20,16 +20,18 @@ function LoginForm() {
     setError("");
     setLoading(true);
 
-    // Redirect nativo NextAuth — il browser gestisce il cookie flow completo
-    await signIn("credentials", {
+    const result = await signIn("credentials", {
       email,
       password,
-      callbackUrl,
+      redirect: false,
     });
 
-    // Se arriviamo qui, signIn ha fallito
-    setLoading(false);
-    setError("Credenziali non valide");
+    if (result?.error) {
+      setLoading(false);
+      setError("Credenziali non valide");
+    } else {
+      window.location.href = callbackUrl;
+    }
   }
 
   return (
