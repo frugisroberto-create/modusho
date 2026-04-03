@@ -31,6 +31,7 @@ export function FeaturedSection() {
   const [loading, setLoading] = useState(true);
 
   const fetchFeatured = useCallback(async () => {
+    if (!currentPropertyId) return;
     setLoading(true);
     try {
       const res = await fetch(
