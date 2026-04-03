@@ -11,7 +11,7 @@ export default function NewMemoPage() {
   const [body, setBody] = useState("");
   const [propertyId, setPropertyId] = useState("");
   const [expiresAt, setExpiresAt] = useState("");
-  const [isPinned, setIsPinned] = useState(false);
+  const [isFeatured, setIsFeatured] = useState(false);
   const [properties, setProperties] = useState<Property[]>([]);
   const [loading, setLoading] = useState(false);
 
@@ -38,7 +38,7 @@ export default function NewMemoPage() {
         body: JSON.stringify({
           title, body, propertyId,
           expiresAt: expiresAt || null,
-          isPinned,
+          isPinned: isFeatured,
         }),
       });
       if (res.ok) { router.push("/memo"); router.refresh(); }
@@ -74,8 +74,8 @@ export default function NewMemoPage() {
           </div>
           <div className="flex items-end pb-1">
             <label className="flex items-center gap-2 text-sm">
-              <input type="checkbox" checked={isPinned} onChange={(e) => setIsPinned(e.target.checked)} />
-              Metti in evidenza (pin)
+              <input type="checkbox" checked={isFeatured} onChange={(e) => setIsFeatured(e.target.checked)} />
+              Metti in evidenza
             </label>
           </div>
         </div>

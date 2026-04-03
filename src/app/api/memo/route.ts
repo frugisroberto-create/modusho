@@ -129,6 +129,7 @@ export async function POST(request: NextRequest) {
   if (!hasAccess) return NextResponse.json({ error: "Accesso negato" }, { status: 403 });
 
   // Crea Content + Memo + StatusHistory in transazione
+  const now = new Date();
   const content = await prisma.content.create({
     data: {
       type: "MEMO",
@@ -138,7 +139,8 @@ export async function POST(request: NextRequest) {
       propertyId,
       createdById: userId,
       updatedById: userId,
-      publishedAt: new Date(),
+      publishedAt: now,
+      ...(isPinned ? { isFeatured: true, featuredAt: now, featuredById: userId } : {}),
     },
   });
 
