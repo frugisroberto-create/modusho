@@ -52,7 +52,7 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
     },
   });
 
-  if (!wf || wf.content.status === "ARCHIVED" && false) {
+  if (!wf) {
     return NextResponse.json({ error: "SOP non trovata" }, { status: 404 });
   }
 
