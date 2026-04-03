@@ -157,23 +157,23 @@ export function OperatorHeader({
       </header>
 
       {/* ── Mobile Bottom Navigation ── */}
-      <MobileBottomNav pathname={pathname} />
+      <MobileBottomNav pathname={pathname} userRole={userRole} />
     </>
   );
 }
 
 // ─── Mobile Bottom Nav ───────────────────────────────────────────────
 
-const MORE_ITEMS: { href: string; label: string }[] = [
-  { href: "/comunicazioni", label: "Memo" },
-  { href: "/brand-book", label: "Brand Book" },
+const MORE_ITEMS: { href: string; label: string; minRole?: string }[] = [
+  { href: "/brand-book", label: "Brand Book", minRole: "HOTEL_MANAGER" },
   { href: "/standard-book", label: "Standard Book" },
 ];
 
-function MobileBottomNav({ pathname }: { pathname: string }) {
+function MobileBottomNav({ pathname, userRole }: { pathname: string; userRole: string }) {
   const [moreOpen, setMoreOpen] = useState(false);
 
-  const isMoreActive = MORE_ITEMS.some(i => pathname.startsWith(i.href));
+  const visibleMoreItems = MORE_ITEMS.filter(i => !i.minRole || (ROLE_LEVEL[userRole] ?? 0) >= (ROLE_LEVEL[i.minRole] ?? 0));
+  const isMoreActive = visibleMoreItems.some(i => pathname.startsWith(i.href));
 
   return (
     <nav className="md:hidden fixed bottom-0 left-0 right-0 z-50 bg-white border-t border-ivory-dark safe-bottom">
@@ -182,7 +182,7 @@ function MobileBottomNav({ pathname }: { pathname: string }) {
         <>
           <div className="fixed inset-0 z-40" onClick={() => setMoreOpen(false)} />
           <div className="absolute bottom-full left-0 right-0 bg-white border-t border-ivory-dark z-50 py-1 shadow-lg">
-            {MORE_ITEMS.map((item) => (
+            {visibleMoreItems.map((item) => (
               <Link key={item.href} href={item.href} onClick={() => setMoreOpen(false)}
                 className={`block px-5 py-3 text-sm font-ui transition-colors ${
                   pathname.startsWith(item.href) ? "text-terracotta font-medium" : "text-charcoal hover:bg-ivory"
