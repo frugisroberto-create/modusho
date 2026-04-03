@@ -54,12 +54,32 @@ export async function GET(request: NextRequest) {
     WHERE pub."toStatus" = 'PUBLISHED' AND c."propertyId" = ANY(${propertyIds}) AND c.type = 'SOP'
   `;
 
-  // Presa visione
+  // Presa visione — calcolo preciso per contenuto/reparto
   const publishedContent = await prisma.content.count({ where: { ...pFilter, isDeleted: false, status: "PUBLISHED", type: { in: ["SOP", "DOCUMENT"] } } });
-  const totalOperators = await prisma.user.count({ where: { role: "OPERATOR", isActive: true, propertyAssignments: { some: { propertyId: { in: propertyIds } } } } });
   const totalAcks = await prisma.contentAcknowledgment.count({ where: { content: { propertyId: { in: propertyIds } } } });
-  const expectedAcks = publishedContent * totalOperators;
-  const ackRate = expectedAcks > 0 ? Math.round((totalAcks / expectedAcks) * 100) : null;
+  const ackStats = await prisma.$queryRaw<{ total_expected: number; total_acked: number }[]>`
+    SELECT
+      COALESCE(SUM(total_ops.cnt), 0)::int as total_expected,
+      COALESCE(SUM(ack.cnt), 0)::int as total_acked
+    FROM "Content" c
+    LEFT JOIN LATERAL (
+      SELECT COUNT(*)::int as cnt FROM "ContentAcknowledgment" ca WHERE ca."contentId" = c.id
+    ) ack ON true
+    LEFT JOIN LATERAL (
+      SELECT COUNT(DISTINCT pa."userId")::int as cnt
+      FROM "PropertyAssignment" pa
+      JOIN "User" u ON u.id = pa."userId"
+      WHERE pa."propertyId" = c."propertyId"
+        AND u."role" = 'OPERATOR' AND u."isActive" = true
+        AND (c."departmentId" IS NULL OR pa."departmentId" IS NULL OR pa."departmentId" = c."departmentId")
+    ) total_ops ON true
+    WHERE c.status = 'PUBLISHED' AND c."isDeleted" = false
+      AND c.type IN ('SOP', 'DOCUMENT')
+      AND c."propertyId" = ANY(${propertyIds})
+      AND total_ops.cnt > 0
+  `;
+  const totalExpected = ackStats[0]?.total_expected || 0;
+  const ackRate = totalExpected > 0 ? Math.round((ackStats[0]?.total_acked / totalExpected) * 100) : null;
 
   // Per hotel
   const properties = await prisma.property.findMany({
@@ -112,7 +132,7 @@ export async function GET(request: NextRequest) {
         sopTotal, sopPublished, sopDraft, sopReviewHm, sopReviewAdmin, sopReturned, sopArchived,
         sopApprovedInPeriod, sopReturnedInPeriod,
         avgWorkflowDays: avgWorkflow[0]?.avg_days != null ? Number(avgWorkflow[0].avg_days) : null,
-        ackRate, totalOperators, publishedContent, totalAcks,
+        ackRate, totalExpected, publishedContent, totalAcks,
       },
       hotelStats,
       trend: weeks,

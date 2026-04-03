@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
+import { Prisma } from "@prisma/client";
 import { getAccessiblePropertyIds, getAccessibleDepartmentIds } from "@/lib/rbac";
 import { z } from "zod/v4";
 
@@ -83,74 +84,52 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({ data: [], meta: { page, pageSize, total: 0 } });
   }
 
-  // Build type filter
-  const typeFilter = type ? `AND c."type" = '${type}'` : "";
+  // Build safe type filters using Prisma.sql
+  const typeCondition = type ? Prisma.sql`AND c."type" = ${type}` : Prisma.empty;
+  const brandBookCondition = (session.user.role === "OPERATOR" || session.user.role === "HOD")
+    ? Prisma.sql`AND c."type" != 'BRAND_BOOK'`
+    : Prisma.empty;
 
-  // Brand Book: escluso per OPERATOR e HOD
-  const brandBookFilter = (session.user.role === "OPERATOR" || session.user.role === "HOD")
-    ? `AND c."type" != 'BRAND_BOOK'`
-    : "";
-
-  // Full-text search with PostgreSQL
-  const results = await prisma.$queryRawUnsafe<
-    {
-      id: string;
-      title: string;
-      type: string;
-      snippet: string;
-      rank: number;
-    }[]
-  >(
-    `
+  // Full-text search with PostgreSQL (safe parameterized query)
+  const results = await prisma.$queryRaw<
+    { id: string; title: string; type: string; snippet: string; rank: number }[]
+  >`
     SELECT
       c.id,
       c.title,
       c."type",
-      ts_headline('italian', c.body, to_tsquery('italian', $1),
+      ts_headline('italian', c.body, to_tsquery('italian', ${sanitized}),
         'StartSel=<mark>, StopSel=</mark>, MaxWords=35, MinWords=15'
       ) as snippet,
-      ts_rank(to_tsvector('italian', c.title || ' ' || c.body), to_tsquery('italian', $1)) as rank
+      ts_rank(to_tsvector('italian', c.title || ' ' || c.body), to_tsquery('italian', ${sanitized})) as rank
     FROM "Content" c
     WHERE c.status = 'PUBLISHED' AND c."isDeleted" = false
-      AND c."propertyId" = ANY($2::text[])
-      AND (c."departmentId" IS NULL OR c."departmentId" = ANY($3::text[]))
-      ${typeFilter}
-      ${brandBookFilter}
+      AND c."propertyId" = ANY(${filteredPropertyIds})
+      AND (c."departmentId" IS NULL OR c."departmentId" = ANY(${departmentFilter}))
+      ${typeCondition}
+      ${brandBookCondition}
       AND (
-        to_tsvector('italian', c.title || ' ' || c.body) @@ to_tsquery('italian', $1)
-        OR c.title ILIKE '%' || $4 || '%'
+        to_tsvector('italian', c.title || ' ' || c.body) @@ to_tsquery('italian', ${sanitized})
+        OR c.title ILIKE '%' || ${q} || '%'
       )
     ORDER BY rank DESC
-    LIMIT $5 OFFSET $6
-    `,
-    sanitized,
-    filteredPropertyIds,
-    departmentFilter,
-    q,
-    pageSize,
-    offset
-  );
+    LIMIT ${pageSize} OFFSET ${offset}
+  `;
 
   // Count total
-  const countResult = await prisma.$queryRawUnsafe<{ count: bigint }[]>(
-    `
+  const countResult = await prisma.$queryRaw<{ count: bigint }[]>`
     SELECT COUNT(*) as count
     FROM "Content" c
     WHERE c.status = 'PUBLISHED' AND c."isDeleted" = false
-      AND c."propertyId" = ANY($2::text[])
-      AND (c."departmentId" IS NULL OR c."departmentId" = ANY($3::text[]))
-      ${typeFilter}
-      ${brandBookFilter}
+      AND c."propertyId" = ANY(${filteredPropertyIds})
+      AND (c."departmentId" IS NULL OR c."departmentId" = ANY(${departmentFilter}))
+      ${typeCondition}
+      ${brandBookCondition}
       AND (
-        to_tsvector('italian', c.title || ' ' || c.body) @@ to_tsquery('italian', $1)
-        OR c.title ILIKE '%' || $4 || '%'
+        to_tsvector('italian', c.title || ' ' || c.body) @@ to_tsquery('italian', ${sanitized})
+        OR c.title ILIKE '%' || ${q} || '%'
       )
-    `,
-    sanitized,
-    filteredPropertyIds,
-    departmentFilter,
-    q
-  );
+  `;
 
   const total = Number(countResult[0]?.count ?? 0);
 
