@@ -4,6 +4,7 @@ import { useState, useEffect, useCallback, useRef } from "react";
 import Link from "next/link";
 import { useOperatorContext } from "./operator-shell";
 import { MobileHide } from "@/components/mobile-hide";
+import { LiveSearchBar } from "@/components/shared/live-search-bar";
 
 interface ContentItem {
   id: string; code: string | null; type: string; title: string; publishedAt: string | null;
@@ -136,17 +137,12 @@ export function ContentList({ contentType, detailPath, title, description, creat
         )}
       </div>
 
-      {/* Search bar */}
-      <div className="flex border border-ivory-dark bg-white overflow-hidden">
-        <input type="text" value={searchQuery} onChange={(e) => handleSearchChange(e.target.value)}
-          placeholder={searchPlaceholder || (contentType === "SOP" ? "Cerca una procedura..." : "Cerca un documento...")}
-          className="flex-1 px-5 py-3 text-sm font-ui text-charcoal bg-transparent"
-          style={{ border: "none", boxShadow: "none" }} />
-        <button type="button" onClick={() => setSearchTerm(searchQuery)}
-          className="shrink-0 bg-terracotta text-white px-6 py-3 text-[12.6px] font-ui font-semibold uppercase tracking-wider hover:bg-terracotta-dark transition-colors">
-          Cerca
-        </button>
-      </div>
+      {/* Search bar — full-text con dropdown live */}
+      <LiveSearchBar
+        propertyId={currentPropertyId}
+        contentType={contentType}
+        placeholder={searchPlaceholder || (contentType === "SOP" ? "Cerca una procedura..." : "Cerca un documento...")}
+      />
 
       {/* Filtri */}
       <div className="flex flex-wrap gap-3">

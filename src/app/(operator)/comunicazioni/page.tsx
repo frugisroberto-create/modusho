@@ -6,6 +6,7 @@ import { useOperatorContext } from "@/components/operator/operator-shell";
 import { ExportPdfButton } from "@/components/shared/export-pdf-button";
 import { AcknowledgeButton } from "@/components/operator/acknowledge-button";
 import { ContentAckRegistry } from "@/components/shared/content-ack-registry";
+import { LiveSearchBar } from "@/components/shared/live-search-bar";
 
 interface MemoItem {
   id: string; contentId: string; title: string; body: string;
@@ -79,17 +80,8 @@ export default function MemoListPage() {
         )}
       </div>
 
-      {/* Search */}
-      <div className="flex border border-ivory-dark bg-white overflow-hidden">
-        <input type="text" value={searchQuery} onChange={(e) => handleSearchChange(e.target.value)}
-          placeholder="Cerca un memo..."
-          className="flex-1 px-5 py-3 text-sm font-ui text-charcoal bg-transparent"
-          style={{ border: "none", boxShadow: "none" }} />
-        <button type="button" onClick={() => setSearchTerm(searchQuery)}
-          className="shrink-0 bg-terracotta text-white px-6 py-3 text-[12.6px] font-ui font-semibold uppercase tracking-wider hover:bg-terracotta-dark transition-colors">
-          Cerca
-        </button>
-      </div>
+      {/* Search — full-text con dropdown live */}
+      <LiveSearchBar propertyId={currentPropertyId} contentType="MEMO" placeholder="Cerca un memo..." />
 
       {/* Lista */}
       {loading ? (
