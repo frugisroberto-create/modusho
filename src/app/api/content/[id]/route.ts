@@ -272,7 +272,7 @@ export async function PUT(
 
     // Push notification best-effort per pubblicazione diretta
     if (targetStatus === "PUBLISHED") {
-      sendContentPublishedPush({
+      await sendContentPublishedPush({
         contentId: id,
         contentTitle: updated.title,
         contentType: content.type,

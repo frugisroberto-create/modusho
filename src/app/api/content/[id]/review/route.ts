@@ -110,7 +110,7 @@ export async function POST(
       });
 
       // Push notification best-effort
-      sendContentPublishedPush({
+      await sendContentPublishedPush({
         contentId,
         contentTitle: content.title,
         contentType: content.type,

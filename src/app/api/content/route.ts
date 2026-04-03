@@ -313,7 +313,7 @@ export async function POST(request: NextRequest) {
 
   // Push notification best-effort per pubblicazione diretta
   if (isDirectPublish) {
-    sendContentPublishedPush({
+    await sendContentPublishedPush({
       contentId: content.id,
       contentTitle: title,
       contentType: type,

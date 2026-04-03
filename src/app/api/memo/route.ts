@@ -160,8 +160,8 @@ export async function POST(request: NextRequest) {
     },
   });
 
-  // Push notification best-effort
-  sendContentPublishedPush({
+  // Push notification best-effort (await per Vercel serverless)
+  await sendContentPublishedPush({
     contentId: content.id,
     contentTitle: title,
     contentType: "MEMO",
