@@ -36,8 +36,8 @@ export const metadata: Metadata = {
   description: "Sistema di governance operativa - HO Collection",
   manifest: "/manifest.json",
   icons: {
-    icon: "/icons/app-icon.svg",
-    apple: "/icons/app-icon.svg",
+    icon: "/icons/icon-192.png",
+    apple: "/icons/apple-touch-icon.png",
   },
   appleWebApp: {
     capable: true,
