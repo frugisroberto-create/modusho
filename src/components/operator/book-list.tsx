@@ -4,6 +4,7 @@ import { useState, useEffect, useCallback } from "react";
 import Link from "next/link";
 import { useOperatorContext } from "./operator-shell";
 import { MobileHide } from "@/components/mobile-hide";
+import { LiveSearchBar } from "@/components/shared/live-search-bar";
 
 const HOO_CREATE_PATHS: Record<string, string> = {
   STANDARD_BOOK: "/hoo-standard-book/new",
@@ -61,22 +62,9 @@ export function BookList({ contentType, basePath, title }: BookListProps) {
 
       // OPERATOR/HOD: filtra per i propri reparti
       if (needsDeptFilter && departments.length > 0) {
-        // Fetch per ogni department e combina i risultati
-        const allItems: BookItem[] = [];
-        for (const dept of departments) {
-          const deptParams = new URLSearchParams(params);
-          deptParams.set("departmentId", dept.id);
-          const res = await fetch(`/api/content?${deptParams}`);
-          if (res.ok) {
-            const json = await res.json();
-            allItems.push(...json.data);
-          }
-        }
-        // Aggiungi anche quelli trasversali (senza department)
         const baseRes = await fetch(`/api/content?${params}`);
         if (baseRes.ok) {
           const json = await baseRes.json();
-          // Filtra: solo quelli senza department (trasversali) + quelli del proprio reparto
           const deptIds = new Set(departments.map(d => d.id));
           const filtered = json.data.filter((item: BookItem) =>
             !item.department || deptIds.has(item.department.id)
@@ -115,6 +103,14 @@ export function BookList({ contentType, basePath, title }: BookListProps) {
         <h1 className="text-xl font-heading font-semibold text-charcoal-dark">{title}</h1>
         {canCreate && <MobileHide><Link href={HOO_CREATE_PATHS[contentType]} className="btn-primary">Nuova sezione</Link></MobileHide>}
       </div>
+
+      {/* Ricerca full-text con navigazione diretta */}
+      <LiveSearchBar
+        propertyId={currentPropertyId}
+        contentType={contentType}
+        placeholder={`Cerca nel ${title.toLowerCase()}...`}
+      />
+
       {items.length === 0 ? (
         <p className="text-sage-light font-ui text-sm text-center py-10">Nessun contenuto disponibile</p>
       ) : (
