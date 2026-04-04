@@ -1,10 +1,9 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import Link from "next/link";
 import { useOperatorContext } from "./operator-shell";
 import { MobileHide } from "@/components/mobile-hide";
-import { LiveSearchBar } from "@/components/shared/live-search-bar";
 
 const HOO_CREATE_PATHS: Record<string, string> = {
   STANDARD_BOOK: "/hoo-standard-book/new",
@@ -42,6 +41,9 @@ export function BookList({ contentType, basePath, title }: BookListProps) {
   const [loading, setLoading] = useState(true);
   const [deleting, setDeleting] = useState<string | null>(null);
   const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
+  const [searchQuery, setSearchQuery] = useState("");
+  const [searchTerm, setSearchTerm] = useState("");
+  const debounceRef = useRef<NodeJS.Timeout | null>(null);
 
   // Carica i reparti accessibili per OPERATOR/HOD
   useEffect(() => {
@@ -53,12 +55,19 @@ export function BookList({ contentType, basePath, title }: BookListProps) {
     fetchDepts();
   }, [needsDeptFilter, currentPropertyId]);
 
+  const handleSearchChange = (val: string) => {
+    setSearchQuery(val);
+    if (debounceRef.current) clearTimeout(debounceRef.current);
+    debounceRef.current = setTimeout(() => setSearchTerm(val), 400);
+  };
+
   const fetchBooks = useCallback(async () => {
     setLoading(true);
     try {
       const params = new URLSearchParams({
         type: contentType, propertyId: currentPropertyId, status: "PUBLISHED", pageSize: "50",
       });
+      if (searchTerm.trim().length >= 2) params.set("search", searchTerm.trim());
 
       // OPERATOR/HOD: filtra per i propri reparti
       if (needsDeptFilter && departments.length > 0) {
@@ -76,7 +85,7 @@ export function BookList({ contentType, basePath, title }: BookListProps) {
         if (res.ok) { const json = await res.json(); setItems(json.data); }
       }
     } finally { setLoading(false); }
-  }, [contentType, currentPropertyId, needsDeptFilter, departments]);
+  }, [contentType, currentPropertyId, needsDeptFilter, departments, searchTerm]);
 
   useEffect(() => { fetchBooks(); }, [fetchBooks]);
 
@@ -104,15 +113,24 @@ export function BookList({ contentType, basePath, title }: BookListProps) {
         {canCreate && <MobileHide><Link href={HOO_CREATE_PATHS[contentType]} className="btn-primary">Nuova sezione</Link></MobileHide>}
       </div>
 
-      {/* Ricerca full-text con navigazione diretta */}
-      <LiveSearchBar
-        propertyId={currentPropertyId}
-        contentType={contentType}
-        placeholder={`Cerca nel ${title.toLowerCase()}...`}
-      />
+      {/* Ricerca full-text — filtra la lista */}
+      <div className="flex border border-ivory-dark bg-white overflow-hidden">
+        <input type="text" value={searchQuery} onChange={(e) => handleSearchChange(e.target.value)}
+          placeholder={`Cerca nel ${title.toLowerCase()}...`}
+          className="flex-1 px-5 py-3 text-sm font-ui text-charcoal bg-transparent"
+          style={{ border: "none", boxShadow: "none" }} />
+        {searchTerm && (
+          <button onClick={() => { setSearchQuery(""); setSearchTerm(""); }}
+            className="px-4 py-3 text-xs font-ui text-charcoal/50 hover:text-charcoal transition-colors">
+            Annulla
+          </button>
+        )}
+      </div>
 
       {items.length === 0 ? (
-        <p className="text-sage-light font-ui text-sm text-center py-10">Nessun contenuto disponibile</p>
+        <p className="text-sage-light font-ui text-sm text-center py-10">
+          {searchTerm ? `Nessun risultato per "${searchTerm}"` : "Nessun contenuto disponibile"}
+        </p>
       ) : (
         <div className="space-y-2">
           {items.map((item) => (

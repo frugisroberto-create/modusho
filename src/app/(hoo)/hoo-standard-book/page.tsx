@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import { useHooContext } from "@/components/hoo/hoo-shell";
 import Link from "next/link";
 
@@ -26,15 +26,26 @@ export default function HooStandardBookListPage() {
   const [showArchived, setShowArchived] = useState(false);
   const [deleting, setDeleting] = useState<string | null>(null);
   const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
+  const [searchQuery, setSearchQuery] = useState("");
+  const [searchTerm, setSearchTerm] = useState("");
+  const debounceRef = useRef<NodeJS.Timeout | null>(null);
+
+  const handleSearchChange = (val: string) => {
+    setSearchQuery(val);
+    if (debounceRef.current) clearTimeout(debounceRef.current);
+    debounceRef.current = setTimeout(() => setSearchTerm(val), 400);
+  };
 
   const fetchItems = useCallback(async () => {
     setLoading(true);
     try {
       const status = showArchived ? "ARCHIVED" : "PUBLISHED";
-      const res = await fetch(`/api/content?type=STANDARD_BOOK&status=${status}&pageSize=50`);
+      const params = new URLSearchParams({ type: "STANDARD_BOOK", status, pageSize: "50" });
+      if (searchTerm.trim().length >= 2) params.set("search", searchTerm.trim());
+      const res = await fetch(`/api/content?${params}`);
       if (res.ok) { const json = await res.json(); setItems(json.data); }
     } finally { setLoading(false); }
-  }, [showArchived]);
+  }, [showArchived, searchTerm]);
 
   useEffect(() => { fetchItems(); }, [fetchItems]);
 
@@ -66,6 +77,20 @@ export default function HooStandardBookListPage() {
           </label>
           {canCreate && <Link href="/hoo-standard-book/new" className="btn-primary">Nuova sezione</Link>}
         </div>
+      </div>
+
+      {/* Ricerca full-text */}
+      <div className="flex border border-ivory-dark bg-white overflow-hidden">
+        <input type="text" value={searchQuery} onChange={(e) => handleSearchChange(e.target.value)}
+          placeholder="Cerca nello standard book..."
+          className="flex-1 px-5 py-3 text-sm font-ui text-charcoal bg-transparent"
+          style={{ border: "none", boxShadow: "none" }} />
+        {searchTerm && (
+          <button onClick={() => { setSearchQuery(""); setSearchTerm(""); }}
+            className="px-4 py-3 text-xs font-ui text-charcoal/50 hover:text-charcoal transition-colors">
+            Annulla
+          </button>
+        )}
       </div>
 
       {loading ? (
