@@ -15,6 +15,7 @@ interface BookItem {
   property: { id: string; name: string; code: string };
   department: { id: string; name: string; code: string } | null;
   acknowledged: boolean;
+  targetAudience: { targetType: string; targetRole: string | null; targetDepartmentId: string | null }[];
 }
 
 interface Department { id: string; name: string; code: string }
@@ -69,21 +70,10 @@ export function BookList({ contentType, basePath, title }: BookListProps) {
       });
       if (searchTerm.trim().length >= 2) params.set("search", searchTerm.trim());
 
-      // OPERATOR/HOD: filtra per i propri reparti
-      if (needsDeptFilter && departments.length > 0) {
-        const baseRes = await fetch(`/api/content?${params}`);
-        if (baseRes.ok) {
-          const json = await baseRes.json();
-          const deptIds = new Set(departments.map(d => d.id));
-          const filtered = json.data.filter((item: BookItem) =>
-            !item.department || deptIds.has(item.department.id)
-          );
-          setItems(filtered);
-        }
-      } else {
-        const res = await fetch(`/api/content?${params}`);
-        if (res.ok) { const json = await res.json(); setItems(json.data); }
-      }
+      // STANDARD_BOOK per OPERATOR/HOD: il server già filtra per ContentTarget (via API)
+      // Non serve filtrare client-side — l'API restituisce solo le sezioni visibili all'utente
+      const res = await fetch(`/api/content?${params}`);
+      if (res.ok) { const json = await res.json(); setItems(json.data); }
     } finally { setLoading(false); }
   }, [contentType, currentPropertyId, needsDeptFilter, departments, searchTerm]);
 

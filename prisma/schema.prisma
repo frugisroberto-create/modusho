@@ -198,9 +198,10 @@ model Content {
   createdById   String
   updatedById   String
   submittedById String?
-  isFeatured    Boolean       @default(false)
-  featuredAt    DateTime?
-  featuredById  String?
+  isFeatured      Boolean       @default(false)
+  featuredAt      DateTime?
+  featuredById    String?
+  standardSource  String?       // "HO_BRAND" | "LQA" | null — solo per STANDARD_BOOK
   isDeleted     Boolean       @default(false)
   deletedAt     DateTime?
   deletedById   String?

@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
+import { SopEditor } from "@/components/shared/sop-editor";
 
 interface Property { id: string; name: string; code: string; departments: { id: string; name: string; code: string }[] }
 
@@ -111,8 +112,7 @@ export function BookForm({ mode, contentType, backPath, contentId, initialData, 
         )}
         <div>
           <label className="block text-sm font-ui font-medium text-charcoal mb-1.5">Contenuto</label>
-          <textarea value={body} onChange={(e) => setBody(e.target.value)} rows={20}
-            className="w-full font-mono text-sm" placeholder="Contenuto (HTML o testo)" />
+          <SopEditor content={body} onChange={setBody} placeholder="Scrivi il contenuto..." editable={true} />
         </div>
       </section>
 

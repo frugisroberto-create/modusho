@@ -87,6 +87,21 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({ data: [], meta: { page, pageSize, total: 0 } });
   }
 
+  // Standard Book: OPERATOR e HOD vedono solo le sezioni con ContentTarget che include
+  // il loro reparto oppure target "tutti i reparti" (ROLE/OPERATOR)
+  if (type === "STANDARD_BOOK" && (userRole === "OPERATOR" || userRole === "HOD")) {
+    where.targetAudience = {
+      some: {
+        OR: [
+          { targetType: "ROLE", targetRole: "OPERATOR" },
+          ...(allAccessibleDeptIds.length > 0
+            ? [{ targetType: "DEPARTMENT", targetDepartmentId: { in: allAccessibleDeptIds } }]
+            : []),
+        ],
+      },
+    };
+  }
+
   // Status enforcement per ruolo
   if (userRole === "OPERATOR") {
     where.status = "PUBLISHED";
@@ -167,7 +182,7 @@ export async function GET(request: NextRequest) {
         department: { select: { id: true, name: true, code: true } },
         property: { select: { id: true, name: true, code: true } },
         targetAudience: {
-          select: { targetType: true, targetRole: true, targetDepartment: { select: { name: true } } },
+          select: { id: true, targetType: true, targetRole: true, targetDepartmentId: true, targetDepartment: { select: { id: true, name: true, code: true } } },
         },
         updatedBy: { select: { id: true, name: true } },
         acknowledgments: {
