@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useCallback, useMemo, useRef } from "react";
+import { useState, useEffect, useCallback, useMemo } from "react";
 import { useHooContext } from "@/components/hoo/hoo-shell";
 import { ValidityBadge } from "@/components/shared/validity-badge";
 import { getValidityStatus } from "@/lib/sop-workflow";
@@ -62,14 +62,7 @@ export default function HooSopListPage() {
   const [validityFilter, setValidityFilter] = useState<"" | "expiring" | "expired">("");
   const [search, setSearch] = useState("");
   const [searchInput, setSearchInput] = useState("");
-  const debounceRef = useRef<NodeJS.Timeout | null>(null);
   const pageSize = 20;
-
-  const handleSearchChange = (val: string) => {
-    setSearchInput(val);
-    if (debounceRef.current) clearTimeout(debounceRef.current);
-    debounceRef.current = setTimeout(() => setSearch(val), 400);
-  };
 
   const fetchSops = useCallback(async () => {
     setLoading(true);
@@ -123,19 +116,38 @@ export default function HooSopListPage() {
         </div>
       </div>
 
-      {/* Search — full-text che filtra la lista */}
-      <div className="flex border border-ivory-dark bg-white overflow-hidden">
-        <input type="text" value={searchInput} onChange={(e) => handleSearchChange(e.target.value)}
+      {/* Search — submit solo su Cerca o Enter */}
+      <form
+        onSubmit={(e) => {
+          e.preventDefault();
+          setSearch(searchInput.trim());
+        }}
+        className="flex border border-ivory-dark bg-white"
+      >
+        <input
+          type="text"
+          value={searchInput}
+          onChange={(e) => setSearchInput(e.target.value)}
           placeholder="Cerca nel titolo, codice o contenuto della SOP..."
-          className="flex-1 px-5 py-3 text-sm font-ui text-charcoal bg-transparent"
-          style={{ border: "none", boxShadow: "none" }} />
+          className="min-w-0 flex-1 px-5 py-3 text-sm font-ui text-charcoal bg-transparent"
+          style={{ border: "none", boxShadow: "none" }}
+        />
         {search && (
-          <button onClick={() => { setSearch(""); setSearchInput(""); }}
-            className="px-4 py-3 text-xs font-ui text-charcoal/50 hover:text-charcoal transition-colors">
+          <button
+            type="button"
+            onClick={() => { setSearch(""); setSearchInput(""); }}
+            className="shrink-0 px-4 py-3 text-xs font-ui text-charcoal/50 hover:text-charcoal transition-colors"
+          >
             Annulla
           </button>
         )}
-      </div>
+        <button
+          type="submit"
+          className="shrink-0 px-6 py-3 bg-terracotta text-white text-xs font-ui font-semibold uppercase tracking-[0.1em] hover:bg-terracotta-light transition-colors"
+        >
+          Cerca
+        </button>
+      </form>
 
       {/* Filtri */}
       <div className="flex items-end gap-4 flex-wrap">

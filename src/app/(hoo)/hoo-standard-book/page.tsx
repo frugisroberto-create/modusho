@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useCallback, useRef } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { useHooContext } from "@/components/hoo/hoo-shell";
 import Link from "next/link";
 
@@ -222,13 +222,6 @@ export default function HooStandardBookListPage() {
   const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState("");
   const [searchTerm, setSearchTerm] = useState("");
-  const debounceRef = useRef<NodeJS.Timeout | null>(null);
-
-  const handleSearchChange = (val: string) => {
-    setSearchQuery(val);
-    if (debounceRef.current) clearTimeout(debounceRef.current);
-    debounceRef.current = setTimeout(() => setSearchTerm(val), 400);
-  };
 
   const fetchItems = useCallback(async () => {
     setLoading(true);
@@ -323,19 +316,38 @@ export default function HooStandardBookListPage() {
         </div>
       </div>
 
-      {/* Ricerca */}
-      <div className="flex border border-ivory-dark bg-white overflow-hidden">
-        <input type="text" value={searchQuery} onChange={(e) => handleSearchChange(e.target.value)}
+      {/* Ricerca — submit solo su Cerca o Enter */}
+      <form
+        onSubmit={(e) => {
+          e.preventDefault();
+          setSearchTerm(searchQuery.trim());
+        }}
+        className="flex border border-ivory-dark bg-white"
+      >
+        <input
+          type="text"
+          value={searchQuery}
+          onChange={(e) => setSearchQuery(e.target.value)}
           placeholder="Cerca nello standard book..."
-          className="flex-1 px-5 py-3 text-sm font-ui text-charcoal bg-transparent"
-          style={{ border: "none", boxShadow: "none" }} />
+          className="min-w-0 flex-1 px-5 py-3 text-sm font-ui text-charcoal bg-transparent"
+          style={{ border: "none", boxShadow: "none" }}
+        />
         {searchTerm && (
-          <button onClick={() => { setSearchQuery(""); setSearchTerm(""); }}
-            className="px-4 py-3 text-xs font-ui text-charcoal/50 hover:text-charcoal transition-colors">
+          <button
+            type="button"
+            onClick={() => { setSearchQuery(""); setSearchTerm(""); }}
+            className="shrink-0 px-4 py-3 text-xs font-ui text-charcoal/50 hover:text-charcoal transition-colors"
+          >
             Annulla
           </button>
         )}
-      </div>
+        <button
+          type="submit"
+          className="shrink-0 px-6 py-3 bg-terracotta text-white text-xs font-ui font-semibold uppercase tracking-[0.1em] hover:bg-terracotta-light transition-colors"
+        >
+          Cerca
+        </button>
+      </form>
 
       {/* Lista */}
       {loading ? (
