@@ -90,6 +90,31 @@ export async function GET(request: NextRequest) {
     ? Prisma.sql`AND c."type" != 'BRAND_BOOK'`
     : Prisma.empty;
 
+  // Status filter:
+  //  - OPERATOR: only PUBLISHED
+  //  - HOD/HM/ADMIN/SUPER_ADMIN: all active states (PUBLISHED + DRAFT + REVIEW_*+RETURNED)
+  //    Always excluded: ARCHIVED (never returned in search)
+  const statusCondition = session.user.role === "OPERATOR"
+    ? Prisma.sql`AND c.status = 'PUBLISHED'`
+    : Prisma.sql`AND c.status != 'ARCHIVED'`;
+
+  // Visibility filter:
+  //  - OPERATOR/HOD: filter by ContentTarget (targetAudience) for PUBLISHED content
+  //    BUT for HOD on DRAFT/REVIEW we use the legacy department-based filter
+  //    so HOD can search in all drafts of their perimeter (departments assigned).
+  //  - HM/ADMIN/SUPER_ADMIN: legacy department-based filter.
+  const isOperator = session.user.role === "OPERATOR";
+  const visibilityCondition = isOperator
+    ? Prisma.sql`AND EXISTS (
+        SELECT 1 FROM "ContentTarget" ct
+        WHERE ct."contentId" = c.id
+          AND (
+            (ct."targetType" = 'ROLE' AND ct."targetRole" = 'OPERATOR')
+            OR (ct."targetType" = 'DEPARTMENT' AND ct."targetDepartmentId" = ANY(${departmentFilter}))
+          )
+      )`
+    : Prisma.sql`AND (c."departmentId" IS NULL OR c."departmentId" = ANY(${departmentFilter}))`;
+
   // Full-text search with PostgreSQL (safe parameterized query)
   const results = await prisma.$queryRaw<
     { id: string; title: string; type: string; snippet: string; rank: number }[]
@@ -103,9 +128,10 @@ export async function GET(request: NextRequest) {
       ) as snippet,
       ts_rank(to_tsvector('italian', c.title || ' ' || c.body), to_tsquery('italian', ${sanitized})) as rank
     FROM "Content" c
-    WHERE c.status = 'PUBLISHED' AND c."isDeleted" = false
+    WHERE c."isDeleted" = false
+      ${statusCondition}
       AND c."propertyId" = ANY(${filteredPropertyIds})
-      AND (c."departmentId" IS NULL OR c."departmentId" = ANY(${departmentFilter}))
+      ${visibilityCondition}
       ${typeCondition}
       ${brandBookCondition}
       AND (
@@ -120,9 +146,10 @@ export async function GET(request: NextRequest) {
   const countResult = await prisma.$queryRaw<{ count: bigint }[]>`
     SELECT COUNT(*) as count
     FROM "Content" c
-    WHERE c.status = 'PUBLISHED' AND c."isDeleted" = false
+    WHERE c."isDeleted" = false
+      ${statusCondition}
       AND c."propertyId" = ANY(${filteredPropertyIds})
-      AND (c."departmentId" IS NULL OR c."departmentId" = ANY(${departmentFilter}))
+      ${visibilityCondition}
       ${typeCondition}
       ${brandBookCondition}
       AND (
