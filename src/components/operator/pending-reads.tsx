@@ -21,12 +21,12 @@ const TYPE_BADGE: Record<string, { label: string; cls: string }> = {
   STANDARD_BOOK: { label: "Standard Book", cls: "badge-standard-book" },
 };
 
-function getDetailPath(type: string): string {
-  if (type === "SOP") return "sop";
-  if (type === "MEMO") return "comunicazioni";
-  if (type === "BRAND_BOOK") return "brand-book";
-  if (type === "STANDARD_BOOK") return "standard-book";
-  return "documents";
+function getDetailHref(type: string, id: string): string {
+  if (type === "SOP") return `/sop/${id}`;
+  if (type === "MEMO") return `/comunicazioni?open=${id}`;
+  if (type === "BRAND_BOOK") return `/brand-book/${id}`;
+  if (type === "STANDARD_BOOK") return `/standard-book/${id}`;
+  return `/documents/${id}`;
 }
 
 export function PendingReads() {
@@ -71,8 +71,7 @@ export function PendingReads() {
       <div className="bg-white border border-ivory-dark">
         {items.map((item, index) => {
           const badge = TYPE_BADGE[item.type] || { label: item.type, cls: "bg-ivory-dark text-charcoal" };
-          const detailPath = getDetailPath(item.type);
-          const href = item.type === "MEMO" ? "/comunicazioni" : `/${detailPath}/${item.id}`;
+          const href = getDetailHref(item.type, item.id);
           return (
             <div key={item.id} className={`flex items-center gap-4 px-5 py-4 ${index < items.length - 1 ? "border-b border-ivory-medium" : ""}`}>
               <div className="w-2.5 h-2.5 rounded-full bg-terracotta shrink-0" />

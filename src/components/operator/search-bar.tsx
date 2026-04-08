@@ -102,7 +102,13 @@ export function SearchBar() {
             return (
               <Link
                 key={r.id}
-                href={r.type === "MEMO" ? `/#comunicazioni` : `/${r.type.toLowerCase() === "sop" ? "sop" : "documents"}/${r.id}`}
+                href={
+                  r.type === "MEMO" ? `/comunicazioni?open=${r.id}` :
+                  r.type === "SOP" ? `/sop/${r.id}` :
+                  r.type === "BRAND_BOOK" ? `/brand-book/${r.id}` :
+                  r.type === "STANDARD_BOOK" ? `/standard-book/${r.id}` :
+                  `/documents/${r.id}`
+                }
                 onClick={() => setOpen(false)}
                 className="block px-5 py-3.5 hover:bg-ivory-dark/50 border-b border-ivory-dark/50 last:border-0 transition-colors"
               >

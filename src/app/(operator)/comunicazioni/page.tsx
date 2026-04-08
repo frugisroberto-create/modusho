@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useCallback, useRef } from "react";
 import { useSession } from "next-auth/react";
+import { useSearchParams } from "next/navigation";
 import { useOperatorContext } from "@/components/operator/operator-shell";
 import { ExportPdfButton } from "@/components/shared/export-pdf-button";
 import { AcknowledgeButton } from "@/components/operator/acknowledge-button";
@@ -18,6 +19,8 @@ export default function MemoListPage() {
   const { data: session } = useSession();
   const userId = session?.user?.id || "";
   const { currentPropertyId, userRole } = useOperatorContext();
+  const searchParams = useSearchParams();
+  const openParam = searchParams.get("open");
   const canCreate = ["HOD", "HOTEL_MANAGER", "ADMIN", "SUPER_ADMIN"].includes(userRole);
 
   const [memos, setMemos] = useState<MemoItem[]>([]);
@@ -26,7 +29,8 @@ export default function MemoListPage() {
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState("");
   const [searchTerm, setSearchTerm] = useState("");
-  const [expandedMemo, setExpandedMemo] = useState<string | null>(null);
+  const [expandedMemo, setExpandedMemo] = useState<string | null>(openParam);
+  const expandAppliedRef = useRef(false);
   const debounceRef = useRef<NodeJS.Timeout | null>(null);
   const pageSize = 20;
 
@@ -55,6 +59,20 @@ export default function MemoListPage() {
 
   useEffect(() => { fetchMemos(); }, [fetchMemos]);
   useEffect(() => { setPage(1); }, [currentPropertyId, searchTerm]);
+
+  // Quando arrivano dalla home con ?open=<id>, scrolla al memo
+  useEffect(() => {
+    if (!openParam || expandAppliedRef.current || memos.length === 0) return;
+    const target = memos.find(m => m.contentId === openParam || m.id === openParam);
+    if (target) {
+      expandAppliedRef.current = true;
+      setExpandedMemo(target.id);
+      setTimeout(() => {
+        const el = document.getElementById(`memo-${target.id}`);
+        if (el) el.scrollIntoView({ behavior: "smooth", block: "start" });
+      }, 100);
+    }
+  }, [openParam, memos]);
 
   const handleSearchChange = (val: string) => {
     setSearchQuery(val);
@@ -93,8 +111,8 @@ export default function MemoListPage() {
           {memos.map((memo, index) => {
             const isExpired = memo.expiresAt && new Date(memo.expiresAt) < now;
             return (
-              <div key={memo.id}
-                className={`flex items-center gap-4 px-5 py-4 ${index < memos.length - 1 ? "border-b border-ivory-medium" : ""} ${isExpired ? "opacity-50" : ""}`}>
+              <div key={memo.id} id={`memo-${memo.id}`}
+                className={`flex items-center gap-4 px-5 py-4 scroll-mt-20 ${index < memos.length - 1 ? "border-b border-ivory-medium" : ""} ${isExpired ? "opacity-50" : ""}`}>
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center gap-2 mb-1">
                     <span className="text-[10px] font-ui font-bold uppercase tracking-[0.15em] px-2 py-0.5 badge-memo">Memo</span>

@@ -18,11 +18,12 @@ const TYPE_BADGE: Record<string, { label: string; cls: string }> = {
   STANDARD_BOOK: { label: "Standard Book", cls: "badge-standard-book" },
 };
 
-function getDetailPath(type: string): string {
-  if (type === "SOP") return "sop";
-  if (type === "BRAND_BOOK") return "brand-book";
-  if (type === "STANDARD_BOOK") return "standard-book";
-  return "documents";
+function getDetailHref(type: string, id: string): string {
+  if (type === "SOP") return `/sop/${id}`;
+  if (type === "MEMO") return `/comunicazioni?open=${id}`;
+  if (type === "BRAND_BOOK") return `/brand-book/${id}`;
+  if (type === "STANDARD_BOOK") return `/standard-book/${id}`;
+  return `/documents/${id}`;
 }
 
 export function FeaturedSection() {
@@ -60,7 +61,7 @@ export function FeaturedSection() {
       <div className="bg-white border border-ivory-dark">
         {items.map((item, index) => {
           const badge = TYPE_BADGE[item.type] || { label: item.type, cls: "bg-ivory-dark text-charcoal" };
-          const detailPath = getDetailPath(item.type);
+          const href = getDetailHref(item.type, item.id);
           return (
             <div key={item.id} className={`flex items-center gap-4 px-5 py-4 ${index < items.length - 1 ? "border-b border-ivory-medium" : ""}`}>
               <div className="w-2.5 h-2.5 rounded-full bg-terracotta shrink-0" />
@@ -68,7 +69,7 @@ export function FeaturedSection() {
                 <span className={`text-[10px] font-ui font-bold uppercase tracking-[0.15em] px-2 py-0.5 w-fit ${badge.cls}`}>
                   {badge.label}
                 </span>
-                <Link href={`/${detailPath}/${item.id}`}
+                <Link href={href}
                   className="font-ui font-medium text-charcoal-dark text-sm hover:text-terracotta transition-colors">
                   {item.title}
                 </Link>
@@ -78,7 +79,7 @@ export function FeaturedSection() {
                   {item.publishedAt && <span>Pubblicata {new Date(item.publishedAt).toLocaleDateString("it-IT", { day: "numeric", month: "short", year: "numeric" })}</span>}
                 </div>
               </div>
-              <Link href={`/${detailPath}/${item.id}`}
+              <Link href={href}
                 className="shrink-0 px-3.5 py-1.5 text-[11px] font-ui font-semibold uppercase tracking-wider text-terracotta border border-terracotta hover:bg-terracotta hover:text-white transition-colors">
                 Leggi
               </Link>

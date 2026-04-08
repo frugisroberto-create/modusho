@@ -70,7 +70,7 @@ export function LatestByType() {
         {
           title: "Ultimi Memo", linkAll: "/comunicazioni", linkAllLabel: "Vedi tutti",
           items: memoData.map(m => ({
-            id: m.contentId, title: m.title, href: "/comunicazioni", code: null,
+            id: m.contentId, title: m.title, href: `/comunicazioni?open=${m.id}`, code: null,
             meta: [m.author, fmtDate(m.publishedAt)].filter(Boolean).join(" · "),
             badge: TYPE_BADGE.MEMO,
           })),
