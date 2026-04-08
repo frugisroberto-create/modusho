@@ -926,7 +926,7 @@ function RaciReassignPanel({ wf, propertyId, onReassigned }: {
   useEffect(() => {
     if (!open) return;
     async function loadUsers() {
-      const res = await fetch(`/api/users?propertyId=${propertyId}&isActive=true&pageSize=200`);
+      const res = await fetch(`/api/users?propertyId=${propertyId}&isActive=true&pageSize=50`);
       if (res.ok) {
         const json = await res.json();
         setUsers(json.data.map((u: { id: string; name: string; role: string }) => ({ id: u.id, name: u.name, role: u.role })));
