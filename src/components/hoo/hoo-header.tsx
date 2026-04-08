@@ -43,6 +43,7 @@ const ROLE_LABEL: Record<string, string> = {
 export function HooHeader({ userName, userRole }: HooHeaderProps) {
   const pathname = usePathname();
   const [menuOpen, setMenuOpen] = useState(false);
+  const [mobileNavOpen, setMobileNavOpen] = useState(false);
 
   const isHoo = userRole === "ADMIN" || userRole === "SUPER_ADMIN";
   const visibleNav = HOO_NAV_ITEMS.filter((item) => {
@@ -57,7 +58,19 @@ export function HooHeader({ userName, userRole }: HooHeaderProps) {
     <header className="bg-terracotta sticky top-0 z-50">
       <div className="max-w-[1200px] mx-auto px-6 lg:px-10">
         <div className="flex items-center justify-between h-14">
-          <div className="flex items-center gap-10">
+          <div className="flex items-center gap-3 md:gap-10">
+            {/* Mobile hamburger */}
+            <button onClick={() => setMobileNavOpen(!mobileNavOpen)}
+              className="md:hidden text-white p-1 -ml-1"
+              aria-label="Apri menu navigazione">
+              <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                {mobileNavOpen ? (
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                ) : (
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" />
+                )}
+              </svg>
+            </button>
             <Link href={isHoo ? "/dashboard" : "/hoo-sop"} className="shrink-0">
               <span className="font-heading text-white text-base tracking-[0.25em] font-normal">
                 ModusHO
@@ -117,6 +130,28 @@ export function HooHeader({ userName, userRole }: HooHeaderProps) {
           </div>
         </div>
       </div>
+
+      {/* Mobile nav drop-down */}
+      {mobileNavOpen && (
+        <>
+          <div className="fixed inset-0 z-40 bg-charcoal-dark/30" onClick={() => setMobileNavOpen(false)} />
+          <nav className="md:hidden absolute top-full left-0 right-0 bg-terracotta border-t border-white/15 z-50 shadow-lg">
+            {visibleNav.map((item) => {
+              const isActive = item.href === "/dashboard"
+                ? pathname === "/dashboard"
+                : pathname.startsWith(item.href);
+              return (
+                <Link key={item.href} href={item.href} onClick={() => setMobileNavOpen(false)}
+                  className={`block px-6 py-3 text-sm font-heading border-b border-white/10 transition-colors ${
+                    isActive ? "text-white bg-white/10" : "text-white/85 hover:bg-white/5"
+                  }`}>
+                  {item.label}
+                </Link>
+              );
+            })}
+          </nav>
+        </>
+      )}
     </header>
   );
 }
