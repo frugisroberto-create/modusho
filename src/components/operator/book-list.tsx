@@ -150,25 +150,14 @@ export function BookList({ contentType, basePath, title }: BookListProps) {
                     }`}>
                       {contentType === "BRAND_BOOK" ? "Brand Book" : "Standard Book"}
                     </span>
-                    {(() => {
-                      // Etichetta reparto:
-                      //  1. Se il content ha un departmentId nativo → usa quello
-                      //  2. Altrimenti (tipico Standard Book) → deriva dai ContentTarget DEPARTMENT
-                      //  3. Se nessun target è DEPARTMENT → "Trasversale" (solo Standard Book)
-                      if (item.department) {
-                        return <span className="text-[11px] font-ui text-charcoal/45">{item.department.name}</span>;
-                      }
-                      const deptTargets = item.targetAudience
-                        .filter(t => t.targetType === "DEPARTMENT" && t.targetDepartment)
-                        .map(t => t.targetDepartment!.name);
-                      if (deptTargets.length > 0) {
-                        return <span className="text-[11px] font-ui text-charcoal/45">{deptTargets.join(", ")}</span>;
-                      }
-                      if (contentType === "STANDARD_BOOK") {
-                        return <span className="text-[11px] font-ui text-charcoal/35 italic">Trasversale</span>;
-                      }
-                      return null;
-                    })()}
+                    {/* Per i Brand Book manteniamo l'etichetta reparto nativo se presente.
+                        Per gli Standard Book non mostriamo i reparti destinatari — in
+                        consultazione è rumore visivo: l'utente vede solo ciò che lo riguarda
+                        (filtro server-side via targetAudience) e non gli serve sapere a chi
+                        ALTRO è visibile. */}
+                    {contentType === "BRAND_BOOK" && item.department && (
+                      <span className="text-[11px] font-ui text-charcoal/45">{item.department.name}</span>
+                    )}
                     {!item.acknowledged && (
                       <span className="text-xs font-ui font-medium px-2 py-0.5 bg-terracotta/10 text-terracotta">Da leggere</span>
                     )}
