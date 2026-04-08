@@ -586,8 +586,8 @@ La home HOO è la prima pagina che vedono HOTEL_MANAGER, ADMIN e SUPER_ADMIN dop
 ### Hero
 
 - Sfondo `#FAF9F5`, padding generoso (56px sopra, 48px sotto)
-- Tagline SOPRA: Inter 12px uppercase, letter-spacing 1px, `rgba(51,51,51,0.5)`
-- Nome hotel SOTTO: Playfair Display 50px, weight 500, `#964733`
+- Nome hotel SOPRA: Playfair Display 50px, weight 500, `#964733`
+- Tagline SOTTO: Inter 12px uppercase, letter-spacing 1px, `rgba(51,51,51,0.5)`
 - Descrizione: Cardo 16px, line-height 27px, `#333`, max-width 560px, centrata
 - Barra ricerca: max-width `520px`, bordo `#C8C5BC`, sfondo bianco, **bottone "CERCA"** terracotta a destra (Inter 12.6px, 600, uppercase)
 
@@ -735,8 +735,8 @@ Il sistema usa il logo ModusHO (simbolo HO Collection con check di governance al
 La home operatore deve avere ESATTAMENTE questa struttura.
 
 **Hero (sfondo #FAF9F5):**
-- Tagline SOPRA: Inter 12px, uppercase, letter-spacing 1px, colore rgba(51,51,51,0.5)
-- Nome hotel SOTTO: Playfair Display 50px, weight 500, colore #964733
+- Nome hotel SOPRA: Playfair Display 50px, weight 500, colore #964733
+- Tagline SOTTO: Inter 12px, uppercase, letter-spacing 1px, colore rgba(51,51,51,0.5)
 - Barra ricerca: bordo 1px #E8E5DC, sfondo bianco, border-radius 0, bottone "Cerca" terracotta
 
 **Gerarchia sezioni (dall'alto verso il basso):**
@@ -756,9 +756,9 @@ La home operatore deve avere ESATTAMENTE questa struttura.
 **Principio "inbox zero"**: la home operatore NON contiene feed cronologici ("Ultime SOP", "Ultimi Memo"), NON contiene sezioni editoriali ("In evidenza"), NON contiene stat box di conteggio. Ogni sezione esiste solo per dire "hai questa azione pendente"; quando non ce ne sono, la home si riduce all'hero con la barra di ricerca. Per consultare contenuti già letti o cercare liberamente, l'operatore usa la barra di ricerca o i menu (SOP / Documenti / Memo / Standard Book).
 
 **Regole precise:**
-1. Tagline SOPRA il nome hotel — MAI sotto
+1. Nome hotel SOPRA la tagline — la tagline è un sottotitolo che segue il nome
 2. Sfondo hero: `#FAF9F5`, sfondo pagina: `#F0EFE9`
-3. Spaziatura generosa: almeno 30px sopra la tagline, 15px tra tagline e nome, 40px tra nome e barra ricerca
+3. Spaziatura generosa: almeno 30px sopra il nome hotel, 15px tra nome e tagline, 40px tra blocco titolo e barra ricerca
 4. Tutto centrato orizzontalmente nel hero
 5. Ogni sezione dopo l'hero scompare dal DOM quando vuota (return null) — la home non mostra mai "placeholder" o liste vuote
 
