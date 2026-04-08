@@ -306,14 +306,20 @@ Content {
 - NON seguono il workflow SOP (no DRAFT → REVIEW_HM → ecc.)
 - Vengono pubblicati direttamente (status = PUBLISHED alla creazione)
 - propertyId nullable: se null, il contenuto è di gruppo (visibile a tutte le strutture)
-- Visibili a TUTTI i ruoli (OPERATOR, HOD, HOTEL_MANAGER, ADMIN, SUPER_ADMIN)
 - Presa visione obbligatoria configurabile (come per le SOP)
 
+**Visibilità per tipo:**
+- **Brand Book**: visibile **solo a HOTEL_MANAGER, ADMIN, SUPER_ADMIN**. OPERATOR e HOD NON vedono il Brand Book — è materiale di brand interno destinato alla governance, non operativo. Bloccato sia in lista che in dettaglio.
+- **Standard Book**: visibile a TUTTI i ruoli (OPERATOR, HOD, HM, ADMIN, SUPER_ADMIN), ma con filtro `targetAudience` (ContentTarget) per OPERATOR/HOD: vedono solo le sezioni destinate ai loro reparti, ai loro ruoli o specificamente a loro.
+
 **Navigazione operatore:**
-La header nav dell'operatore ha 4 tab (Brand Book e Standard Book NON sono nella header operatore — li accede dalla home):
+La header nav dell'operatore ha 4 tab (Brand Book e Standard Book NON sono nella header operatore):
 ```
 Home | SOP | Documenti | Memo
 ```
+- **OPERATOR e HOD**: non vedono Brand Book né Standard Book nell'header. Accedono allo Standard Book (quando previsto dal targetAudience) tramite la home (sezioni "in evidenza" / "ultimi per tipo") o tramite link diretti.
+- **HM, ADMIN, SUPER_ADMIN**: vedono "Brand Book" e "Standard Book" come voci di navigazione diretta nell'header.
+
 L'operatore NON vede la sub-nav (nessuna funzione di gestione).
 
 ## Workflow SOP — REGOLE NON NEGOZIABILI
@@ -569,7 +575,7 @@ La home HOO è la prima pagina che vedono HOTEL_MANAGER, ADMIN e SUPER_ADMIN dop
 | Standard Book | — | — | ✅ | ✅ | ✅ |
 | Analytics | — | — | — | ✅ | ✅ |
 
-**Nota**: OPERATOR e HOD vedono Brand Book e Standard Book dalla home (sezioni in evidenza / ultime per tipo), non dalla header nav. HM+ li vede come voci di navigazione diretta.
+**Nota**: OPERATOR e HOD non vedono **Brand Book** in nessuna sezione (è riservato a HM+). Per **Standard Book**, OPERATOR e HOD lo vedono solo dalla home / link diretti (sezioni in evidenza / ultime per tipo) e solo se previsto dal targetAudience della sezione. HM+ vede entrambi come voci di navigazione diretta nell'header.
 
 ### Sub-nav (barra secondaria — funzioni di gestione)
 

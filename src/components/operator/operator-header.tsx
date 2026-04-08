@@ -26,7 +26,7 @@ const NAV_ITEMS: { href: string; label: string; minRole?: string }[] = [
   { href: "/documents", label: "Documenti" },
   { href: "/comunicazioni", label: "Memo" },
   { href: "/brand-book", label: "Brand Book", minRole: "HOTEL_MANAGER" },
-  { href: "/standard-book", label: "Standard Book" },
+  { href: "/standard-book", label: "Standard Book", minRole: "HOTEL_MANAGER" },
 ];
 
 const ROLE_LEVEL: Record<string, number> = {
@@ -166,7 +166,7 @@ export function OperatorHeader({
 
 const MORE_ITEMS: { href: string; label: string; minRole?: string }[] = [
   { href: "/brand-book", label: "Brand Book", minRole: "HOTEL_MANAGER" },
-  { href: "/standard-book", label: "Standard Book" },
+  { href: "/standard-book", label: "Standard Book", minRole: "HOTEL_MANAGER" },
 ];
 
 function MobileBottomNav({ pathname, userRole }: { pathname: string; userRole: string }) {
