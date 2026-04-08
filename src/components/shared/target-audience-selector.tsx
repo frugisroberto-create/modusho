@@ -151,16 +151,23 @@ export function TargetAudienceSelector({
       <div>
         <p className="text-xs font-ui font-semibold uppercase tracking-wider text-charcoal/55 mb-1.5">Reparti</p>
         <div className="border border-ivory-dark divide-y divide-ivory-dark/50 max-h-[200px] overflow-y-auto">
-          {departments.map((dept) => (
-            <label key={dept.id} className="flex items-center gap-3 py-2 px-3 cursor-pointer hover:bg-ivory-medium/30 transition-colors">
-              <input type="checkbox"
-                checked={value.departmentIds.includes(dept.id)}
-                onChange={() => toggleDepartment(dept.id)}
-                className="w-4 h-4 accent-terracotta" />
-              <span className="text-sm font-ui text-charcoal">{dept.name}</span>
-              <span className="text-xs text-charcoal/40 ml-auto font-ui">{dept.code}</span>
-            </label>
-          ))}
+          {departments.map((dept) => {
+            const coveredByAll = value.allDepartments;
+            return (
+              <label key={dept.id} className={`flex items-center gap-3 py-2 px-3 transition-colors ${coveredByAll ? "opacity-50 cursor-not-allowed bg-ivory-medium/30" : "cursor-pointer hover:bg-ivory-medium/30"}`}>
+                <input type="checkbox"
+                  checked={coveredByAll || value.departmentIds.includes(dept.id)}
+                  disabled={coveredByAll}
+                  onChange={() => toggleDepartment(dept.id)}
+                  className="w-4 h-4 accent-terracotta disabled:opacity-50" />
+                <span className="text-sm font-ui text-charcoal">{dept.name}</span>
+                {coveredByAll && (
+                  <span className="text-[10px] font-ui text-charcoal/40 italic ml-1">già incluso in &quot;Tutti gli operatori&quot;</span>
+                )}
+                <span className="text-xs text-charcoal/40 ml-auto font-ui">{dept.code}</span>
+              </label>
+            );
+          })}
           {departments.length === 0 && (
             <p className="px-3 py-2 text-xs font-ui text-charcoal/40 italic">Nessun reparto configurato</p>
           )}
@@ -193,16 +200,33 @@ export function TargetAudienceSelector({
           {filteredUsers.length === 0 ? (
             <p className="px-3 py-2 text-xs font-ui text-charcoal/40 italic">Nessun utente trovato</p>
           ) : (
-            filteredUsers.map((u) => (
-              <label key={u.id} className="flex items-center gap-3 py-2 px-3 cursor-pointer hover:bg-ivory-medium/30 transition-colors">
-                <input type="checkbox"
-                  checked={value.userIds.includes(u.id)}
-                  onChange={() => toggleUser(u.id)}
-                  className="w-4 h-4 accent-terracotta" />
-                <span className="text-sm font-ui text-charcoal">{u.name}</span>
-                <span className="text-[10px] font-ui text-charcoal/40 ml-auto uppercase tracking-wider">{u.role}</span>
-              </label>
-            ))
+            filteredUsers.map((u) => {
+              // Verifica se l'utente è già "coperto" da una selezione più ampia
+              const coveredByAllOps = value.allDepartments && u.role === "OPERATOR";
+              const coveredByRole =
+                (u.role === "HOD" && value.roles.includes("HOD")) ||
+                (u.role === "HOTEL_MANAGER" && value.roles.includes("HOTEL_MANAGER"));
+              const covered = coveredByAllOps || coveredByRole;
+              const coverageLabel = coveredByAllOps
+                ? "già incluso in \"Tutti gli operatori\""
+                : coveredByRole
+                  ? `già incluso in "${ROLE_LABELS[u.role as TargetRole]}"`
+                  : "";
+              return (
+                <label key={u.id} className={`flex items-center gap-3 py-2 px-3 transition-colors ${covered ? "opacity-50 cursor-not-allowed bg-ivory-medium/30" : "cursor-pointer hover:bg-ivory-medium/30"}`}>
+                  <input type="checkbox"
+                    checked={covered || value.userIds.includes(u.id)}
+                    disabled={covered}
+                    onChange={() => toggleUser(u.id)}
+                    className="w-4 h-4 accent-terracotta disabled:opacity-50" />
+                  <span className="text-sm font-ui text-charcoal">{u.name}</span>
+                  {covered && (
+                    <span className="text-[10px] font-ui text-charcoal/40 italic ml-1">{coverageLabel}</span>
+                  )}
+                  <span className="text-[10px] font-ui text-charcoal/40 ml-auto uppercase tracking-wider">{u.role}</span>
+                </label>
+              );
+            })
           )}
         </div>
       </div>

@@ -227,14 +227,17 @@ export function SopForm({ mode, contentId, initialData, userRole, userDepartment
         </select>
       </div>
 
-      {/* Reparto della SOP */}
+      {/* Reparto proprietario della SOP */}
       {propertyId && (
         <div>
-          <label className="block text-sm font-ui font-medium text-charcoal mb-1.5">Reparto</label>
-          <p className="text-xs font-ui text-charcoal/45 mb-2">Il reparto a cui appartiene la SOP</p>
+          <label className="block text-sm font-ui font-medium text-charcoal mb-1.5">Reparto proprietario</label>
+          <p className="text-xs font-ui text-charcoal/45 mb-2">
+            Il reparto che redige e mantiene la SOP. Serve per la generazione del codice (es. PPL-FO-001) e per la tracciabilità —
+            <strong className="text-charcoal/60"> non determina la visibilità</strong>, che è governata dai destinatari sotto.
+          </p>
           <select value={departmentId} onChange={(e) => setDepartmentId(e.target.value)}
             disabled={mode === "edit"} className="w-full disabled:opacity-50">
-            <option value="">Seleziona reparto</option>
+            <option value="">Seleziona reparto proprietario</option>
             {departments.map(d => <option key={d.id} value={d.id}>{d.name} ({d.code})</option>)}
           </select>
         </div>
