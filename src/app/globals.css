@@ -152,6 +152,27 @@
   }
 }
 
+/* Fix iOS Safari auto-zoom sui campi input.
+   Quando un <input>/<textarea> ha font-size < 16px, iOS fa automaticamente
+   zoom al focus: il viewport si ridimensiona, header/footer fissi si
+   riposizionano, la tastiera occupa metà schermo e l'app sembra "perdere
+   responsività" mentre l'utente digita nelle barre di ricerca.
+   Forziamo 16px solo su dispositivi touch per non toccare il desktop. */
+@media (hover: none) and (pointer: coarse) {
+  input[type="text"],
+  input[type="search"],
+  input[type="email"],
+  input[type="tel"],
+  input[type="url"],
+  input[type="number"],
+  input[type="password"],
+  input:not([type]),
+  textarea,
+  select {
+    font-size: 16px !important;
+  }
+}
+
 @keyframes skeleton-pulse {
   0%, 100% { background-color: #F0EFE9; }
   50% { background-color: #E8E5DC; }
