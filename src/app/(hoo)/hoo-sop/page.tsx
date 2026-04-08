@@ -1,11 +1,10 @@
 "use client";
 
-import { useState, useEffect, useCallback, useMemo } from "react";
+import { useState, useEffect, useCallback, useMemo, useRef } from "react";
 import { useHooContext } from "@/components/hoo/hoo-shell";
 import { ValidityBadge } from "@/components/shared/validity-badge";
 import { getValidityStatus } from "@/lib/sop-workflow";
 import Link from "next/link";
-import { LiveSearchBar } from "@/components/shared/live-search-bar";
 
 interface SopWorkflowItem {
   id: string;
@@ -63,7 +62,14 @@ export default function HooSopListPage() {
   const [validityFilter, setValidityFilter] = useState<"" | "expiring" | "expired">("");
   const [search, setSearch] = useState("");
   const [searchInput, setSearchInput] = useState("");
+  const debounceRef = useRef<NodeJS.Timeout | null>(null);
   const pageSize = 20;
+
+  const handleSearchChange = (val: string) => {
+    setSearchInput(val);
+    if (debounceRef.current) clearTimeout(debounceRef.current);
+    debounceRef.current = setTimeout(() => setSearch(val), 400);
+  };
 
   const fetchSops = useCallback(async () => {
     setLoading(true);
@@ -117,8 +123,19 @@ export default function HooSopListPage() {
         </div>
       </div>
 
-      {/* Search — full-text */}
-      <LiveSearchBar contentType="SOP" placeholder="Cerca una SOP..." />
+      {/* Search — full-text che filtra la lista */}
+      <div className="flex border border-ivory-dark bg-white overflow-hidden">
+        <input type="text" value={searchInput} onChange={(e) => handleSearchChange(e.target.value)}
+          placeholder="Cerca nel titolo, codice o contenuto della SOP..."
+          className="flex-1 px-5 py-3 text-sm font-ui text-charcoal bg-transparent"
+          style={{ border: "none", boxShadow: "none" }} />
+        {search && (
+          <button onClick={() => { setSearch(""); setSearchInput(""); }}
+            className="px-4 py-3 text-xs font-ui text-charcoal/50 hover:text-charcoal transition-colors">
+            Annulla
+          </button>
+        )}
+      </div>
 
       {/* Filtri */}
       <div className="flex items-end gap-4 flex-wrap">
@@ -141,12 +158,6 @@ export default function HooSopListPage() {
             <option value="expired">Scadute</option>
           </select>
         </div>
-        {search && (
-          <button onClick={() => { setSearch(""); setSearchInput(""); }}
-            className="text-xs font-ui text-charcoal/50 hover:text-charcoal py-2 transition-colors">
-            Annulla ricerca
-          </button>
-        )}
       </div>
 
       {/* Lista (con filtro validità client-side) */}
