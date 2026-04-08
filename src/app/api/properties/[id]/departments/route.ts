@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
-import { getAccessiblePropertyIds } from "@/lib/rbac";
+import { getAccessiblePropertyIds, checkAccess } from "@/lib/rbac";
 import { z } from "zod/v4";
 
 export async function GET(
@@ -44,6 +44,11 @@ export async function POST(
   }
 
   const { id: propertyId } = await params;
+
+  // Property scope check: scoped ADMIN may only add departments to properties they manage
+  const hasAccess = await checkAccess(session.user.id, "ADMIN", propertyId);
+  if (!hasAccess) return NextResponse.json({ error: "Accesso negato" }, { status: 403 });
+
   const body = await request.json();
   const parsed = createDeptSchema.safeParse(body);
   if (!parsed.success) return NextResponse.json({ error: "Parametri non validi" }, { status: 400 });

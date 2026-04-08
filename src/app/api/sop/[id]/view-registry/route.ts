@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
+import { checkAccess } from "@/lib/rbac";
 
 type RouteParams = { params: Promise<{ id: string }> };
 
@@ -48,6 +49,12 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
   if (!content) {
     return NextResponse.json({ error: "SOP non trovata" }, { status: 404 });
   }
+
+  // Property scope check: scoped HM/ADMIN may only see registries for their properties.
+  // For HOD also verify the requested department is among their assignments.
+  const requiredDept = userRole === "HOD" ? filterDepartmentId : undefined;
+  const hasAccess = await checkAccess(session.user.id, "OPERATOR", content.propertyId, requiredDept);
+  if (!hasAccess) return NextResponse.json({ error: "Accesso negato" }, { status: 403 });
 
   const currentVersion = content.version;
   const requiresNewAck = content.sopWorkflow?.requiresNewAcknowledgment ?? true;

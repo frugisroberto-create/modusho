@@ -85,6 +85,10 @@ export async function PUT(
   const property = await prisma.property.findUnique({ where: { id } });
   if (!property) return NextResponse.json({ error: "Struttura non trovata" }, { status: 404 });
 
+  // Property scope check: scoped ADMIN may only update properties they manage
+  const hasAccess = await checkAccess(session.user.id, "ADMIN", id);
+  if (!hasAccess) return NextResponse.json({ error: "Accesso negato" }, { status: 403 });
+
   await prisma.property.update({ where: { id }, data: parsed.data });
 
   return NextResponse.json({ data: { id, success: true } });

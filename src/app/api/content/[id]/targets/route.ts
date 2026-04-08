@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
+import { checkAccess } from "@/lib/rbac";
 import { z } from "zod/v4";
 
 interface RouteParams { params: Promise<{ id: string }> }
@@ -19,6 +20,10 @@ export async function GET(_req: NextRequest, { params }: RouteParams) {
     select: { id: true, type: true, propertyId: true },
   });
   if (!content) return NextResponse.json({ error: "Contenuto non trovato" }, { status: 404 });
+
+  // RBAC: l'utente deve almeno poter accedere alla property del contenuto
+  const hasAccess = await checkAccess(session.user.id, "OPERATOR", content.propertyId);
+  if (!hasAccess) return NextResponse.json({ error: "Accesso negato" }, { status: 403 });
 
   const targets = await prisma.contentTarget.findMany({
     where: { contentId: id },
@@ -63,6 +68,10 @@ export async function PUT(req: NextRequest, { params }: RouteParams) {
     select: { id: true, type: true, propertyId: true },
   });
   if (!content) return NextResponse.json({ error: "Contenuto non trovato" }, { status: 404 });
+
+  // Property scope check: scoped ADMIN may only modify targets of contents in their properties
+  const hasAccess = await checkAccess(session.user.id, "ADMIN", content.propertyId);
+  if (!hasAccess) return NextResponse.json({ error: "Accesso negato" }, { status: 403 });
 
   const body = await req.json();
   const parsed = putSchema.safeParse(body);
