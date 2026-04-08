@@ -1,8 +1,8 @@
 "use client";
 
-import { useState, useRef } from "react";
+import { useState, useRef, useEffect } from "react";
 import { useHooContext } from "@/components/hoo/hoo-shell";
-import { redirect } from "next/navigation";
+import { useRouter } from "next/navigation";
 import Link from "next/link";
 import * as XLSX from "xlsx";
 
@@ -22,10 +22,14 @@ interface ImportResult {
 
 export default function SopImportPage() {
   const { userRole } = useHooContext();
+  const router = useRouter();
+  const isAuthorized = userRole === "ADMIN" || userRole === "SUPER_ADMIN";
 
-  if (userRole && userRole !== "ADMIN" && userRole !== "SUPER_ADMIN") {
-    redirect("/hoo-sop");
-  }
+  useEffect(() => {
+    if (userRole && !isAuthorized) {
+      router.replace("/hoo-sop");
+    }
+  }, [userRole, isAuthorized, router]);
 
   const [manifestRows, setManifestRows] = useState<ManifestRow[]>([]);
   const [manifestFile, setManifestFile] = useState<File | null>(null);
@@ -118,6 +122,9 @@ export default function SopImportPage() {
     if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
     return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
   };
+
+  // Evita il flash dell'UI mentre il router naviga via per i ruoli non autorizzati
+  if (userRole && !isAuthorized) return null;
 
   return (
     <div className="max-w-3xl space-y-6">
