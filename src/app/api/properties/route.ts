@@ -35,7 +35,7 @@ export async function GET(request: NextRequest) {
       const expectedAcks = publishedCount * operatorCount;
       return {
         id: p.id, name: p.name, code: p.code, tagline: p.tagline, city: p.city,
-        address: p.address, description: p.description, website: p.website, logoUrl: p.logoUrl,
+        address: p.address, description: p.description, website: p.website,
         departments: p.departments,
         sopTotal, sopPublished,
         ackRate: expectedAcks > 0 ? Math.round((ackCount / expectedAcks) * 100) : null,

@@ -6,7 +6,7 @@ import { useParams, useRouter } from "next/navigation";
 interface PropertyData {
   id: string; name: string; code: string; tagline: string | null; city: string;
   address: string | null; description: string | null; website: string | null;
-  logoUrl: string | null; isActive: boolean;
+  isActive: boolean;
 }
 
 export default function EditPropertyPage() {

@@ -11,7 +11,7 @@ interface Operator {
 }
 interface PropertyDetail {
   id: string; name: string; code: string; tagline: string | null; city: string;
-  address: string | null; description: string | null; website: string | null; logoUrl: string | null;
+  address: string | null; description: string | null; website: string | null;
   isActive: boolean; departments: Department[]; operators: Operator[];
 }
 

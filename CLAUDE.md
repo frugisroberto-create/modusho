@@ -134,7 +134,6 @@ Property {
   address       // indirizzo completo (opzionale)
   description   // descrizione breve della struttura (opzionale)
   website       // URL sito web della struttura (opzionale)
-  logoUrl       // percorso logo della struttura (opzionale, upload in /public/uploads/logos/)
   isActive
   createdAt
   updatedAt
@@ -1108,19 +1107,16 @@ Il sistema deve permettere la gestione completa delle strutture.
 
 2. **Dettaglio struttura**: src/app/(hoo)/properties/[id]/page.tsx
    - Info generali (nome, codice, città, indirizzo, descrizione, sito web)
-   - Logo della struttura (visualizzazione + cambio)
    - Lista reparti configurati (aggiungi/rimuovi/modifica)
    - KPI della struttura (SOP totali, pubblicate, % presa visione)
    - Lista operatori assegnati
 
 3. **Crea nuova struttura**: src/app/(hoo)/properties/new/page.tsx
    - Form: nome, codice, tagline, città, indirizzo, descrizione, sito web
-   - Upload logo (immagine PNG/JPG, max 2MB, salvata in /public/uploads/logos/)
    - Selezione reparti iniziali (da lista predefinita + possibilità di aggiungerne di custom)
 
 4. **Modifica struttura**: src/app/(hoo)/properties/[id]/edit/page.tsx
    - Modifica tutti i campi
-   - Cambio logo (upload nuovo, preview)
    - Attiva/disattiva struttura (isActive)
 
 5. **Gestione reparti per struttura**:
@@ -1128,22 +1124,12 @@ Il sistema deve permettere la gestione completa delle strutture.
    - Rimuovi reparto (solo se non ha SOP associate)
    - Modifica nome reparto
 
-### Logo della struttura
-
-- Il logo è associato alla singola property (campo logoUrl)
-- Upload: file immagine (PNG, JPG, SVG), max 2MB
-- Salvataggio: /public/uploads/logos/{propertyCode}-logo.{ext}
-- Visualizzazione: nel header quando l'operatore è in contesto di quella property, nella lista strutture lato HOO, nei report
-- Se non c'è logo: mostrare le iniziali del nome property in un cerchio colorato (fallback)
-
 ### API
 
 - GET /api/properties — lista tutte le property (rispetta RBAC)
 - GET /api/properties/[id] — dettaglio property
 - POST /api/properties — crea nuova property (solo ADMIN, SUPER_ADMIN)
 - PUT /api/properties/[id] — modifica property
-- POST /api/properties/[id]/logo — upload logo (multipart/form-data)
-- DELETE /api/properties/[id]/logo — rimuovi logo
 - GET /api/properties/[id]/departments — lista reparti
 - POST /api/properties/[id]/departments — aggiungi reparto
 - PUT /api/properties/[id]/departments/[depId] — modifica reparto
