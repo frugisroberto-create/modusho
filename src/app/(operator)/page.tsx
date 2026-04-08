@@ -22,12 +22,14 @@ export default async function OperatorHome({ searchParams }: Props) {
   return (
     <div>
       {/* ── Hero: nome hotel + tagline + barra ricerca ──
-          Sfondo uniforme con il resto della pagina (bg-ivory sul layout).
-          Con la home minimale l'hero ha spazio per respirare — spaziatura
-          generosa per portare la barra di ricerca verso il centro ottico. */}
-      <section className="relative z-10 flex flex-col items-center pt-20 sm:pt-28 md:pt-36 pb-16 sm:pb-20">
+          min-h: l'hero occupa ~55% dell'altezza viewport e centra il suo
+          contenuto verticalmente (justify-center). In questo modo, anche con
+          la home "inbox zero" e senza contenuto sotto, nome hotel + tagline +
+          search rimangono sempre al centro ottico dello schermo, indipendente
+          dalla taglia del viewport (iPhone piccolo, iPhone Pro Max, desktop). */}
+      <section className="relative z-10 flex flex-col items-center justify-center min-h-[55vh] sm:min-h-[60vh] py-12">
         <PropertyName />
-        <div className="w-full max-w-[520px] mt-16 sm:mt-20">
+        <div className="w-full max-w-[520px] mt-12 sm:mt-14">
           <SearchBar />
         </div>
       </section>
