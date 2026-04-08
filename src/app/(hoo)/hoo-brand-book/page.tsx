@@ -80,7 +80,7 @@ export default function HooBrandBookListPage() {
       ) : (
         <div className="bg-white border border-ivory-dark">
           {items.map((item, idx) => (
-            <Link key={item.id} href={`/hoo-brand-book/${item.id}/edit`}
+            <Link key={item.id} href={`/brand-book/${item.id}`}
               className={`flex items-center justify-between p-4 hover:bg-ivory transition-colors ${idx < items.length - 1 ? "border-b border-ivory-medium" : ""}`}>
               <div>
                 <div className="flex items-center gap-2 mb-1">

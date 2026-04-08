@@ -360,7 +360,9 @@ export default function HooStandardBookListPage() {
                     )}
                     <span className="text-[11px] font-ui text-charcoal/45">{item.property.name}</span>
                   </div>
-                  <h3 className="font-ui font-medium text-charcoal-dark text-sm mb-2">{item.title}</h3>
+                  <Link href={`/standard-book/${item.id}`} className="block mb-2 hover:text-terracotta transition-colors">
+                    <h3 className="font-ui font-medium text-charcoal-dark text-sm">{item.title}</h3>
+                  </Link>
                   {/* Reparti assegnati */}
                   <div className="flex items-center gap-2 flex-wrap">
                     <span className="text-[11px] font-ui text-charcoal/40 uppercase tracking-wider">Visibile a:</span>
