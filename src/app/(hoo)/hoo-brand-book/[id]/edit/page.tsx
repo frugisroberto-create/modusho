@@ -22,7 +22,7 @@ export default async function EditBrandBookPage({ params }: Props) {
     <div>
       <h1 className="text-xl font-heading font-medium text-charcoal-dark mb-6">Modifica Brand Book</h1>
       <BookForm mode="edit" contentType="BRAND_BOOK" backPath="/hoo-brand-book" contentId={content.id}
-        initialData={{ title: content.title, body: content.body, propertyId: content.propertyId }} canDelete />
+        initialData={{ title: content.title, body: content.body, propertyId: content.propertyId }} canDelete userRole={user.role} />
     </div>
   );
 }

@@ -4,18 +4,24 @@ import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { useHooContext } from "@/components/hoo/hoo-shell";
 import { AttachmentUploader } from "@/components/shared/attachment-uploader";
+import { TargetAudienceSelector, type TargetAudienceState } from "@/components/shared/target-audience-selector";
 
 interface Property { id: string; name: string; code: string; departments: { id: string; name: string; code: string }[] }
 
 export default function NewDocumentPage() {
   const router = useRouter();
   const { userRole } = useHooContext();
-  const isHoo = userRole === "ADMIN" || userRole === "SUPER_ADMIN";
 
   const [title, setTitle] = useState("");
   const [body, setBody] = useState("");
   const [propertyId, setPropertyId] = useState("");
   const [departmentId, setDepartmentId] = useState("");
+  const [targetAudience, setTargetAudience] = useState<TargetAudienceState>({
+    allDepartments: false,
+    departmentIds: [],
+    roles: [],
+    userIds: [],
+  });
   const [properties, setProperties] = useState<Property[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
@@ -37,9 +43,19 @@ export default function NewDocumentPage() {
   const departments = selectedProperty?.departments || [];
   const saved = !!createdContentId;
 
+  const totalTargets =
+    (targetAudience.allDepartments ? 1 : 0) +
+    targetAudience.departmentIds.length +
+    targetAudience.roles.length +
+    targetAudience.userIds.length;
+
   const handleCreate = async () => {
     if (!title.trim() || !body.trim() || !propertyId) {
       setError("Titolo, contenuto e struttura sono obbligatori");
+      return;
+    }
+    if (totalTargets === 0) {
+      setError("Seleziona almeno un destinatario");
       return;
     }
     setError("");
@@ -54,6 +70,10 @@ export default function NewDocumentPage() {
           body,
           propertyId,
           departmentId: departmentId || null,
+          targetAllDepartments: targetAudience.allDepartments,
+          targetDepartmentIds: targetAudience.departmentIds,
+          targetRoles: targetAudience.roles,
+          targetUserIds: targetAudience.userIds,
           publishDirectly: true,
         }),
       });
@@ -96,13 +116,17 @@ export default function NewDocumentPage() {
         <div className="grid grid-cols-2 gap-4">
           <div>
             <label className="block text-sm font-ui font-medium text-charcoal mb-1.5">Struttura</label>
-            <select value={propertyId} onChange={(e) => { setPropertyId(e.target.value); setDepartmentId(""); }}
+            <select value={propertyId} onChange={(e) => {
+                setPropertyId(e.target.value);
+                setDepartmentId("");
+                setTargetAudience({ allDepartments: false, departmentIds: [], roles: [], userIds: [] });
+              }}
               className="w-full px-3 py-2 border border-ivory-dark text-sm font-ui bg-white" disabled={saved}>
               {properties.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
             </select>
           </div>
           <div>
-            <label className="block text-sm font-ui font-medium text-charcoal mb-1.5">Reparto (opzionale)</label>
+            <label className="block text-sm font-ui font-medium text-charcoal mb-1.5">Reparto proprietario (opzionale)</label>
             <select value={departmentId} onChange={(e) => setDepartmentId(e.target.value)}
               className="w-full px-3 py-2 border border-ivory-dark text-sm font-ui bg-white" disabled={saved}>
               <option value="">Trasversale</option>
@@ -111,6 +135,18 @@ export default function NewDocumentPage() {
           </div>
         </div>
       </div>
+
+      {/* Destinatari */}
+      {propertyId && !saved && (
+        <div className="bg-white border border-ivory-dark p-5">
+          <TargetAudienceSelector
+            propertyId={propertyId}
+            userRole={userRole}
+            value={targetAudience}
+            onChange={setTargetAudience}
+          />
+        </div>
+      )}
 
       {/* Allegati — visibile sempre, attivo dopo il salvataggio */}
       {saved ? (

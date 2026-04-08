@@ -22,7 +22,7 @@ export default async function EditStandardBookPage({ params }: Props) {
     <div>
       <h1 className="text-xl font-heading font-medium text-charcoal-dark mb-6">Modifica Standard Book</h1>
       <BookForm mode="edit" contentType="STANDARD_BOOK" backPath="/hoo-standard-book" contentId={content.id}
-        initialData={{ title: content.title, body: content.body, propertyId: content.propertyId }} canDelete />
+        initialData={{ title: content.title, body: content.body, propertyId: content.propertyId }} canDelete userRole={user.role} />
     </div>
   );
 }

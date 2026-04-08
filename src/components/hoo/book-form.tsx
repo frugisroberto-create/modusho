@@ -3,6 +3,7 @@
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { SopEditor } from "@/components/shared/sop-editor";
+import { TargetAudienceSelector, type TargetAudienceState, type TargetRole } from "@/components/shared/target-audience-selector";
 
 interface Property { id: string; name: string; code: string; departments: { id: string; name: string; code: string }[] }
 
@@ -13,14 +14,21 @@ interface BookFormProps {
   contentId?: string;
   initialData?: { title: string; body: string; propertyId: string; departmentId?: string | null };
   canDelete?: boolean;
+  userRole?: string;
 }
 
-export function BookForm({ mode, contentType, backPath, contentId, initialData, canDelete }: BookFormProps) {
+export function BookForm({ mode, contentType, backPath, contentId, initialData, canDelete, userRole = "ADMIN" }: BookFormProps) {
   const router = useRouter();
   const [title, setTitle] = useState(initialData?.title ?? "");
   const [body, setBody] = useState(initialData?.body ?? "");
   const [propertyId, setPropertyId] = useState(initialData?.propertyId ?? "");
   const [departmentId, setDepartmentId] = useState(initialData?.departmentId ?? "");
+  const [targetAudience, setTargetAudience] = useState<TargetAudienceState>({
+    allDepartments: false,
+    departmentIds: initialData?.departmentId ? [initialData.departmentId] : [],
+    roles: [],
+    userIds: [],
+  });
   const [properties, setProperties] = useState<Property[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
@@ -41,8 +49,41 @@ export function BookForm({ mode, contentType, backPath, contentId, initialData, 
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
+  // In edit mode: load existing targetAudience
+  useEffect(() => {
+    if (mode === "edit" && contentId) {
+      async function loadTargets() {
+        const res = await fetch(`/api/content/${contentId}`);
+        if (res.ok) {
+          const json = await res.json();
+          const targets: { targetType: string; targetRole?: string; targetDepartmentId?: string; targetUserId?: string }[] = json.data.targetAudience || [];
+          setTargetAudience({
+            allDepartments: targets.some(t => t.targetType === "ROLE" && t.targetRole === "OPERATOR"),
+            roles: targets
+              .filter(t => t.targetType === "ROLE" && t.targetRole && t.targetRole !== "OPERATOR")
+              .map(t => t.targetRole as TargetRole),
+            departmentIds: targets
+              .filter(t => t.targetType === "DEPARTMENT" && t.targetDepartmentId)
+              .map(t => t.targetDepartmentId as string),
+            userIds: targets
+              .filter(t => t.targetType === "USER" && t.targetUserId)
+              .map(t => t.targetUserId as string),
+          });
+        }
+      }
+      loadTargets();
+    }
+  }, [mode, contentId]);
+
+  const totalTargets =
+    (targetAudience.allDepartments ? 1 : 0) +
+    targetAudience.departmentIds.length +
+    targetAudience.roles.length +
+    targetAudience.userIds.length;
+
   const handleSubmit = async (publish: boolean) => {
     if (!title.trim() || !body.trim() || !propertyId) { setError("Titolo, contenuto e struttura obbligatori"); return; }
+    if (totalTargets === 0) { setError("Seleziona almeno un destinatario"); return; }
     setLoading(true); setError("");
     try {
       if (mode === "create") {
@@ -51,6 +92,10 @@ export function BookForm({ mode, contentType, backPath, contentId, initialData, 
           body: JSON.stringify({
             type: contentType, title, body, propertyId,
             ...(contentType === "STANDARD_BOOK" && departmentId ? { departmentId } : {}),
+            targetAllDepartments: targetAudience.allDepartments,
+            targetDepartmentIds: targetAudience.departmentIds,
+            targetRoles: targetAudience.roles,
+            targetUserIds: targetAudience.userIds,
             ...(publish ? { publishDirectly: true } : { sendToReview: false }),
           }),
         });
@@ -59,7 +104,13 @@ export function BookForm({ mode, contentType, backPath, contentId, initialData, 
       } else {
         const res = await fetch(`/api/content/${contentId}`, {
           method: "PUT", headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ title, body }),
+          body: JSON.stringify({
+            title, body,
+            targetAllDepartments: targetAudience.allDepartments,
+            targetDepartmentIds: targetAudience.departmentIds,
+            targetRoles: targetAudience.roles,
+            targetUserIds: targetAudience.userIds,
+          }),
         });
         if (!res.ok) { const j = await res.json(); setError(j.error || "Errore"); return; }
         router.push(backPath);
@@ -115,6 +166,18 @@ export function BookForm({ mode, contentType, backPath, contentId, initialData, 
           <SopEditor content={body} onChange={setBody} placeholder="Scrivi il contenuto..." editable={true} />
         </div>
       </section>
+
+      {/* Destinatari */}
+      {propertyId && (
+        <section className="bg-ivory-medium border border-ivory-dark p-6">
+          <TargetAudienceSelector
+            propertyId={propertyId}
+            userRole={userRole}
+            value={targetAudience}
+            onChange={setTargetAudience}
+          />
+        </section>
+      )}
 
       {error && <p className="text-sm font-ui text-alert-red">{error}</p>}
 

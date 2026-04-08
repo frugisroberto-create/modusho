@@ -102,6 +102,11 @@ const createMemoSchema = z.object({
   propertyId: z.string(),
   expiresAt: z.string().nullable().optional(),
   isPinned: z.boolean().optional(),
+  // Destinatari (ContentTarget) — più tipi possono coesistere
+  targetDepartmentIds: z.array(z.string()).optional().default([]),
+  targetAllDepartments: z.boolean().optional().default(false),
+  targetRoles: z.array(z.enum(["OPERATOR", "HOD", "HOTEL_MANAGER"])).optional().default([]),
+  targetUserIds: z.array(z.string()).optional().default([]),
 });
 
 export async function POST(request: NextRequest) {
@@ -116,7 +121,7 @@ export async function POST(request: NextRequest) {
   const parsed = createMemoSchema.safeParse(body);
   if (!parsed.success) return NextResponse.json({ error: "Parametri non validi", details: parsed.error.issues }, { status: 400 });
 
-  const { title, body: memoBody, propertyId, expiresAt, isPinned } = parsed.data;
+  const { title, body: memoBody, propertyId, expiresAt, isPinned, targetAllDepartments, targetDepartmentIds, targetRoles, targetUserIds } = parsed.data;
 
   // Verifica permesso sul tipo MEMO
   const canManageMemo = await canUserManageContentType(session.user.id, "MEMO");
@@ -152,6 +157,27 @@ export async function POST(request: NextRequest) {
       isPinned: isPinned ?? false,
     },
   });
+
+  // ContentTarget: destinatari (più tipi possono coesistere)
+  const targetsToCreate: { contentId: string; targetType: "ROLE" | "DEPARTMENT" | "USER"; targetRole?: "OPERATOR" | "HOD" | "HOTEL_MANAGER"; targetDepartmentId?: string; targetUserId?: string }[] = [];
+  if (targetAllDepartments) {
+    targetsToCreate.push({ contentId: content.id, targetType: "ROLE", targetRole: "OPERATOR" });
+  }
+  for (const r of targetRoles) {
+    if (r === "OPERATOR" && targetAllDepartments) continue;
+    targetsToCreate.push({ contentId: content.id, targetType: "ROLE", targetRole: r });
+  }
+  for (const deptId of targetDepartmentIds) {
+    targetsToCreate.push({ contentId: content.id, targetType: "DEPARTMENT", targetDepartmentId: deptId });
+  }
+  for (const uid of targetUserIds) {
+    targetsToCreate.push({ contentId: content.id, targetType: "USER", targetUserId: uid });
+  }
+  // Fallback legacy: nessun target esplicito → tutti gli operatori
+  if (targetsToCreate.length === 0) {
+    targetsToCreate.push({ contentId: content.id, targetType: "ROLE", targetRole: "OPERATOR" });
+  }
+  await prisma.contentTarget.createMany({ data: targetsToCreate });
 
   await prisma.contentStatusHistory.create({
     data: {

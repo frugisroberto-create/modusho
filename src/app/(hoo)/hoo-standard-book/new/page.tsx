@@ -10,7 +10,7 @@ export default async function NewStandardBookPage() {
   return (
     <div>
       <h1 className="text-xl font-heading font-medium text-charcoal-dark mb-6">Nuova sezione Standard Book</h1>
-      <BookForm mode="create" contentType="STANDARD_BOOK" backPath="/hoo-standard-book" />
+      <BookForm mode="create" contentType="STANDARD_BOOK" backPath="/hoo-standard-book" userRole={user.role} />
     </div>
   );
 }
