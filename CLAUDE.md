@@ -550,9 +550,9 @@ Eccezione unica: `SUPER_ADMIN` bypassa tutto.
 
 ## Home HOO — Layout approvato (HM / Admin / Super Admin)
 
-La home HOO è la prima pagina che vedono HOTEL_MANAGER, ADMIN e SUPER_ADMIN dopo il login. NON è la dashboard analytics: è un punto di partenza operativo con visibilità immediata su cosa richiede attenzione.
+La home HOO è la prima pagina che vedono HOTEL_MANAGER, ADMIN e SUPER_ADMIN dopo il login. È sia il punto di partenza operativo (cosa richiede attenzione) sia il pannello di governance con KPI, alert e confronti — tutto consolidato in un'unica pagina per evitare la dispersione.
 
-**Route:** `/dashboard` (la dashboard analytics si sposta a `/analytics`)
+**Route:** `/dashboard`. La rotta `/analytics` esiste come alias storico e fa redirect a `/dashboard` — non c'è una pagina analytics separata.
 
 **Riferimento visivo:** `modusho-home-preview.html` (file preview approvato)
 
@@ -573,9 +573,10 @@ La home HOO è la prima pagina che vedono HOTEL_MANAGER, ADMIN e SUPER_ADMIN dop
 | Memo | ✅ | ✅ | ✅ | ✅ | ✅ |
 | Brand Book | — | — | ✅ | ✅ | ✅ |
 | Standard Book | — | — | ✅ | ✅ | ✅ |
-| Analytics | — | — | — | ✅ | ✅ |
 
-**Nota**: OPERATOR e HOD non vedono **Brand Book** in nessuna sezione (è riservato a HM+). Per **Standard Book**, OPERATOR e HOD lo vedono solo dalla home / link diretti (sezioni in evidenza / ultime per tipo) e solo se previsto dal targetAudience della sezione. HM+ vede entrambi come voci di navigazione diretta nell'header.
+**Nota Brand/Standard Book**: OPERATOR e HOD non vedono **Brand Book** in nessuna sezione (è riservato a HM+). Per **Standard Book**, OPERATOR e HOD lo vedono solo dalla home / link diretti (sezioni in evidenza / ultime per tipo) e solo se previsto dal targetAudience della sezione. HM+ vede entrambi come voci di navigazione diretta nell'header.
+
+**Nota Analytics**: non c'è una voce "Analytics" separata nell'header HOO. Le funzioni analytics (KPI, alert critici, confronti hotel/reparto, coda approvazioni) sono integrate nella home HOO `/dashboard` accessibile via la voce "Home". La rotta `/analytics` esiste come alias storico e fa redirect a `/dashboard`.
 
 ### Sub-nav (barra secondaria — funzioni di gestione)
 
@@ -647,16 +648,18 @@ La home HOO è la prima pagina che vedono HOTEL_MANAGER, ADMIN e SUPER_ADMIN dop
 | "Da prendere visione" | Sì | No | No | No | No |
 | "In evidenza" | No | Sì (senza "Gestisci") | Sì (senza "Gestisci") | Sì (con "Gestisci") | Sì (con "Gestisci") |
 | Badge stato nelle colonne | No | Sì | Sì | Sì | Sì |
-| Analytics nell'header | No | No | No | Sì | Sì |
+| Analytics integrate nella home `/dashboard` | No | No | No | Sì | Sì |
 | Gestione utenti in sub-nav | No | No | No | Sì | Sì |
 | Strutture in sub-nav | No | No | No | Sì | Sì |
 | Cestino in sub-nav | No | No | No | No | Sì |
 
 ---
 
-## Analytics HOO — Layout e priorità
+## Analytics HOO — Sezioni della home /dashboard
 
-La pagina analytics (`/analytics`) è lo strumento di governo avanzato del HOO. In pochi secondi deve rispondere a:
+> **Nota architetturale**: le funzioni analytics descritte in questa sezione sono **integrate nella home HOO `/dashboard`**. Non esiste una pagina `/analytics` separata: la rotta `/analytics` è un alias che fa redirect a `/dashboard`. Mantenere consolidate le viste di alert + approvazioni + KPI in una sola pagina è una scelta deliberata per privilegiare l'immediatezza e l'azione (vedi sezione "Home HOO" sopra).
+
+Le sezioni descritte qui sotto sono i blocchi che compongono la home HOO. In pochi secondi devono rispondere a:
 1. Cosa richiede la mia azione immediata?
 2. Dove si sta fermando il sistema?
 3. Come stanno avanzando gli hotel?
@@ -934,8 +937,8 @@ ModusHO/
 │   │   │   ├── documents/
 │   │   │   └── memo/
 │   │   ├── (hoo)/            # interfaccia HOO/admin
-│   │   │   ├── dashboard/    # home HOO (hero, stats, in evidenza, 3 colonne — vedi sezione dedicata)
-│   │   │   ├── analytics/    # KPI avanzati, monitoraggio, confronto hotel/reparti
+│   │   │   ├── dashboard/    # home HOO + analytics consolidate (KPI, alert, confronto hotel/reparti)
+│   │   │   ├── analytics/    # alias storico — redirect a /dashboard
 │   │   │   ├── approvals/    # approvazione SOP
 │   │   │   ├── properties/   # gestione strutture
 │   │   │   ├── users/        # gestione utenti
