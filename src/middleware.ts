@@ -78,10 +78,18 @@ export default withAuth(
       }
     }
 
-    // 4d. Route HOO gestione: almeno HOTEL_MANAGER (incluso Brand Book)
-    if (pathname.startsWith("/library") || pathname.startsWith("/memo") ||
-        pathname.startsWith("/content") || pathname.startsWith("/hoo-brand-book")) {
+    // 4d. Brand Book HOO: solo HM+ (workflow approvazione obbligatorio)
+    if (pathname.startsWith("/hoo-brand-book")) {
       if (ROLE_HIERARCHY[userRole] < ROLE_HIERARCHY.HOTEL_MANAGER) {
+        return NextResponse.redirect(new URL("/unauthorized", req.url));
+      }
+    }
+
+    // 4e. Library/Memo/Content: HOD+ (HOD può creare DOCUMENT/MEMO direttamente
+    //     limitatamente al proprio reparto — vedi /api/content e /api/memo)
+    if (pathname.startsWith("/library") || pathname.startsWith("/memo") ||
+        pathname.startsWith("/content")) {
+      if (ROLE_HIERARCHY[userRole] < ROLE_HIERARCHY.HOD) {
         return NextResponse.redirect(new URL("/unauthorized", req.url));
       }
     }
