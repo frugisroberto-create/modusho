@@ -81,9 +81,14 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
     }, { status: 400 });
   }
 
-  // Pubblicazione finale: solo ADMIN/SUPER_ADMIN per spec
-  // (HM con canApprove può solo gestire REVIEW_HM, non pubblicare)
-  const userCanApprove = session.user.canApprove && (userRole === "ADMIN" || userRole === "SUPER_ADMIN");
+  // Pubblicazione finale: HM/ADMIN/SUPER_ADMIN con flag canApprove possono
+  // pubblicare direttamente (bypass del workflow). In alternativa, l'utente
+  // assegnato come A nel RACI può approvare quando submittedToA è true.
+  // Nota: il check di property scope sopra (checkAccess HOTEL_MANAGER) garantisce
+  // che HM non possa pubblicare SOP di property a cui non è assegnato.
+  const userCanApprove = session.user.canApprove && (
+    userRole === "HOTEL_MANAGER" || userRole === "ADMIN" || userRole === "SUPER_ADMIN"
+  );
   if (!userCanApprove && !canApprove(userId, wfInfo)) {
     return NextResponse.json({
       error: "Non hai permessi per approvare questa SOP",

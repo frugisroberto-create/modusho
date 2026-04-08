@@ -104,7 +104,14 @@ Queste quattro dimensioni NON sono intercambiabili. Ruolo e permessi NON sono la
 | ADMIN | Approvazione finale e pubblicazione (HOO) | sì | sì | sì | tutti |
 | SUPER_ADMIN | Override tecnico globale | sì | sì | sì | tutti |
 
-**Nota critica**: HOTEL_MANAGER con `canApprove = sì` NON significa pubblicazione finale. Nel workflow SOP, HM valida lo step intermedio (REVIEW_HM) e promuove ad ADMIN. Solo ADMIN e SUPER_ADMIN possono fare pubblicazione finale (REVIEW_ADMIN → PUBLISHED).
+**Nota su pubblicazione e flag canApprove**: il flag `canApprove` è il discriminante tecnico che abilita un utente a pubblicare direttamente i contenuti, indipendentemente dal suo ruolo nominale. Quando un HOO abilita `canApprove = sì` su un account, quell'utente può pubblicare le SOP delle proprie property assegnate.
+
+In pratica:
+- **Qualunque HOTEL_MANAGER** con `canApprove = sì` può pubblicare le SOP della propria struttura (oltre a validare lo step REVIEW_HM). Senza il flag, può solo creare, modificare e revisionare ma non pubblicare.
+- **ADMIN** e **SUPER_ADMIN** hanno `canApprove = sì` per default e possono sempre pubblicare.
+- Lo scope di pubblicazione è **sempre** limitato alle property a cui l'utente è esplicitamente assegnato (anche per ADMIN — non SUPER_ADMIN che è override globale).
+
+La decisione di concedere o revocare `canApprove` a un HM è una scelta operativa dell'HOO, basata sulla fiducia e sull'autonomia che si vuole dare a quella persona specifica.
 
 **Nota su ADMIN**: ADMIN è il profilo operativo finale del workflow (il HOO). NON va confuso con SUPER_ADMIN che è un override tecnico.
 
@@ -1014,7 +1021,7 @@ Le azioni disponibili dipendono SEMPRE da quattro fattori verificati esplicitame
 ### Permessi per ruolo operativo
 - **OPERATOR**: può solo leggere (canView) e confermare presa visione. Non crea, non modifica, non approva.
 - **HOD**: può creare e modificare contenuti (canEdit) SOLO nel proprio reparto, SOLO per i tipi di contenuto autorizzati. Non approva.
-- **HOTEL_MANAGER**: può creare, modificare e revisionare (canApprove). Può modificare SOP durante REVIEW_HM. Valida e promuove ad ADMIN. NON pubblica.
+- **HOTEL_MANAGER**: può creare, modificare e revisionare. Può modificare SOP durante REVIEW_HM. Se l'account ha `canApprove = sì` (decisione discrezionale dell'HOO sul singolo utente), può anche pubblicare direttamente le SOP delle property a cui è assegnato. Senza il flag canApprove, può solo promuovere le SOP allo step successivo del workflow ma non pubblicarle.
 - **ADMIN**: approvazione finale e pubblicazione. Può creare e pubblicare direttamente. Può intervenire su tutto il backstage finale.
 - **SUPER_ADMIN**: override tecnico globale su tutto.
 
