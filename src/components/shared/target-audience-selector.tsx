@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 
 interface Department {
   id: string;
@@ -41,22 +41,26 @@ const ROLE_LABELS: Record<TargetRole, string> = {
 export function TargetAudienceSelector({
   propertyId,
   userRole,
-  userDepartmentId,
+  userDepartmentId: _userDepartmentId,
   value,
   onChange,
 }: TargetAudienceSelectorProps) {
+  void _userDepartmentId; // legacy prop kept for backward compat
   const [departments, setDepartments] = useState<Department[]>([]);
+  const [myDepartments, setMyDepartments] = useState<Department[]>([]);
   const [users, setUsers] = useState<User[]>([]);
   const [loading, setLoading] = useState(true);
   const [userSearch, setUserSearch] = useState("");
+  const hodPresetApplied = useRef(false);
 
   useEffect(() => {
     async function load() {
       setLoading(true);
       try {
-        const [deptRes, usersRes] = await Promise.all([
+        const [deptRes, usersRes, myDeptsRes] = await Promise.all([
           fetch(`/api/properties/${propertyId}/departments`),
           fetch(`/api/users?propertyId=${propertyId}&isActive=true&pageSize=50`),
+          fetch(`/api/my-departments?propertyId=${propertyId}`),
         ]);
         if (deptRes.ok) {
           const j = await deptRes.json();
@@ -66,22 +70,61 @@ export function TargetAudienceSelector({
           const j = await usersRes.json();
           setUsers(j.data || []);
         }
+        if (myDeptsRes.ok) {
+          const j = await myDeptsRes.json();
+          setMyDepartments(j.data || []);
+        }
       } finally { setLoading(false); }
     }
     if (propertyId) load();
   }, [propertyId]);
 
-  // HOD: ruolo limitato — può creare contenuti solo per il proprio reparto.
-  // Mostra un selettore semplificato (read-only sul proprio reparto).
+  // HOD: ruolo limitato — può creare contenuti solo per i propri reparti accessibili.
+  // Auto-preseleziona tutti i suoi reparti la prima volta.
+  useEffect(() => {
+    if (userRole === "HOD" && myDepartments.length > 0 && !hodPresetApplied.current && value.departmentIds.length === 0) {
+      hodPresetApplied.current = true;
+      onChange({
+        allDepartments: false,
+        departmentIds: myDepartments.map(d => d.id),
+        roles: [],
+        userIds: [],
+      });
+    }
+  }, [userRole, myDepartments, value.departmentIds.length, onChange]);
+
   if (userRole === "HOD") {
-    const ownDept = departments.find((d) => d.id === userDepartmentId);
+    const toggleMyDept = (deptId: string) => {
+      const isSelected = value.departmentIds.includes(deptId);
+      const next = isSelected
+        ? value.departmentIds.filter(id => id !== deptId)
+        : [...value.departmentIds, deptId];
+      onChange({ ...value, departmentIds: next, allDepartments: false, roles: [], userIds: [] });
+    };
     return (
       <div>
-        <label className="block text-sm font-ui font-medium text-charcoal mb-1.5">Destinatari</label>
-        <div className="border border-ivory-dark bg-ivory-medium/30 px-3 py-2 text-sm text-charcoal">
-          {ownDept?.name || "Il tuo reparto"}
-        </div>
-        <p className="text-xs text-charcoal/40 mt-1">Come Capo Reparto puoi creare contenuti solo per il tuo reparto.</p>
+        <label className="block text-sm font-ui font-medium text-charcoal mb-1.5">Destinatari (i tuoi reparti)</label>
+        <p className="text-xs font-ui text-charcoal/45 mb-2">
+          Come Capo Reparto puoi inviare contenuti solo agli operatori dei tuoi reparti.
+        </p>
+        {loading ? (
+          <p className="text-xs font-ui text-charcoal/40">Caricamento...</p>
+        ) : myDepartments.length === 0 ? (
+          <p className="text-xs font-ui text-alert-red">Nessun reparto assegnato — contatta l&apos;amministratore.</p>
+        ) : (
+          <div className="border border-ivory-dark divide-y divide-ivory-dark/50">
+            {myDepartments.map(dept => (
+              <label key={dept.id} className="flex items-center gap-3 py-2 px-3 cursor-pointer hover:bg-ivory-medium/30 transition-colors">
+                <input type="checkbox"
+                  checked={value.departmentIds.includes(dept.id)}
+                  onChange={() => toggleMyDept(dept.id)}
+                  className="w-4 h-4 accent-terracotta" />
+                <span className="text-sm font-ui text-charcoal">{dept.name}</span>
+                <span className="text-xs text-charcoal/40 ml-auto font-ui">{dept.code}</span>
+              </label>
+            ))}
+          </div>
+        )}
       </div>
     );
   }

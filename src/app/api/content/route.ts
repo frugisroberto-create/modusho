@@ -290,21 +290,47 @@ export async function POST(request: NextRequest) {
   }
 
   // Validazione server-side: publishDirectly
-  // SOP: solo ADMIN/SUPER_ADMIN | DOCUMENT/MEMO: anche HOTEL_MANAGER
+  // SOP: solo ADMIN/SUPER_ADMIN
+  // DOCUMENT/MEMO: HM/ADMIN/SUPER_ADMIN/HOD (HOD limitato al proprio perimetro — vedi sotto)
+  // BRAND_BOOK/STANDARD_BOOK: solo ADMIN/SUPER_ADMIN
   if (publishDirectly) {
     if (type === "SOP" && role !== "ADMIN" && role !== "SUPER_ADMIN") {
       return NextResponse.json({ error: "Solo ADMIN e SUPER_ADMIN possono pubblicare SOP direttamente" }, { status: 403 });
     }
-    if (type !== "SOP" && role !== "HOTEL_MANAGER" && role !== "ADMIN" && role !== "SUPER_ADMIN") {
-      return NextResponse.json({ error: "Non hai permessi per pubblicare direttamente" }, { status: 403 });
+    if ((type === "BRAND_BOOK" || type === "STANDARD_BOOK") && role !== "ADMIN" && role !== "SUPER_ADMIN") {
+      return NextResponse.json({ error: "Solo ADMIN e SUPER_ADMIN possono pubblicare Brand/Standard Book direttamente" }, { status: 403 });
+    }
+    if ((type === "DOCUMENT" || type === "MEMO") && role === "OPERATOR") {
+      return NextResponse.json({ error: "Operatore non può pubblicare contenuti" }, { status: 403 });
     }
   }
 
-  // Determina stato iniziale in base al ruolo
+  // Restrizione HOD: se è HOD e pubblica direttamente DOCUMENT/MEMO, può solo
+  // targettare il proprio reparto (no targetRoles, no targetUserIds, no allDepartments,
+  // targetDepartmentIds limitati ai reparti accessibili).
+  if (role === "HOD" && publishDirectly && (type === "DOCUMENT" || type === "MEMO")) {
+    const { targetAllDepartments: tAll, targetRoles: tRoles, targetUserIds: tUsers, targetDepartmentIds: tDepts } = parsed.data;
+    if (tAll || tRoles.length > 0 || tUsers.length > 0) {
+      return NextResponse.json({
+        error: "Come HOD puoi targettare solo i tuoi reparti — non sono ammessi ruoli trasversali, utenti specifici o 'tutti gli operatori'",
+      }, { status: 403 });
+    }
+    // Verifica che ogni reparto target sia accessibile dall'HOD
+    const { getAccessibleDepartmentIds } = await import("@/lib/rbac");
+    const accessibleDepts = await getAccessibleDepartmentIds(userId, propertyId);
+    const outOfPerimeter = tDepts.filter(d => !accessibleDepts.includes(d));
+    if (outOfPerimeter.length > 0) {
+      return NextResponse.json({
+        error: "Alcuni reparti destinatari non rientrano nel tuo perimetro",
+      }, { status: 403 });
+    }
+  }
+
+  // Determina stato iniziale in base al ruolo + tipo
   const initialStatus = publishDirectly
-    ? getSubmitTargetStatus(role, "publishDirectly")
+    ? getSubmitTargetStatus(role, "publishDirectly", type)
     : sendToReview
-      ? getSubmitTargetStatus(role, "sendToReview")
+      ? getSubmitTargetStatus(role, "sendToReview", type)
       : "DRAFT" as const;
 
   const isDirectPublish = initialStatus === "PUBLISHED";

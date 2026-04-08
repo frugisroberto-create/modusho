@@ -129,9 +129,33 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: "Non hai permesso di creare memo" }, { status: 403 });
   }
   const userId = session.user.id;
+  const role = session.user.role;
 
-  const hasAccess = await checkAccess(userId, "HOTEL_MANAGER", propertyId);
+  // OPERATOR non può creare memo
+  if (role === "OPERATOR") {
+    return NextResponse.json({ error: "Operatore non può creare memo" }, { status: 403 });
+  }
+
+  // Accesso minimo HOD alla property
+  const hasAccess = await checkAccess(userId, "HOD", propertyId);
   if (!hasAccess) return NextResponse.json({ error: "Accesso negato" }, { status: 403 });
+
+  // Restrizione HOD: può targettare solo i propri reparti, niente ruoli/utenti/all
+  if (role === "HOD") {
+    if (targetAllDepartments || targetRoles.length > 0 || targetUserIds.length > 0) {
+      return NextResponse.json({
+        error: "Come HOD puoi targettare solo i tuoi reparti — non sono ammessi ruoli trasversali, utenti specifici o 'tutti gli operatori'",
+      }, { status: 403 });
+    }
+    const { getAccessibleDepartmentIds } = await import("@/lib/rbac");
+    const accessibleDepts = await getAccessibleDepartmentIds(userId, propertyId);
+    const outOfPerimeter = targetDepartmentIds.filter(d => !accessibleDepts.includes(d));
+    if (outOfPerimeter.length > 0) {
+      return NextResponse.json({
+        error: "Alcuni reparti destinatari non rientrano nel tuo perimetro",
+      }, { status: 403 });
+    }
+  }
 
   // Crea Content + Memo + StatusHistory in transazione
   const now = new Date();

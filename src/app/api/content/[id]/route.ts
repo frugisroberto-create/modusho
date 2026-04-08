@@ -267,12 +267,20 @@ export async function PUT(
 
   // Invio a review o pubblicazione diretta (per DRAFT/RETURNED)
   if ((sendToReview || publishDirectly) && (content.status === "DRAFT" || content.status === "RETURNED")) {
-    // Validazione server-side
-    if (publishDirectly && role !== "ADMIN" && role !== "SUPER_ADMIN") {
-      return NextResponse.json({ error: "Solo ADMIN e SUPER_ADMIN possono pubblicare direttamente" }, { status: 403 });
+    // Validazione server-side: pubblicazione diretta
+    if (publishDirectly) {
+      if (content.type === "SOP" && role !== "ADMIN" && role !== "SUPER_ADMIN") {
+        return NextResponse.json({ error: "Solo ADMIN e SUPER_ADMIN possono pubblicare SOP direttamente" }, { status: 403 });
+      }
+      if ((content.type === "BRAND_BOOK" || content.type === "STANDARD_BOOK") && role !== "ADMIN" && role !== "SUPER_ADMIN") {
+        return NextResponse.json({ error: "Solo ADMIN e SUPER_ADMIN possono pubblicare Brand/Standard Book direttamente" }, { status: 403 });
+      }
+      if ((content.type === "DOCUMENT" || content.type === "MEMO") && role === "OPERATOR") {
+        return NextResponse.json({ error: "Operatore non può pubblicare contenuti" }, { status: 403 });
+      }
     }
     const action = publishDirectly ? "publishDirectly" : "sendToReview";
-    const targetStatus = getSubmitTargetStatus(role, action);
+    const targetStatus = getSubmitTargetStatus(role, action, content.type);
     const noteMap: Record<string, string> = {
       REVIEW_HM: "Inviata a Hotel Manager",
       REVIEW_ADMIN: "Inviata per approvazione finale",

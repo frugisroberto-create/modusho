@@ -1,16 +1,33 @@
-import { Role, ContentStatus } from "@prisma/client";
+import { Role, ContentStatus, ContentType } from "@prisma/client";
 
 export type SubmitAction = "sendToReview" | "publishDirectly";
 
+/**
+ * Tipo di contenuto che NON richiede workflow di approvazione
+ * (HOD può pubblicare direttamente nel proprio perimetro).
+ */
+function isNoWorkflowType(contentType?: ContentType): boolean {
+  return contentType === "MEMO" || contentType === "DOCUMENT";
+}
+
 export function getSubmitTargetStatus(
   role: Role,
-  action: SubmitAction
+  action: SubmitAction,
+  contentType?: ContentType
 ): ContentStatus {
   if (action === "publishDirectly") {
     if (role === "ADMIN" || role === "SUPER_ADMIN") {
       return "PUBLISHED";
     }
-    throw new Error(`Il ruolo ${role} non può pubblicare direttamente`);
+    // HOTEL_MANAGER può pubblicare direttamente DOCUMENT/MEMO (non SOP)
+    if (role === "HOTEL_MANAGER" && isNoWorkflowType(contentType)) {
+      return "PUBLISHED";
+    }
+    // HOD può pubblicare direttamente DOCUMENT/MEMO (limitato al proprio reparto)
+    if (role === "HOD" && isNoWorkflowType(contentType)) {
+      return "PUBLISHED";
+    }
+    throw new Error(`Il ruolo ${role} non può pubblicare direttamente ${contentType ?? "questo contenuto"}`);
   }
 
   switch (role) {
@@ -26,16 +43,28 @@ export function getSubmitTargetStatus(
   }
 }
 
-export function getAvailableSubmitActions(role: Role): {
+export function getAvailableSubmitActions(
+  role: Role,
+  contentType?: ContentType
+): {
   canSendToReview: boolean;
   canPublishDirectly: boolean;
   reviewLabel: string;
 } {
+  const isNoWorkflow = isNoWorkflowType(contentType);
   switch (role) {
     case "HOD":
-      return { canSendToReview: true, canPublishDirectly: false, reviewLabel: "Invia a Hotel Manager" };
+      return {
+        canSendToReview: !isNoWorkflow, // niente review per memo/document
+        canPublishDirectly: isNoWorkflow,
+        reviewLabel: "Invia a Hotel Manager",
+      };
     case "HOTEL_MANAGER":
-      return { canSendToReview: true, canPublishDirectly: false, reviewLabel: "Invia per approvazione finale" };
+      return {
+        canSendToReview: !isNoWorkflow,
+        canPublishDirectly: isNoWorkflow,
+        reviewLabel: "Invia per approvazione finale",
+      };
     case "ADMIN":
     case "SUPER_ADMIN":
       return { canSendToReview: true, canPublishDirectly: true, reviewLabel: "Invia a Hotel Manager" };
