@@ -84,7 +84,6 @@ export async function GET(request: NextRequest) {
             body: true,
             publishedAt: true,
             createdBy: { select: { name: true } },
-            isFeatured: true,
             acknowledgments: {
               where: { userId },
               select: { acknowledgedAt: true },
@@ -93,7 +92,7 @@ export async function GET(request: NextRequest) {
           },
         },
       },
-      orderBy: [{ isPinned: "desc" }, { content: { publishedAt: "desc" } }],
+      orderBy: { content: { publishedAt: "desc" } },
       skip: (page - 1) * pageSize,
       take: pageSize,
     }),
@@ -110,7 +109,6 @@ export async function GET(request: NextRequest) {
       author: m.content.createdBy.name,
       isPinned: m.isPinned,
       expiresAt: m.expiresAt,
-      isFeatured: m.content.isFeatured,
       acknowledged: m.content.acknowledgments.length > 0,
       acknowledgedAt: m.content.acknowledgments[0]?.acknowledgedAt ?? null,
     })),
@@ -124,7 +122,6 @@ const createMemoSchema = z.object({
   body: z.string().min(1),
   propertyId: z.string(),
   expiresAt: z.string().nullable().optional(),
-  isPinned: z.boolean().optional(),
   // Destinatari (ContentTarget) — più tipi possono coesistere
   targetDepartmentIds: z.array(z.string()).optional().default([]),
   targetAllDepartments: z.boolean().optional().default(false),
@@ -144,7 +141,7 @@ export async function POST(request: NextRequest) {
   const parsed = createMemoSchema.safeParse(body);
   if (!parsed.success) return NextResponse.json({ error: "Parametri non validi", details: parsed.error.issues }, { status: 400 });
 
-  const { title, body: memoBody, propertyId, expiresAt, isPinned, targetAllDepartments, targetDepartmentIds, targetRoles, targetUserIds } = parsed.data;
+  const { title, body: memoBody, propertyId, expiresAt, targetAllDepartments, targetDepartmentIds, targetRoles, targetUserIds } = parsed.data;
 
   // Verifica permesso sul tipo MEMO
   const canManageMemo = await canUserManageContentType(session.user.id, "MEMO");
@@ -192,7 +189,6 @@ export async function POST(request: NextRequest) {
       createdById: userId,
       updatedById: userId,
       publishedAt: now,
-      ...(isPinned ? { isFeatured: true, featuredAt: now, featuredById: userId } : {}),
     },
   });
 
@@ -201,7 +197,6 @@ export async function POST(request: NextRequest) {
       contentId: content.id,
       propertyId,
       expiresAt: expiresAt ? new Date(expiresAt) : null,
-      isPinned: isPinned ?? false,
     },
   });
 

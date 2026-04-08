@@ -14,7 +14,6 @@ const contentQuerySchema = z.object({
   departmentId: z.string().optional(),
   status: z.enum(["DRAFT", "REVIEW_HM", "REVIEW_ADMIN", "PUBLISHED", "RETURNED", "ARCHIVED"]).optional(),
   acknowledged: z.enum(["true", "false"]).optional(),
-  featured: z.enum(["true"]).optional(),
   excludeUpdatedBy: z.string().optional(),
   search: z.string().max(200).optional(),
   page: z.coerce.number().int().min(1).default(1),
@@ -37,7 +36,7 @@ export async function GET(request: NextRequest) {
     );
   }
 
-  const { type, propertyId, departmentId, status, acknowledged, featured, excludeUpdatedBy, search, page, pageSize } = parsed.data;
+  const { type, propertyId, departmentId, status, acknowledged, excludeUpdatedBy, search, page, pageSize } = parsed.data;
   const userId = session.user.id;
 
   // RBAC: determina property accessibili
@@ -130,11 +129,6 @@ export async function GET(request: NextRequest) {
     where.acknowledgments = { none: { userId } };
   }
 
-  // Filter by featured
-  if (featured === "true") {
-    where.isFeatured = true;
-  }
-
   if (excludeUpdatedBy) {
     where.updatedById = { not: excludeUpdatedBy };
   }
@@ -168,9 +162,7 @@ export async function GET(request: NextRequest) {
     }
   }
 
-  const orderBy = featured === "true"
-    ? { featuredAt: "desc" as const }
-    : { publishedAt: "desc" as const };
+  const orderBy = { publishedAt: "desc" as const };
 
   const [contents, total] = await Promise.all([
     prisma.content.findMany({
@@ -182,7 +174,6 @@ export async function GET(request: NextRequest) {
         title: true,
         status: true,
         version: true,
-        isFeatured: true,
         publishedAt: true,
         createdAt: true,
         propertyId: true,
@@ -213,7 +204,6 @@ export async function GET(request: NextRequest) {
       title: c.title,
       status: c.status,
       version: c.version,
-      isFeatured: c.isFeatured,
       publishedAt: c.publishedAt,
       createdAt: c.createdAt,
       propertyId: c.propertyId,

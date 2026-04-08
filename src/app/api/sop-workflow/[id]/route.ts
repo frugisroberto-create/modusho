@@ -36,7 +36,6 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
           body: true,
           status: true,
           version: true,
-          isFeatured: true,
           publishedAt: true,
           createdAt: true,
           updatedAt: true,
@@ -119,7 +118,6 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
       consultationPending: wf.submittedToC && wf.consultedConfirmedVersion !== wf.textVersionCount,
       publishedAt: wf.content.publishedAt,
       createdAt: wf.content.createdAt,
-      isFeatured: wf.content.isFeatured,
     },
   });
 }
