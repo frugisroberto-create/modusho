@@ -431,6 +431,15 @@ export function SopWorkflowEditor({ workflowId, currentUserId, currentUserRole, 
         </div>
       )}
 
+      {/* ── Riassegna RACI (HM/HOO) — visibile su bozze in lavorazione, escluso REVIEW_ADMIN ── */}
+      {(isHm || isHoo) && (wf.contentStatus === "DRAFT" || wf.contentStatus === "REVIEW_HM" || wf.contentStatus === "RETURNED") && (
+        <RaciReassignPanel
+          wf={wf}
+          propertyId={wf.property.id}
+          onReassigned={fetchWorkflow}
+        />
+      )}
+
       {/* ── Review due date (published) ── */}
       {isPubblicata && (
         <ReviewDueDateSection
@@ -898,6 +907,127 @@ function ConsultationStatus({ wf, isC, confirmNote, onConfirmNoteChange, onConfi
 }
 
 // ─── Published Actions ──────────────────────────────────────────────
+
+// ─── Riassegna RACI panel (HM/HOO only) ─────────────────────────────────
+
+function RaciReassignPanel({ wf, propertyId, onReassigned }: {
+  wf: SopWorkflowData;
+  propertyId: string;
+  onReassigned: () => Promise<void>;
+}) {
+  const [open, setOpen] = useState(false);
+  const [users, setUsers] = useState<{ id: string; name: string; role: string }[]>([]);
+  const [responsibleId, setResponsibleId] = useState(wf.responsible.id);
+  const [consultedId, setConsultedId] = useState<string>(wf.consulted?.id ?? "");
+  const [accountableId, setAccountableId] = useState(wf.accountable.id);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState("");
+
+  useEffect(() => {
+    if (!open) return;
+    async function loadUsers() {
+      const res = await fetch(`/api/users?propertyId=${propertyId}&isActive=true&pageSize=200`);
+      if (res.ok) {
+        const json = await res.json();
+        setUsers(json.data.map((u: { id: string; name: string; role: string }) => ({ id: u.id, name: u.name, role: u.role })));
+      }
+    }
+    loadUsers();
+  }, [open, propertyId]);
+
+  const handleSave = async () => {
+    setLoading(true);
+    setError("");
+    try {
+      const res = await fetch(`/api/sop-workflow/${wf.id}/raci`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          responsibleId,
+          consultedId: consultedId || null,
+          accountableId,
+        }),
+      });
+      if (res.ok) {
+        await onReassigned();
+        setOpen(false);
+      } else {
+        const json = await res.json();
+        setError(json.error || "Errore nella riassegnazione");
+      }
+    } finally { setLoading(false); }
+  };
+
+  const eligibleR = users.filter(u => ["HOD", "HOTEL_MANAGER", "ADMIN", "SUPER_ADMIN"].includes(u.role));
+  const eligibleC = users.filter(u => ["HOTEL_MANAGER", "ADMIN", "SUPER_ADMIN"].includes(u.role));
+  const eligibleA = users.filter(u => ["ADMIN", "SUPER_ADMIN"].includes(u.role));
+
+  if (!open) {
+    return (
+      <div className="bg-ivory border border-ivory-dark p-4 flex items-center justify-between">
+        <div>
+          <p className="text-sm font-ui font-medium text-charcoal">Modifica ruoli RACI</p>
+          <p className="text-xs font-ui text-charcoal/45 mt-0.5">
+            Cambia chi è Responsabile, Consultato o Accountable di questa bozza
+          </p>
+        </div>
+        <button onClick={() => setOpen(true)}
+          className="btn-outline !py-2 !px-4 text-xs">
+          Riassegna
+        </button>
+      </div>
+    );
+  }
+
+  return (
+    <div className="bg-ivory border border-ivory-dark p-4 space-y-3">
+      <div className="flex items-center justify-between">
+        <p className="text-sm font-ui font-semibold text-charcoal">Riassegna ruoli RACI</p>
+        <button onClick={() => { setOpen(false); setError(""); }}
+          className="text-xs font-ui text-charcoal/50 hover:text-charcoal">Annulla</button>
+      </div>
+
+      <div>
+        <label className="block text-[11px] font-ui font-semibold text-charcoal/60 uppercase tracking-wider mb-1">
+          Responsabile (R)
+        </label>
+        <select value={responsibleId} onChange={(e) => setResponsibleId(e.target.value)} className="w-full">
+          {eligibleR.map(u => <option key={u.id} value={u.id}>{u.name} ({u.role})</option>)}
+        </select>
+      </div>
+
+      <div>
+        <label className="block text-[11px] font-ui font-semibold text-charcoal/60 uppercase tracking-wider mb-1">
+          Consultato (C) — opzionale
+        </label>
+        <select value={consultedId} onChange={(e) => setConsultedId(e.target.value)} className="w-full">
+          <option value="">— Nessuno —</option>
+          {eligibleC.map(u => <option key={u.id} value={u.id}>{u.name} ({u.role})</option>)}
+        </select>
+      </div>
+
+      <div>
+        <label className="block text-[11px] font-ui font-semibold text-charcoal/60 uppercase tracking-wider mb-1">
+          Accountable (A)
+        </label>
+        <select value={accountableId} onChange={(e) => setAccountableId(e.target.value)} className="w-full">
+          {eligibleA.map(u => <option key={u.id} value={u.id}>{u.name} ({u.role})</option>)}
+        </select>
+      </div>
+
+      {error && <p className="text-xs font-ui text-alert-red">{error}</p>}
+
+      <p className="text-xs font-ui text-charcoal/45">
+        Cambiare R o C resetta lo stato di sottomissione e l&apos;eventuale conferma di consultazione.
+      </p>
+
+      <button onClick={handleSave} disabled={loading}
+        className="btn-primary !py-2 !px-4 text-xs disabled:opacity-50">
+        {loading ? "Salvataggio..." : "Salva nuovi ruoli"}
+      </button>
+    </div>
+  );
+}
 
 function PublishedActions({ contentId, workflowId, isFeatured, onRefresh }: { contentId: string; workflowId: string; isFeatured: boolean; onRefresh: () => Promise<void> }) {
   const router = useRouter();
