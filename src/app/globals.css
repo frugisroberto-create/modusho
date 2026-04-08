@@ -144,6 +144,12 @@
   .safe-bottom {
     padding-bottom: env(safe-area-inset-bottom, 0px);
   }
+
+  /* Clearance per il main content operator su mobile:
+     altezza bottom-nav (56px) + safe-area-inset iOS (~34px) + margine (16px). */
+  .pb-mobile-nav {
+    padding-bottom: calc(56px + 16px + env(safe-area-inset-bottom, 0px));
+  }
 }
 
 @keyframes skeleton-pulse {

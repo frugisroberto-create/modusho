@@ -67,7 +67,7 @@ export function OperatorShell({
           currentPropertyId={currentPropertyId}
           onPropertyChange={handlePropertyChange}
         />
-        <main className="max-w-7xl mx-auto px-4 sm:px-6 pb-16 md:pb-0">
+        <main className="max-w-7xl mx-auto px-4 sm:px-6 pb-mobile-nav md:pb-0">
           {children}
         </main>
         <PushPermissionBanner />
