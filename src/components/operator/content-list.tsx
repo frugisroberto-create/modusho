@@ -32,9 +32,9 @@ interface ContentListProps {
 
 export function ContentList({ contentType, detailPath, title, description, createPath, createLabel, searchPlaceholder }: ContentListProps) {
   const { currentPropertyId, userRole } = useOperatorContext();
-  const canCreate = contentType === "DOCUMENT"
-    ? ["HOTEL_MANAGER", "ADMIN", "SUPER_ADMIN"].includes(userRole)
-    : ["HOD", "HOTEL_MANAGER", "ADMIN", "SUPER_ADMIN"].includes(userRole);
+  // HOD può creare DOCUMENT/MEMO direttamente (limitato al proprio reparto)
+  // e può creare SOP attraverso il workflow RACI
+  const canCreate = ["HOD", "HOTEL_MANAGER", "ADMIN", "SUPER_ADMIN"].includes(userRole);
 
   const [items, setItems] = useState<ContentItem[]>([]);
   const [departments, setDepartments] = useState<Department[]>([]);
