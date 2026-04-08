@@ -349,7 +349,9 @@ export function SopWorkflowEditor({ workflowId, currentUserId, currentUserRole, 
   const isC = wf.myRole === "C";
   const isA = wf.myRole === "A";
   const isHoo = currentUserRole === "ADMIN" || currentUserRole === "SUPER_ADMIN";
-  const isAdminOverride = !wf.myRole && isHoo;
+  const isHm = currentUserRole === "HOTEL_MANAGER";
+  // Override per HM/HOO: hanno autorità di governance, possono modificare anche se non R/C/A
+  const isAdminOverride = !wf.myRole && (isHoo || isHm);
   const draftStatuses: ContentStatusType[] = ["DRAFT", "REVIEW_HM", "REVIEW_ADMIN", "RETURNED"];
   const isInLavorazione = draftStatuses.includes(wf.contentStatus);
   const isPubblicata = wf.contentStatus === "PUBLISHED";

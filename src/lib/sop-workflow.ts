@@ -100,15 +100,16 @@ export function getRaciRole(userId: string, wf: SopWorkflowInfo): RaciRole | nul
 
 // ─── Permission Checks ────────────────────────────────────────────────
 
-/** Anyone involved (R/C/A) or ADMIN/SUPER_ADMIN can edit while IN_LAVORAZIONE,
- *  as long as the draft has NOT been submitted to A. */
+/** Anyone involved (R/C/A) or HM/ADMIN/SUPER_ADMIN can edit while IN_LAVORAZIONE,
+ *  as long as the draft has NOT been submitted to A.
+ *  HM and HOO have governance authority and can intervene on any draft in their perimeter. */
 export function canEditText(userId: string, wf: SopWorkflowInfo, userRole?: string): boolean {
   if (!isDraft(wf.contentStatus)) return false;
   if (wf.submittedToA) return false;
   if (userId === wf.responsibleId) return true;
   if (userId === wf.consultedId) return true;
   if (userId === wf.accountableId) return true;
-  if (userRole === "ADMIN" || userRole === "SUPER_ADMIN") return true;
+  if (userRole === "HOTEL_MANAGER" || userRole === "ADMIN" || userRole === "SUPER_ADMIN") return true;
   return false;
 }
 
