@@ -27,11 +27,8 @@ export default function MemoListPage() {
   const [total, setTotal] = useState(0);
   const [page, setPage] = useState(1);
   const [loading, setLoading] = useState(true);
-  const [searchQuery, setSearchQuery] = useState("");
-  const [searchTerm, setSearchTerm] = useState("");
   const [expandedMemo, setExpandedMemo] = useState<string | null>(openParam);
   const expandAppliedRef = useRef(false);
-  const debounceRef = useRef<NodeJS.Timeout | null>(null);
   const pageSize = 20;
 
   const fetchMemos = useCallback(async () => {
@@ -45,20 +42,14 @@ export default function MemoListPage() {
       const res = await fetch(`/api/memo?${params}`);
       if (res.ok) {
         const json = await res.json();
-        let items: MemoItem[] = json.data;
-        // Client-side title filter
-        if (searchTerm.trim().length >= 2) {
-          const q = searchTerm.toLowerCase();
-          items = items.filter((m) => m.title.toLowerCase().includes(q) || m.body.toLowerCase().includes(q));
-        }
-        setMemos(items);
+        setMemos(json.data);
         setTotal(json.meta.total);
       }
     } finally { setLoading(false); }
-  }, [currentPropertyId, page, searchTerm]);
+  }, [currentPropertyId, page]);
 
   useEffect(() => { fetchMemos(); }, [fetchMemos]);
-  useEffect(() => { setPage(1); }, [currentPropertyId, searchTerm]);
+  useEffect(() => { setPage(1); }, [currentPropertyId]);
 
   // Quando arrivano dalla home con ?open=<id>, scrolla al memo
   useEffect(() => {
@@ -73,12 +64,6 @@ export default function MemoListPage() {
       }, 100);
     }
   }, [openParam, memos]);
-
-  const handleSearchChange = (val: string) => {
-    setSearchQuery(val);
-    if (debounceRef.current) clearTimeout(debounceRef.current);
-    debounceRef.current = setTimeout(() => setSearchTerm(val), 400);
-  };
 
   const totalPages = Math.ceil(total / pageSize);
   const now = new Date();

@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useCallback, useRef } from "react";
+import { useState, useEffect, useCallback } from "react";
 import Link from "next/link";
 import { useOperatorContext } from "./operator-shell";
 import { MobileHide } from "@/components/mobile-hide";
@@ -44,9 +44,6 @@ export function ContentList({ contentType, detailPath, title, description, creat
   const [departmentFilter, setDepartmentFilter] = useState("");
   const [deptsLoaded, setDeptsLoaded] = useState(false);
   const [readFilter, setReadFilter] = useState<"" | "true" | "false">("");
-  const [searchQuery, setSearchQuery] = useState("");
-  const [searchTerm, setSearchTerm] = useState("");
-  const debounceRef = useRef<NodeJS.Timeout | null>(null);
   const pageSize = 20;
 
   const roleRequiresSpecificDept = userRole === "OPERATOR" || userRole === "HOD";
@@ -73,30 +70,6 @@ export function ContentList({ contentType, detailPath, title, description, creat
 
   const fetchContent = useCallback(async () => {
     setLoading(true);
-
-    // If search term, use search API
-    if (searchTerm.trim().length >= 2) {
-      const params = new URLSearchParams({
-        q: searchTerm, propertyId: currentPropertyId, type: contentType,
-        page: page.toString(), pageSize: pageSize.toString(),
-      });
-      if (departmentFilter) params.set("departmentId", departmentFilter);
-      try {
-        const res = await fetch(`/api/search?${params}`);
-        if (res.ok) {
-          const json = await res.json();
-          // Search returns different shape — map to ContentItem
-          setItems(json.data.map((r: { id: string; title: string; type: string; snippet: string }) => ({
-            id: r.id, code: null, type: r.type, title: r.title,
-            publishedAt: null, department: null, property: { id: "", name: "", code: "" },
-            acknowledged: null, acknowledgedAt: null,
-          })));
-          setTotal(json.meta.total);
-        }
-      } finally { setLoading(false); }
-      return;
-    }
-
     const params = new URLSearchParams({
       type: contentType, propertyId: currentPropertyId, status: "PUBLISHED",
       page: page.toString(), pageSize: pageSize.toString(),
@@ -107,16 +80,10 @@ export function ContentList({ contentType, detailPath, title, description, creat
       const res = await fetch(`/api/content?${params}`);
       if (res.ok) { const json = await res.json(); setItems(json.data); setTotal(json.meta.total); }
     } finally { setLoading(false); }
-  }, [contentType, currentPropertyId, page, departmentFilter, readFilter, searchTerm]);
+  }, [contentType, currentPropertyId, page, departmentFilter, readFilter]);
 
   useEffect(() => { fetchContent(); }, [fetchContent]);
-  useEffect(() => { setPage(1); }, [departmentFilter, readFilter, currentPropertyId, searchTerm]);
-
-  const handleSearchChange = (val: string) => {
-    setSearchQuery(val);
-    if (debounceRef.current) clearTimeout(debounceRef.current);
-    debounceRef.current = setTimeout(() => setSearchTerm(val), 400);
-  };
+  useEffect(() => { setPage(1); }, [departmentFilter, readFilter, currentPropertyId]);
 
   const totalPages = Math.ceil(total / pageSize);
 
