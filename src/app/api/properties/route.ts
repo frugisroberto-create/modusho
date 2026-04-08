@@ -86,9 +86,9 @@ export async function POST(request: NextRequest) {
 
   // Create departments
   const depts = departmentCodes ?? [
-    { name: "Front Office", code: "FO" }, { name: "Housekeeping", code: "HK" },
-    { name: "F&B", code: "FB" }, { name: "Maintenance", code: "MNT" },
-    { name: "Spa/Wellness", code: "SPA" }, { name: "Administration", code: "ADM" },
+    { name: "Front Office", code: "FO" }, { name: "Room Division", code: "RM" },
+    { name: "F&B", code: "FB" }, { name: "Maintenance", code: "MT" },
+    { name: "Spa/Wellness", code: "SP" }, { name: "Back of House", code: "QA" },
   ];
   for (const d of depts) {
     await prisma.department.create({ data: { name: d.name, code: d.code, propertyId: property.id } });

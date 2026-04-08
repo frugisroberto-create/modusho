@@ -5,11 +5,11 @@ import { useRouter } from "next/navigation";
 
 const DEFAULT_DEPTS = [
   { name: "Front Office", code: "FO", checked: true },
-  { name: "Housekeeping", code: "HK", checked: true },
+  { name: "Room Division", code: "RM", checked: true },
   { name: "F&B", code: "FB", checked: true },
-  { name: "Maintenance", code: "MNT", checked: true },
-  { name: "Spa/Wellness", code: "SPA", checked: true },
-  { name: "Administration", code: "ADM", checked: true },
+  { name: "Maintenance", code: "MT", checked: true },
+  { name: "Spa/Wellness", code: "SP", checked: true },
+  { name: "Back of House", code: "QA", checked: true },
 ];
 
 export default function NewPropertyPage() {
