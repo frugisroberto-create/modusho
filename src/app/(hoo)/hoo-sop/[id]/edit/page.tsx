@@ -19,7 +19,7 @@ export default async function EditSopPage({ params }: Props) {
 
   const content = await prisma.content.findUnique({
     where: { id, isDeleted: false },
-    select: { id: true, type: true, title: true, body: true, status: true, propertyId: true, departmentId: true, isFeatured: true },
+    select: { id: true, type: true, title: true, body: true, status: true, propertyId: true, departmentId: true },
   });
 
   if (!content) notFound();
@@ -39,7 +39,6 @@ export default async function EditSopPage({ params }: Props) {
             contentType={content.type}
             contentStatus={content.status}
             userRole={user.role}
-            isFeatured={content.isFeatured}
           />
         )}
       </div>

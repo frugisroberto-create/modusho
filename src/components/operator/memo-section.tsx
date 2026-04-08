@@ -43,18 +43,11 @@ export function MemoSection() {
         {memos.map((memo) => (
           <div
             key={memo.id}
-            className={`bg-ivory-medium border border-ivory-dark p-5 ${
-              memo.isPinned ? "border-l-[3px] border-l-terracotta" : ""
-            }`}
+            className="bg-ivory-medium border border-ivory-dark p-5"
           >
             <div className="flex items-start gap-3">
               <div className="flex-1 min-w-0">
                 <div className="flex items-center gap-2 mb-1.5">
-                  {memo.isPinned && (
-                    <span className="text-xs font-ui font-medium px-2 py-0.5 rounded bg-terracotta/10 text-terracotta">
-                      In evidenza
-                    </span>
-                  )}
                   <h3 className="font-ui font-medium text-charcoal-dark text-sm truncate">
                     {memo.title}
                   </h3>

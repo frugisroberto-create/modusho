@@ -101,9 +101,6 @@ export default function MemoListPage() {
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center gap-2 mb-1">
                     <span className="text-[10px] font-ui font-bold uppercase tracking-[0.15em] px-2 py-0.5 badge-memo">Memo</span>
-                    {memo.isPinned && (
-                      <span className="text-[10px] font-ui font-bold uppercase tracking-wider px-2 py-0.5 bg-terracotta/10 text-terracotta">In evidenza</span>
-                    )}
                     {isExpired && (
                       <span className="text-[10px] font-ui uppercase tracking-wider px-2 py-0.5 bg-ivory-dark text-charcoal/50">Scaduto</span>
                     )}

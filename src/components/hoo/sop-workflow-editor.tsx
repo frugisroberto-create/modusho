@@ -47,7 +47,6 @@ interface SopWorkflowData {
   consultationPending: boolean;
   publishedAt: string | null;
   createdAt: string;
-  isFeatured?: boolean;
 }
 
 interface NoteItem {
@@ -519,7 +518,7 @@ export function SopWorkflowEditor({ workflowId, currentUserId, currentUserRole, 
 
       {/* ── Azioni post-pubblicazione (HOO / HM) ── */}
       {isPubblicata && (currentUserRole === "ADMIN" || currentUserRole === "SUPER_ADMIN" || currentUserRole === "HOTEL_MANAGER") && (
-        <PublishedActions contentId={wf.contentId} workflowId={workflowId} isFeatured={wf.isFeatured ?? false} onRefresh={fetchWorkflow} />
+        <PublishedActions contentId={wf.contentId} workflowId={workflowId} onRefresh={fetchWorkflow} />
       )}
 
       {/* ── Tabs: Note / Versioni / Allegati / Eventi ── */}
@@ -1029,26 +1028,13 @@ function RaciReassignPanel({ wf, propertyId, onReassigned }: {
   );
 }
 
-function PublishedActions({ contentId, workflowId, isFeatured, onRefresh }: { contentId: string; workflowId: string; isFeatured: boolean; onRefresh: () => Promise<void> }) {
+function PublishedActions({ contentId, workflowId, onRefresh }: { contentId: string; workflowId: string; onRefresh: () => Promise<void> }) {
   const router = useRouter();
   const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [showReopenModal, setShowReopenModal] = useState(false);
   const [showArchiveModal, setShowArchiveModal] = useState(false);
-  const [featured, setFeatured] = useState(isFeatured);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
-
-  const handleToggleFeature = async () => {
-    setLoading(true);
-    try {
-      const method = featured ? "DELETE" : "POST";
-      const res = await fetch(`/api/content/${contentId}/feature`, { method });
-      if (res.ok) {
-        setFeatured(!featured);
-        await onRefresh();
-      }
-    } finally { setLoading(false); }
-  };
 
   const handleReopen = async () => {
     setLoading(true);
@@ -1094,10 +1080,6 @@ function PublishedActions({ contentId, workflowId, isFeatured, onRefresh }: { co
         <button onClick={() => setShowReopenModal(true)}
           className="btn-primary !py-2.5 !px-5">
           Modifica
-        </button>
-        <button onClick={handleToggleFeature} disabled={loading}
-          className="btn-outline !py-2.5 !px-5 disabled:opacity-50">
-          {featured ? "Rimuovi evidenza" : "In evidenza"}
         </button>
         <button onClick={() => setShowArchiveModal(true)}
           className="btn-outline !py-2.5 !px-5">

@@ -125,7 +125,7 @@ export default async function SopDetailPage({ params }: Props) {
         <MobileHide>
           <div className="mt-3 flex items-center gap-2">
             {isFullGovernance ? (
-              <ContentActions contentId={content.id} contentType={content.type} contentStatus={content.status} userRole={user.role} isFeatured={content.isFeatured} sopWorkflowId={content.sopWorkflow?.id} />
+              <ContentActions contentId={content.id} contentType={content.type} contentStatus={content.status} userRole={user.role} sopWorkflowId={content.sopWorkflow?.id} />
             ) : canExportPdf ? (
               <ExportPdfButton contentId={content.id} />
             ) : null}

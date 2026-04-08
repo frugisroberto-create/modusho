@@ -15,7 +15,6 @@ export default function NewMemoPage() {
   const [body, setBody] = useState("");
   const [propertyId, setPropertyId] = useState("");
   const [expiresAt, setExpiresAt] = useState("");
-  const [isFeatured, setIsFeatured] = useState(false);
   const [properties, setProperties] = useState<Property[]>([]);
   const [targetAudience, setTargetAudience] = useState<TargetAudienceState>({
     allDepartments: false,
@@ -63,7 +62,6 @@ export default function NewMemoPage() {
         body: JSON.stringify({
           title, body, propertyId,
           expiresAt: expiresAt || null,
-          isPinned: isFeatured,
           targetAllDepartments: targetAudience.allDepartments,
           targetDepartmentIds: targetAudience.departmentIds,
           targetRoles: targetAudience.roles,
@@ -108,19 +106,10 @@ export default function NewMemoPage() {
             <textarea value={body} onChange={(e) => setBody(e.target.value)} rows={6} required
               className="w-full px-3 py-2 border border-ivory-dark text-sm font-body" placeholder="Testo del memo..." />
           </div>
-          <div className="grid grid-cols-2 gap-4">
-            <div>
-              <label className="block text-sm font-ui font-medium text-charcoal mb-1.5">Scadenza (opzionale)</label>
-              <input type="date" value={expiresAt} onChange={(e) => setExpiresAt(e.target.value)}
-                className="w-full px-3 py-2 border border-ivory-dark text-sm font-ui" />
-            </div>
-            <div className="flex items-end pb-1">
-              <label className="flex items-center gap-2 text-sm font-ui text-charcoal">
-                <input type="checkbox" checked={isFeatured} onChange={(e) => setIsFeatured(e.target.checked)}
-                  className="w-4 h-4 accent-terracotta" />
-                Metti in evidenza
-              </label>
-            </div>
+          <div>
+            <label className="block text-sm font-ui font-medium text-charcoal mb-1.5">Scadenza (opzionale)</label>
+            <input type="date" value={expiresAt} onChange={(e) => setExpiresAt(e.target.value)}
+              className="w-full px-3 py-2 border border-ivory-dark text-sm font-ui" />
           </div>
         </div>
 

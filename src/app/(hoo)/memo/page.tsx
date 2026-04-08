@@ -10,7 +10,6 @@ import { useSession } from "next-auth/react";
 interface MemoItem {
   id: string; contentId: string; title: string; body: string;
   publishedAt: string | null; author: string; isPinned: boolean; expiresAt: string | null;
-  isFeatured: boolean;
 }
 
 interface Property { id: string; name: string; code: string }
@@ -65,12 +64,6 @@ export default function MemoManagementPage() {
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ archive: true }),
     });
-    if (res.ok) fetchMemos();
-  };
-
-  const handleToggleFeature = async (contentId: string, currentlyFeatured: boolean) => {
-    const method = currentlyFeatured ? "DELETE" : "POST";
-    const res = await fetch(`/api/content/${contentId}/feature`, { method });
     if (res.ok) fetchMemos();
   };
 
@@ -139,12 +132,6 @@ export default function MemoManagementPage() {
                   </div>
                   <div className="flex items-center gap-1 shrink-0">
                     <ExportPdfButton contentId={m.contentId} />
-                    {(userRole === "HOTEL_MANAGER" || userRole === "ADMIN" || userRole === "SUPER_ADMIN") && (
-                      <button onClick={() => handleToggleFeature(m.contentId, m.isFeatured)}
-                        className="px-2 py-1 text-xs text-terracotta hover:bg-terracotta/10">
-                        {m.isFeatured ? "Rimuovi evidenza" : "In evidenza"}
-                      </button>
-                    )}
                     <Link href={`/memo/${m.contentId}`} className="px-2 py-1 text-xs text-terracotta hover:bg-terracotta/10">Modifica</Link>
                     <button onClick={() => handleArchive(m.id)} className="px-2 py-1 text-xs text-alert-red hover:bg-alert-red/10">Archivia</button>
                   </div>

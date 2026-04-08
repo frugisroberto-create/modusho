@@ -9,7 +9,6 @@ interface ContentActionsProps {
   contentType?: string;
   contentStatus: string;
   userRole: string;
-  isFeatured?: boolean;
   sopWorkflowId?: string;
 }
 
@@ -23,10 +22,9 @@ function getListRoute(contentType?: string): string {
 
 const BTN_DANGER = "btn-outline-sm !border-alert-red !text-alert-red hover:!bg-alert-red hover:!text-white";
 
-export function ContentActions({ contentId, contentType, contentStatus, userRole, isFeatured = false, sopWorkflowId }: ContentActionsProps) {
+export function ContentActions({ contentId, contentType, contentStatus, userRole, sopWorkflowId }: ContentActionsProps) {
   const router = useRouter();
   const [archiveModal, setArchiveModal] = useState(false);
-  const [featured, setFeatured] = useState(isFeatured);
   const [editModal, setEditModal] = useState(false);
   const [deleteModal, setDeleteModal] = useState(false);
   const [archiveNote, setArchiveNote] = useState("");
@@ -34,16 +32,6 @@ export function ContentActions({ contentId, contentType, contentStatus, userRole
 
   const canAct = userRole === "HOTEL_MANAGER" || userRole === "ADMIN" || userRole === "SUPER_ADMIN";
   if (!canAct) return null;
-
-  const canFeature = canAct; // HM+ can toggle featured
-
-  const handleToggleFeature = async () => {
-    try {
-      const method = featured ? "DELETE" : "POST";
-      const res = await fetch(`/api/content/${contentId}/feature`, { method });
-      if (res.ok) { setFeatured(!featured); router.refresh(); }
-    } catch {}
-  };
 
   const handleArchive = async () => {
     if (archiveNote.length < 5) return;
@@ -71,12 +59,6 @@ export function ContentActions({ contentId, contentType, contentStatus, userRole
     <>
       <div className="flex items-center gap-2 flex-wrap">
         <ExportPdfButton contentId={contentId} />
-
-        {contentStatus === "PUBLISHED" && canFeature && (
-          <button onClick={handleToggleFeature} className="btn-outline-sm">
-            {featured ? "Rimuovi evidenza" : "In evidenza"}
-          </button>
-        )}
 
         {(contentStatus === "PUBLISHED" || (contentStatus !== "ARCHIVED")) && (
           <button onClick={() => contentStatus === "PUBLISHED" && contentType === "SOP" ? setEditModal(true) : router.push(editHref)} className="btn-outline-sm">

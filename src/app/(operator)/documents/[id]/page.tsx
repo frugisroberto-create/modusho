@@ -81,7 +81,7 @@ export default async function DocumentDetailPage({ params }: Props) {
           )}
         </div>
         <div className="mt-3 hidden md:flex items-center gap-2">
-          <ContentActions contentId={content.id} contentType={content.type} contentStatus={content.status} userRole={user.role} isFeatured={content.isFeatured} />
+          <ContentActions contentId={content.id} contentType={content.type} contentStatus={content.status} userRole={user.role} />
         </div>
       </div>
 
