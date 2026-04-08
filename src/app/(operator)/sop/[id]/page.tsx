@@ -1,7 +1,7 @@
 import { notFound, redirect } from "next/navigation";
 import { getSessionUser } from "@/lib/session";
 import { prisma } from "@/lib/prisma";
-import { checkAccess } from "@/lib/rbac";
+import { checkAccess, getAccessibleDepartmentIds } from "@/lib/rbac";
 import { AcknowledgeButton } from "@/components/operator/acknowledge-button";
 import { SopViewTracker } from "@/components/operator/sop-view-tracker";
 import { ContentActions } from "@/components/hoo/content-actions";
@@ -23,7 +23,7 @@ export default async function SopDetailPage({ params }: Props) {
     include: {
       property: { select: { id: true, name: true, code: true } },
       department: { select: { id: true, name: true, code: true } },
-      createdBy: { select: { name: true } },
+      createdBy: { select: { id: true, name: true } },
       sopWorkflow: { select: { id: true, requiresNewAcknowledgment: true, reviewDueDate: true } },
       sopViewRecords: {
         where: { userId: user.id },
@@ -32,13 +32,38 @@ export default async function SopDetailPage({ params }: Props) {
         select: { contentVersion: true, viewedAt: true, acknowledgedAt: true },
       },
       acknowledgments: { where: { userId: user.id }, select: { acknowledgedAt: true }, take: 1 },
+      targetAudience: {
+        select: { targetType: true, targetRole: true, targetDepartmentId: true, targetUserId: true },
+      },
     },
   });
 
   if (!content || content.status !== "PUBLISHED") notFound();
 
-  const hasAccess = await checkAccess(user.id, "OPERATOR", content.propertyId, content.departmentId ?? undefined);
+  // RBAC coarse: l'utente deve poter accedere alla property del contenuto.
+  // NB: NON passiamo content.departmentId qui — la visibility per OPERATOR/HOD
+  // viene poi verificata tramite targetAudience (una SOP può essere targetata
+  // su uno specifico USER o su un DEPARTMENT diverso da quello del content).
+  const hasAccess = await checkAccess(user.id, "OPERATOR", content.propertyId);
   if (!hasAccess) notFound();
+
+  // RBAC fine per OPERATOR/HOD: deve esserci un ContentTarget che matcha
+  // (ROLE OPERATOR, ROLE <userRole>, USER <userId>, o DEPARTMENT accessibile).
+  // Allinea la visibility del dettaglio con quella della lista /api/content.
+  if (user.role === "OPERATOR" || user.role === "HOD") {
+    const accessibleDepts = await getAccessibleDepartmentIds(user.id, content.propertyId);
+    const isInTarget = content.targetAudience.some((t) => {
+      if (t.targetType === "ROLE" && t.targetRole === "OPERATOR") return true;
+      if (t.targetType === "ROLE" && t.targetRole === user.role) return true;
+      if (t.targetType === "USER" && t.targetUserId === user.id) return true;
+      if (t.targetType === "DEPARTMENT" && t.targetDepartmentId && accessibleDepts.includes(t.targetDepartmentId)) return true;
+      return false;
+    });
+    // HOD può comunque vedere i propri contenuti (anche se non nel target)
+    if (!isInTarget && !(user.role === "HOD" && content.createdBy.id === user.id)) {
+      notFound();
+    }
+  }
 
   const isOperator = user.role === "OPERATOR";
   const isHod = user.role === "HOD";

@@ -1,7 +1,7 @@
 import { notFound, redirect } from "next/navigation";
 import { getSessionUser } from "@/lib/session";
 import { prisma } from "@/lib/prisma";
-import { checkAccess } from "@/lib/rbac";
+import { checkAccess, getAccessibleDepartmentIds } from "@/lib/rbac";
 import { AcknowledgeButton } from "@/components/operator/acknowledge-button";
 import { ContentActions } from "@/components/hoo/content-actions";
 import { ContentTimeline } from "@/components/shared/content-timeline";
@@ -22,15 +22,36 @@ export default async function DocumentDetailPage({ params }: Props) {
     include: {
       property: { select: { id: true, name: true, code: true } },
       department: { select: { id: true, name: true, code: true } },
-      createdBy: { select: { name: true } },
+      createdBy: { select: { id: true, name: true } },
       acknowledgments: { where: { userId: user.id }, select: { acknowledgedAt: true }, take: 1 },
+      targetAudience: {
+        select: { targetType: true, targetRole: true, targetDepartmentId: true, targetUserId: true },
+      },
     },
   });
 
   if (!content || content.status !== "PUBLISHED") notFound();
 
-  const hasAccess = await checkAccess(user.id, "OPERATOR", content.propertyId, content.departmentId ?? undefined);
+  // RBAC coarse: property access (no departmentId — la visibility fine è
+  // decisa da targetAudience, non dal departmentId del content).
+  const hasAccess = await checkAccess(user.id, "OPERATOR", content.propertyId);
   if (!hasAccess) notFound();
+
+  // RBAC fine per OPERATOR/HOD: match su targetAudience.
+  // Allinea la visibility del dettaglio con /api/content list.
+  if (user.role === "OPERATOR" || user.role === "HOD") {
+    const accessibleDepts = await getAccessibleDepartmentIds(user.id, content.propertyId);
+    const isInTarget = content.targetAudience.some((t) => {
+      if (t.targetType === "ROLE" && t.targetRole === "OPERATOR") return true;
+      if (t.targetType === "ROLE" && t.targetRole === user.role) return true;
+      if (t.targetType === "USER" && t.targetUserId === user.id) return true;
+      if (t.targetType === "DEPARTMENT" && t.targetDepartmentId && accessibleDepts.includes(t.targetDepartmentId)) return true;
+      return false;
+    });
+    if (!isInTarget && !(user.role === "HOD" && content.createdBy.id === user.id)) {
+      notFound();
+    }
+  }
 
   const acknowledged = content.acknowledgments.length > 0;
   const acknowledgedAt = content.acknowledgments[0]?.acknowledgedAt?.toISOString() ?? null;
