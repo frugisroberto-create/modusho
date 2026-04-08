@@ -192,8 +192,12 @@ export async function DELETE(
     return NextResponse.json({ error: "Non puoi eliminare te stesso" }, { status: 400 });
   }
 
-  const user = await prisma.user.findUnique({ where: { id }, select: { id: true, role: true } });
+  const user = await prisma.user.findUnique({ where: { id }, select: { id: true, role: true, email: true, isActive: true } });
   if (!user) return NextResponse.json({ error: "Utente non trovato" }, { status: 404 });
+
+  if (!user.isActive) {
+    return NextResponse.json({ error: "Utente già disattivato" }, { status: 400 });
+  }
 
   // Check if user is R/C/A in active workflows (draft/working state)
   const activeWorkflows = await prisma.sopWorkflow.count({
@@ -210,15 +214,23 @@ export async function DELETE(
   });
   if (activeWorkflows > 0) {
     return NextResponse.json({
-      error: `Impossibile eliminare: l'utente è coinvolto in ${activeWorkflows} SOP in lavorazione. Riassegnare prima i ruoli.`,
+      error: `Impossibile disattivare: l'utente è coinvolto in ${activeWorkflows} SOP in lavorazione. Riassegnare prima i ruoli RACI.`,
     }, { status: 409 });
   }
 
-  await prisma.$transaction([
-    prisma.propertyAssignment.deleteMany({ where: { userId: id } }),
-    prisma.userContentPermission.deleteMany({ where: { userId: id } }),
-    prisma.user.delete({ where: { id } }),
-  ]);
+  // SOFT DELETE: preserva l'audit trail (riferimenti createdById, authorId,
+  // SopWorkflowEvent.actorId, ContentNote.authorId, ecc. restano intatti).
+  // L'utente non può più loggare (isActive=false + passwordHash vuoto).
+  // L'email originale viene rinominata per liberarla per riuso futuro.
+  const timestamp = Date.now();
+  await prisma.user.update({
+    where: { id },
+    data: {
+      isActive: false,
+      passwordHash: "",
+      email: `${user.email}_DEACTIVATED_${timestamp}`,
+    },
+  });
 
-  return NextResponse.json({ data: { deleted: true } });
+  return NextResponse.json({ data: { deactivated: true } });
 }

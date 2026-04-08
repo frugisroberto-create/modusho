@@ -218,14 +218,20 @@ export default function UserDetailPage() {
         </button>
       </div>
 
-      {/* Modale eliminazione definitiva */}
+      {/* Modale eliminazione definitiva (soft-delete) */}
       {showDeleteModal && (
         <div className="fixed inset-0 bg-charcoal-dark/60 flex items-center justify-center z-50 p-4">
           <div className="bg-ivory w-full max-w-md p-6 border border-ivory-dark">
-            <h3 className="text-lg font-heading font-semibold text-alert-red mb-2">Elimina utente</h3>
-            <p className="text-sm font-ui text-charcoal mb-4">
-              L&apos;utente <strong>{user.name}</strong> verrà eliminato definitivamente dal sistema. Questa azione non è reversibile.
+            <h3 className="text-lg font-heading font-semibold text-alert-red mb-2">Elimina definitivamente</h3>
+            <p className="text-sm font-ui text-charcoal mb-2">
+              L&apos;utente <strong>{user.name}</strong> verrà eliminato:
             </p>
+            <ul className="text-xs font-ui text-charcoal/60 list-disc list-inside mb-3 space-y-0.5">
+              <li>Non potrà più accedere al sistema</li>
+              <li>L&apos;email originale (<strong>{user.email}</strong>) sarà liberata per riuso</li>
+              <li>Tutti i contenuti firmati, le note, gli eventi workflow e l&apos;audit storico <strong>resteranno intatti</strong></li>
+              <li>L&apos;operazione non è reversibile (se serve riattivare, usa &quot;Disattiva utente&quot; invece)</li>
+            </ul>
             {deleteError && (
               <p className="text-sm font-ui text-alert-red bg-alert-red/5 border-l-4 border-alert-red px-3 py-2 mb-4">{deleteError}</p>
             )}
@@ -244,12 +250,12 @@ export default function UserDetailPage() {
                     router.refresh();
                   } else {
                     const json = await res.json().catch(() => null);
-                    setDeleteError(json?.error || "Errore nell'eliminazione");
+                    setDeleteError(json?.error || "Errore nella disattivazione");
                   }
                 } finally { setDeleting(false); }
               }} disabled={deleting}
                 className="px-4 py-2 text-sm font-ui font-medium text-white bg-alert-red hover:bg-alert-red/80 disabled:opacity-50 transition-colors">
-                {deleting ? "..." : "Elimina"}
+                {deleting ? "..." : "Elimina definitivamente"}
               </button>
             </div>
           </div>
