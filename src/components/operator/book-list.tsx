@@ -109,18 +109,38 @@ export function BookList({ contentType, basePath, title }: BookListProps) {
       </div>
 
       {/* Ricerca full-text — filtra la lista */}
-      <div className="flex border border-ivory-dark bg-white overflow-hidden">
-        <input type="text" value={searchQuery} onChange={(e) => handleSearchChange(e.target.value)}
+      <form
+        onSubmit={(e) => {
+          e.preventDefault();
+          if (debounceRef.current) clearTimeout(debounceRef.current);
+          setSearchTerm(searchQuery.trim());
+        }}
+        className="flex border border-ivory-dark bg-white overflow-hidden"
+      >
+        <input
+          type="text"
+          value={searchQuery}
+          onChange={(e) => handleSearchChange(e.target.value)}
           placeholder={`Cerca nel ${title.toLowerCase()}...`}
           className="flex-1 px-5 py-3 text-sm font-ui text-charcoal bg-transparent"
-          style={{ border: "none", boxShadow: "none" }} />
+          style={{ border: "none", boxShadow: "none" }}
+        />
         {searchTerm && (
-          <button onClick={() => { setSearchQuery(""); setSearchTerm(""); }}
-            className="px-4 py-3 text-xs font-ui text-charcoal/50 hover:text-charcoal transition-colors">
+          <button
+            type="button"
+            onClick={() => { setSearchQuery(""); setSearchTerm(""); }}
+            className="px-4 py-3 text-xs font-ui text-charcoal/50 hover:text-charcoal transition-colors"
+          >
             Annulla
           </button>
         )}
-      </div>
+        <button
+          type="submit"
+          className="px-6 py-3 bg-terracotta text-white text-xs font-ui font-semibold uppercase tracking-[0.1em] hover:bg-terracotta-light transition-colors"
+        >
+          Cerca
+        </button>
+      </form>
 
       {items.length === 0 ? (
         <p className="text-sage-light font-ui text-sm text-center py-10">
