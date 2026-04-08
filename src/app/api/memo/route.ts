@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
-import { getAccessiblePropertyIds, checkAccess, canUserManageContentType } from "@/lib/rbac";
+import { getAccessiblePropertyIds, getAccessibleDepartmentIds, checkAccess, canUserManageContentType } from "@/lib/rbac";
 import { sendContentPublishedPush } from "@/lib/push-notification";
 import { z } from "zod/v4";
 
@@ -32,6 +32,7 @@ export async function GET(request: NextRequest) {
 
   const { propertyId, includeExpired, status, page, pageSize } = parsed.data;
   const userId = session.user.id;
+  const userRole = session.user.role;
 
   // RBAC
   const accessiblePropertyIds = await getAccessiblePropertyIds(userId);
@@ -40,9 +41,31 @@ export async function GET(request: NextRequest) {
   }
 
   const now = new Date();
+  const contentWhere: Record<string, unknown> = {
+    status: (status || "PUBLISHED") as "PUBLISHED" | "ARCHIVED",
+  };
+
+  // Visibilità per OPERATOR/HOD basata su targetAudience (ContentTarget)
+  // Allinea il filtro alla logica di /api/content GET
+  if (userRole === "OPERATOR" || userRole === "HOD") {
+    const accessibleDepts = await getAccessibleDepartmentIds(userId, propertyId);
+    contentWhere.targetAudience = {
+      some: {
+        OR: [
+          { targetType: "ROLE", targetRole: "OPERATOR" },
+          { targetType: "ROLE", targetRole: userRole },
+          { targetType: "USER", targetUserId: userId },
+          ...(accessibleDepts.length > 0
+            ? [{ targetType: "DEPARTMENT", targetDepartmentId: { in: accessibleDepts } }]
+            : []),
+        ],
+      },
+    };
+  }
+
   const where: Record<string, unknown> = {
     propertyId,
-    content: { status: (status || "PUBLISHED") as "PUBLISHED" | "ARCHIVED" },
+    content: contentWhere,
   };
 
   // Admin può vedere anche i memo scaduti
