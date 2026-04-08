@@ -59,7 +59,7 @@ export function OperatorShell({
 
   return (
     <OperatorContext.Provider value={{ currentPropertyId, setCurrentPropertyId, properties, userRole }}>
-      <div className="min-h-screen bg-ivory-medium">
+      <div className="min-h-screen bg-ivory">
         <OperatorHeader
           userName={userName}
           userRole={userRole}

@@ -22,10 +22,10 @@ export default async function OperatorHome({ searchParams }: Props) {
   return (
     <div>
       {/* ── Hero: nome hotel + tagline + barra ricerca ──
-          Con la home minimale (no feed, no sezioni editoriali) l'hero ha spazio
-          per respirare — aumentata spaziatura verticale e gap per portare la
-          barra di ricerca verso il centro ottico della pagina. */}
-      <section className="relative z-10 bg-ivory flex flex-col items-center pt-20 sm:pt-28 md:pt-36 pb-16 sm:pb-20 -mx-4 sm:-mx-6 px-4 sm:px-6">
+          Sfondo uniforme con il resto della pagina (bg-ivory sul layout).
+          Con la home minimale l'hero ha spazio per respirare — spaziatura
+          generosa per portare la barra di ricerca verso il centro ottico. */}
+      <section className="relative z-10 flex flex-col items-center pt-20 sm:pt-28 md:pt-36 pb-16 sm:pb-20">
         <PropertyName />
         <div className="w-full max-w-[520px] mt-16 sm:mt-20">
           <SearchBar />
