@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useCallback, useRef } from "react";
+import { useState, useEffect, useCallback } from "react";
 import Link from "next/link";
 import { useOperatorContext } from "./operator-shell";
 import { MobileHide } from "@/components/mobile-hide";
@@ -49,7 +49,6 @@ export function BookList({ contentType, basePath, title }: BookListProps) {
   const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState("");
   const [searchTerm, setSearchTerm] = useState("");
-  const debounceRef = useRef<NodeJS.Timeout | null>(null);
 
   // Carica i reparti accessibili per OPERATOR/HOD
   useEffect(() => {
@@ -60,12 +59,6 @@ export function BookList({ contentType, basePath, title }: BookListProps) {
     }
     fetchDepts();
   }, [needsDeptFilter, currentPropertyId]);
-
-  const handleSearchChange = (val: string) => {
-    setSearchQuery(val);
-    if (debounceRef.current) clearTimeout(debounceRef.current);
-    debounceRef.current = setTimeout(() => setSearchTerm(val), 400);
-  };
 
   const fetchBooks = useCallback(async () => {
     setLoading(true);
@@ -108,35 +101,34 @@ export function BookList({ contentType, basePath, title }: BookListProps) {
         {canCreate && <MobileHide><Link href={HOO_CREATE_PATHS[contentType]} className="btn-primary">Nuova sezione</Link></MobileHide>}
       </div>
 
-      {/* Ricerca full-text — filtra la lista */}
+      {/* Ricerca full-text — submit su CERCA o Enter, niente auto-debounce */}
       <form
         onSubmit={(e) => {
           e.preventDefault();
-          if (debounceRef.current) clearTimeout(debounceRef.current);
           setSearchTerm(searchQuery.trim());
         }}
-        className="flex border border-ivory-dark bg-white overflow-hidden"
+        className="flex border border-ivory-dark bg-white"
       >
         <input
           type="text"
           value={searchQuery}
-          onChange={(e) => handleSearchChange(e.target.value)}
+          onChange={(e) => setSearchQuery(e.target.value)}
           placeholder={`Cerca nel ${title.toLowerCase()}...`}
-          className="flex-1 px-5 py-3 text-sm font-ui text-charcoal bg-transparent"
+          className="min-w-0 flex-1 px-5 py-3 text-sm font-ui text-charcoal bg-transparent"
           style={{ border: "none", boxShadow: "none" }}
         />
         {searchTerm && (
           <button
             type="button"
             onClick={() => { setSearchQuery(""); setSearchTerm(""); }}
-            className="px-4 py-3 text-xs font-ui text-charcoal/50 hover:text-charcoal transition-colors"
+            className="shrink-0 px-4 py-3 text-xs font-ui text-charcoal/50 hover:text-charcoal transition-colors"
           >
             Annulla
           </button>
         )}
         <button
           type="submit"
-          className="px-6 py-3 bg-terracotta text-white text-xs font-ui font-semibold uppercase tracking-[0.1em] hover:bg-terracotta-light transition-colors"
+          className="shrink-0 px-6 py-3 bg-terracotta text-white text-xs font-ui font-semibold uppercase tracking-[0.1em] hover:bg-terracotta-light transition-colors"
         >
           Cerca
         </button>
