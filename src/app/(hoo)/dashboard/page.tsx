@@ -46,7 +46,10 @@ export default function GovernanceDashboardPage() {
   const [departmentFilter, setDepartmentFilter] = useState("");
   const [departments, setDepartments] = useState<{ id: string; name: string }[]>([]);
   const [expandedProperty, setExpandedProperty] = useState<string | null>(null);
-  const [dismissedAlerts, setDismissedAlerts] = useState<Set<number>>(new Set());
+  // Set di chiavi composite "<category>:<id>" per evitare collisioni tra
+  // categorie e per dismissare per identità (non per indice — l'indice
+  // diventa instabile quando si applica il filtro reparto).
+  const [dismissedAlerts, setDismissedAlerts] = useState<Set<string>>(new Set());
 
   const getPeriodDates = useCallback((p: PeriodPreset) => {
     const to = new Date();
@@ -93,18 +96,22 @@ export default function GovernanceDashboardPage() {
   }
   if (!data) return <p className="text-sage-light font-ui">Errore nel caricamento della dashboard</p>;
 
-  const allAlertsRaw = [
-    ...data.alerts.stalledReviewAdmin, ...data.alerts.stalledReviewHm,
-    ...data.alerts.stalledDraft, ...data.alerts.inactiveHotels,
-    ...data.alerts.emptyDepts, ...data.alerts.highReturnHotels,
-    ...data.alerts.lowAckContents,
+  // Costruzione lista alert con chiave composita (categoria:id) stabile
+  // anche dopo filtro reparto / cambio dataset
+  const allAlertsRaw: ((typeof data.alerts.stalledReviewAdmin)[number] & { _key: string })[] = [
+    ...data.alerts.stalledReviewAdmin.map(a => ({ ...a, _key: `stalledReviewAdmin:${a.id}` })),
+    ...data.alerts.stalledReviewHm.map(a => ({ ...a, _key: `stalledReviewHm:${a.id}` })),
+    ...data.alerts.stalledDraft.map(a => ({ ...a, _key: `stalledDraft:${a.id}` })),
+    ...data.alerts.inactiveHotels.map(a => ({ ...a, _key: `inactiveHotels:${a.id}` })),
+    ...data.alerts.emptyDepts.map(a => ({ ...a, _key: `emptyDepts:${a.id}` })),
+    ...data.alerts.highReturnHotels.map(a => ({ ...a, _key: `highReturnHotels:${a.id}` })),
+    ...data.alerts.lowAckContents.map(a => ({ ...a, _key: `lowAckContents:${a.id}` })),
   ].filter((alert) => {
     if (!departmentFilter) return true;
-    // Filter alerts that have a department field
-    if (alert.department === undefined) return true; // alerts without dept (e.g. inactive hotels) pass through
+    if (alert.department === undefined) return true; // alerts senza dept (es. inactive hotels) passano
     return alert.department === null || alert.department === departments.find(d => d.id === departmentFilter)?.name;
   });
-  const allAlerts = allAlertsRaw.filter((_, i) => !dismissedAlerts.has(i));
+  const allAlerts = allAlertsRaw.filter((alert) => !dismissedAlerts.has(alert._key));
 
   const periodLabels: Record<PeriodPreset, string> = { week: "Settimana", month: "Mese", quarter: "Trimestre" };
 
@@ -177,11 +184,10 @@ export default function GovernanceDashboardPage() {
         <section id="critical-alerts">
           <h2 className="text-lg font-heading font-semibold text-charcoal-dark mb-3">Alert critici</h2>
           <div className="space-y-2">
-            {allAlertsRaw.map((alert, i) => {
-              if (dismissedAlerts.has(i)) return null;
+            {allAlerts.map((alert) => {
               const borderColor = alert.severity === "critical" ? "border-l-alert-red" : alert.severity === "warning" ? "border-l-alert-yellow" : "border-l-sage-light";
               return (
-                <div key={`${alert.id}-${i}`}
+                <div key={alert._key}
                   className={`flex items-center justify-between px-5 py-3.5 bg-white border border-ivory-dark border-l-4 ${borderColor}`}>
                   <div className="flex items-center gap-3 flex-1 min-w-0">
                     <svg className={`w-4 h-4 shrink-0 ${alert.severity === "critical" ? "text-alert-red" : alert.severity === "warning" ? "text-alert-yellow" : "text-sage-light"}`}
@@ -194,7 +200,7 @@ export default function GovernanceDashboardPage() {
                     </div>
                   </div>
                   <span className="text-sm font-ui text-charcoal shrink-0 mr-3">{alert.message}</span>
-                  <button onClick={() => setDismissedAlerts(prev => new Set([...prev, i]))}
+                  <button onClick={() => setDismissedAlerts(prev => new Set([...prev, alert._key]))}
                     className="shrink-0 w-6 h-6 flex items-center justify-center text-charcoal/30 hover:text-charcoal/60 transition-colors"
                     title="Nascondi alert">
                     <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
