@@ -4,6 +4,7 @@ import { authOptions } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { checkAccess, canUserManageContentType } from "@/lib/rbac";
 import { resolveRaciRoles, needsReview } from "@/lib/sop-workflow";
+import { sanitizeHtml } from "@/lib/sanitize-html";
 import { z } from "zod/v4";
 
 // ─── GET: lista bozze SOP in cui l'utente e' coinvolto come R/C/A ────
@@ -332,13 +333,16 @@ export async function POST(request: NextRequest) {
 
   // Crea tutto in transazione
   const result = await prisma.$transaction(async (tx) => {
+    // SEC: sanitizza HTML lato server
+    const sanitizedBody = sanitizeHtml(data.body);
+
     // 1. Content
     const content = await tx.content.create({
       data: {
         type: "SOP",
         code: sopCode,
         title: data.title,
-        body: data.body,
+        body: sanitizedBody,
         status: "DRAFT",
         propertyId: data.propertyId,
         departmentId: data.departmentId,
@@ -367,7 +371,7 @@ export async function POST(request: NextRequest) {
         sopWorkflowId: workflow.id,
         versionNumber: 1,
         title: data.title,
-        body: data.body,
+        body: sanitizedBody,
         savedById: userId,
       },
     });

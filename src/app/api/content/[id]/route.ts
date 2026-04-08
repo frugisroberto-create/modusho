@@ -6,6 +6,7 @@ import { checkAccess, canUserManageContentType, getAccessibleDepartmentIds } fro
 import { changeContentStatus } from "@/lib/content-status";
 import { getSubmitTargetStatus } from "@/lib/content-workflow";
 import { sendContentPublishedPush } from "@/lib/push-notification";
+import { sanitizeHtml } from "@/lib/sanitize-html";
 import { z } from "zod/v4";
 
 export async function GET(
@@ -181,7 +182,9 @@ export async function PUT(
     return NextResponse.json({ error: "Accesso negato" }, { status: 403 });
   }
 
-  const { title, body, departmentId, sendToReview, publishDirectly, requireNewAcknowledgment, revisionNote } = parsed.data;
+  const { title, body: rawBodyInput, departmentId, sendToReview, publishDirectly, requireNewAcknowledgment, revisionNote } = parsed.data;
+  // SEC: sanitizza HTML lato server se il body è stato inviato
+  const body = rawBodyInput !== undefined ? sanitizeHtml(rawBodyInput) : undefined;
 
   // Blocca cambio departmentId non autorizzato
   if (departmentId !== undefined && departmentId !== content.departmentId) {
