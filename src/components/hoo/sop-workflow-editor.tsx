@@ -544,7 +544,7 @@ export function SopWorkflowEditor({ workflowId, currentUserId, currentUserRole, 
           {activeTab === "note" && <NotesPanel workflowId={workflowId} />}
           {activeTab === "versioni" && <VersionsPanel workflowId={workflowId} />}
           {activeTab === "allegati" && (
-            <AttachmentUploader contentId={wf.contentId} canEdit={(isR || isAdminOverride) && isInLavorazione} />
+            <AttachmentUploader contentId={wf.contentId} canEdit={(isR || isC || isA || isAdminOverride || isHm || isHoo) && isInLavorazione && !wf.submittedToA} />
           )}
           {activeTab === "eventi" && <EventsPanel workflowId={workflowId} />}
         </div>
