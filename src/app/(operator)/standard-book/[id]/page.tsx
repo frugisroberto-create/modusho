@@ -2,6 +2,7 @@ import { notFound, redirect } from "next/navigation";
 import { getSessionUser } from "@/lib/session";
 import { prisma } from "@/lib/prisma";
 import { canUserAccessContent } from "@/lib/rbac";
+import { stripEnColumnFromStandardBook } from "@/lib/standard-book";
 import { AcknowledgeButton } from "@/components/operator/acknowledge-button";
 import Link from "next/link";
 
@@ -68,9 +69,11 @@ export default async function StandardBookDetailPage({ params }: Props) {
         </div>
       </div>
 
-      {/* Tabella standard — larghezza piena, stili inline preservati (no prose reset) */}
+      {/* Tabella standard — larghezza piena, stili inline preservati (no prose reset).
+          La colonna "Standard (EN)" viene rimossa server-side per migliorare la
+          leggibilità (specialmente su mobile) — era un duplicato della colonna IT. */}
       <div className="overflow-x-auto mb-8 border border-ivory-dark bg-white"
-        dangerouslySetInnerHTML={{ __html: content.body }} />
+        dangerouslySetInnerHTML={{ __html: stripEnColumnFromStandardBook(content.body) }} />
 
       {user.role === "OPERATOR" && (
         <div className="border-t border-ivory-dark pt-6">
