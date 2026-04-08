@@ -99,17 +99,20 @@ export async function GET(request: NextRequest) {
     : Prisma.sql`AND c.status != 'ARCHIVED'`;
 
   // Visibility filter:
-  //  - OPERATOR/HOD: filter by ContentTarget (targetAudience) for PUBLISHED content
-  //    BUT for HOD on DRAFT/REVIEW we use the legacy department-based filter
-  //    so HOD can search in all drafts of their perimeter (departments assigned).
-  //  - HM/ADMIN/SUPER_ADMIN: legacy department-based filter.
+  //  - OPERATOR: filter by ContentTarget (targetAudience): ROLE/OPERATOR, ROLE/<userRole>,
+  //    USER/<userId>, DEPARTMENT in perimeter.
+  //  - HOD/HM/ADMIN/SUPER_ADMIN: legacy department-based filter (search in drafts perimeter).
   const isOperator = session.user.role === "OPERATOR";
+  const userIdParam = session.user.id;
+  const userRoleParam = session.user.role;
   const visibilityCondition = isOperator
     ? Prisma.sql`AND EXISTS (
         SELECT 1 FROM "ContentTarget" ct
         WHERE ct."contentId" = c.id
           AND (
             (ct."targetType" = 'ROLE' AND ct."targetRole" = 'OPERATOR')
+            OR (ct."targetType" = 'ROLE' AND ct."targetRole" = ${userRoleParam})
+            OR (ct."targetType" = 'USER' AND ct."targetUserId" = ${userIdParam})
             OR (ct."targetType" = 'DEPARTMENT' AND ct."targetDepartmentId" = ANY(${departmentFilter}))
           )
       )`

@@ -85,17 +85,21 @@ export async function GET(request: NextRequest) {
 
   // Visibilità per OPERATOR/HOD basata su targetAudience (ContentTarget)
   // Vale per SOP, DOCUMENT, MEMO, STANDARD_BOOK
+  // Match su:
+  //  - ROLE/OPERATOR (tutti gli operatori — visibile a OPERATOR e HOD)
+  //  - ROLE/<userRole> (target rivolto al ruolo dell'utente — es. ROLE/HOD)
+  //  - USER/<userId> (target rivolto specificamente all'utente)
+  //  - DEPARTMENT/<deptId> (target su uno dei reparti accessibili dell'utente)
   if (userRole === "OPERATOR" || userRole === "HOD") {
-    where.targetAudience = {
-      some: {
-        OR: [
-          { targetType: "ROLE", targetRole: "OPERATOR" },
-          ...(allAccessibleDeptIds.length > 0
-            ? [{ targetType: "DEPARTMENT", targetDepartmentId: { in: allAccessibleDeptIds } }]
-            : []),
-        ],
-      },
-    };
+    const orClauses: Record<string, unknown>[] = [
+      { targetType: "ROLE", targetRole: "OPERATOR" },
+      { targetType: "ROLE", targetRole: userRole },
+      { targetType: "USER", targetUserId: userId },
+    ];
+    if (allAccessibleDeptIds.length > 0) {
+      orClauses.push({ targetType: "DEPARTMENT", targetDepartmentId: { in: allAccessibleDeptIds } });
+    }
+    where.targetAudience = { some: { OR: orClauses } };
   } else {
     // HM/ADMIN/SUPER_ADMIN: vedono tutto in base alla property accessibile
     // (logica dipartimentale legacy mantenuta come fallback opzionale)
@@ -231,8 +235,11 @@ const createContentSchema = z.object({
   body: z.string().min(1),
   propertyId: z.string(),
   departmentId: z.string().nullable().optional(),
+  // Destinatari (ContentTarget) — uno o più tipi possono essere combinati
   targetDepartmentIds: z.array(z.string()).optional().default([]),
   targetAllDepartments: z.boolean().optional().default(false),
+  targetRoles: z.array(z.enum(["OPERATOR", "HOD", "HOTEL_MANAGER"])).optional().default([]),
+  targetUserIds: z.array(z.string()).optional().default([]),
   sendToReview: z.boolean().optional(),
   publishDirectly: z.boolean().optional(),
 });
@@ -317,23 +324,32 @@ export async function POST(request: NextRequest) {
     },
   });
 
-  // ContentTarget: destinatari
-  if (parsed.data.targetAllDepartments) {
-    await prisma.contentTarget.create({
-      data: { contentId: content.id, targetType: "ROLE", targetRole: "OPERATOR" },
-    });
-  } else if (parsed.data.targetDepartmentIds.length > 0) {
-    await prisma.contentTarget.createMany({
-      data: parsed.data.targetDepartmentIds.map((deptId) => ({
-        contentId: content.id,
-        targetType: "DEPARTMENT" as const,
-        targetDepartmentId: deptId,
-      })),
-    });
-  } else if (departmentId) {
-    await prisma.contentTarget.create({
-      data: { contentId: content.id, targetType: "DEPARTMENT", targetDepartmentId: departmentId },
-    });
+  // ContentTarget: destinatari (più tipi possono coesistere)
+  const { targetAllDepartments, targetDepartmentIds, targetRoles, targetUserIds } = parsed.data;
+  const targetsToCreate: { contentId: string; targetType: "ROLE" | "DEPARTMENT" | "USER"; targetRole?: "OPERATOR" | "HOD" | "HOTEL_MANAGER"; targetDepartmentId?: string; targetUserId?: string }[] = [];
+
+  if (targetAllDepartments) {
+    targetsToCreate.push({ contentId: content.id, targetType: "ROLE", targetRole: "OPERATOR" });
+  }
+  for (const role of targetRoles) {
+    // Evita duplicati con OPERATOR già aggiunto da targetAllDepartments
+    if (role === "OPERATOR" && targetAllDepartments) continue;
+    targetsToCreate.push({ contentId: content.id, targetType: "ROLE", targetRole: role });
+  }
+  for (const deptId of targetDepartmentIds) {
+    targetsToCreate.push({ contentId: content.id, targetType: "DEPARTMENT", targetDepartmentId: deptId });
+  }
+  for (const uid of targetUserIds) {
+    targetsToCreate.push({ contentId: content.id, targetType: "USER", targetUserId: uid });
+  }
+
+  // Fallback legacy: se nessun target esplicito ma c'è departmentId della SOP, usa quello
+  if (targetsToCreate.length === 0 && departmentId) {
+    targetsToCreate.push({ contentId: content.id, targetType: "DEPARTMENT", targetDepartmentId: departmentId });
+  }
+
+  if (targetsToCreate.length > 0) {
+    await prisma.contentTarget.createMany({ data: targetsToCreate });
   }
 
   // ContentStatusHistory: creazione → DRAFT

@@ -210,8 +210,11 @@ const createSopSchema = z.object({
   hodUserId: z.string().optional(),
   hmUserId: z.string().optional(),
   hooUserId: z.string().optional(),
+  // Destinatari (ContentTarget) — più tipi possono coesistere
   targetDepartmentIds: z.array(z.string()).optional().default([]),
   targetAllDepartments: z.boolean().optional().default(false),
+  targetRoles: z.array(z.enum(["OPERATOR", "HOD", "HOTEL_MANAGER"])).optional().default([]),
+  targetUserIds: z.array(z.string()).optional().default([]),
 });
 
 export async function POST(request: NextRequest) {
@@ -378,25 +381,29 @@ export async function POST(request: NextRequest) {
       },
     });
 
-    // 5. ContentTarget: destinatari
+    // 5. ContentTarget: destinatari (più tipi possono coesistere)
+    const targetsToCreate: { contentId: string; targetType: "ROLE" | "DEPARTMENT" | "USER"; targetRole?: "OPERATOR" | "HOD" | "HOTEL_MANAGER"; targetDepartmentId?: string; targetUserId?: string }[] = [];
+
     if (data.targetAllDepartments) {
-      await tx.contentTarget.create({
-        data: { contentId: content.id, targetType: "ROLE", targetRole: "OPERATOR" },
-      });
-    } else if (data.targetDepartmentIds.length > 0) {
-      await tx.contentTarget.createMany({
-        data: data.targetDepartmentIds.map((deptId) => ({
-          contentId: content.id,
-          targetType: "DEPARTMENT" as const,
-          targetDepartmentId: deptId,
-        })),
-      });
-    } else {
-      // Default: reparto della SOP
-      await tx.contentTarget.create({
-        data: { contentId: content.id, targetType: "DEPARTMENT", targetDepartmentId: data.departmentId },
-      });
+      targetsToCreate.push({ contentId: content.id, targetType: "ROLE", targetRole: "OPERATOR" });
     }
+    for (const r of data.targetRoles) {
+      if (r === "OPERATOR" && data.targetAllDepartments) continue;
+      targetsToCreate.push({ contentId: content.id, targetType: "ROLE", targetRole: r });
+    }
+    for (const deptId of data.targetDepartmentIds) {
+      targetsToCreate.push({ contentId: content.id, targetType: "DEPARTMENT", targetDepartmentId: deptId });
+    }
+    for (const uid of data.targetUserIds) {
+      targetsToCreate.push({ contentId: content.id, targetType: "USER", targetUserId: uid });
+    }
+
+    // Fallback legacy: nessun target esplicito → reparto della SOP
+    if (targetsToCreate.length === 0) {
+      targetsToCreate.push({ contentId: content.id, targetType: "DEPARTMENT", targetDepartmentId: data.departmentId });
+    }
+
+    await tx.contentTarget.createMany({ data: targetsToCreate });
 
     // 6. ContentStatusHistory
     await tx.contentStatusHistory.create({
