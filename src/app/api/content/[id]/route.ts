@@ -94,8 +94,11 @@ const updateContentSchema = z.object({
   title: z.string().min(1).max(500).optional(),
   body: z.string().min(1).optional(),
   departmentId: z.string().nullable().optional(),
+  // Destinatari (ContentTarget) — più tipi possono coesistere
   targetDepartmentIds: z.array(z.string()).optional(),
   targetAllDepartments: z.boolean().optional(),
+  targetRoles: z.array(z.enum(["OPERATOR", "HOD", "HOTEL_MANAGER"])).optional(),
+  targetUserIds: z.array(z.string()).optional(),
   sendToReview: z.boolean().optional(),
   publishDirectly: z.boolean().optional(),
   requireNewAcknowledgment: z.boolean().optional(),
@@ -231,21 +234,34 @@ export async function PUT(
   }
 
   // Aggiornamento ContentTarget (solo se non ancora pubblicato)
-  if ((content.status === "DRAFT" || content.status === "RETURNED") &&
-      (parsed.data.targetDepartmentIds !== undefined || parsed.data.targetAllDepartments !== undefined)) {
+  // Replace-all: se uno qualsiasi dei campi target è presente, riscrive tutti i target
+  const hasTargetUpdate =
+    parsed.data.targetDepartmentIds !== undefined ||
+    parsed.data.targetAllDepartments !== undefined ||
+    parsed.data.targetRoles !== undefined ||
+    parsed.data.targetUserIds !== undefined;
+
+  if ((content.status === "DRAFT" || content.status === "RETURNED") && hasTargetUpdate) {
     await prisma.contentTarget.deleteMany({ where: { contentId: id } });
+
+    const targetsToCreate: { contentId: string; targetType: "ROLE" | "DEPARTMENT" | "USER"; targetRole?: "OPERATOR" | "HOD" | "HOTEL_MANAGER"; targetDepartmentId?: string; targetUserId?: string }[] = [];
+
     if (parsed.data.targetAllDepartments) {
-      await prisma.contentTarget.create({
-        data: { contentId: id, targetType: "ROLE", targetRole: "OPERATOR" },
-      });
-    } else if (parsed.data.targetDepartmentIds && parsed.data.targetDepartmentIds.length > 0) {
-      await prisma.contentTarget.createMany({
-        data: parsed.data.targetDepartmentIds.map((deptId: string) => ({
-          contentId: id,
-          targetType: "DEPARTMENT" as const,
-          targetDepartmentId: deptId,
-        })),
-      });
+      targetsToCreate.push({ contentId: id, targetType: "ROLE", targetRole: "OPERATOR" });
+    }
+    for (const r of (parsed.data.targetRoles ?? [])) {
+      if (r === "OPERATOR" && parsed.data.targetAllDepartments) continue;
+      targetsToCreate.push({ contentId: id, targetType: "ROLE", targetRole: r });
+    }
+    for (const deptId of (parsed.data.targetDepartmentIds ?? [])) {
+      targetsToCreate.push({ contentId: id, targetType: "DEPARTMENT", targetDepartmentId: deptId });
+    }
+    for (const uid of (parsed.data.targetUserIds ?? [])) {
+      targetsToCreate.push({ contentId: id, targetType: "USER", targetUserId: uid });
+    }
+
+    if (targetsToCreate.length > 0) {
+      await prisma.contentTarget.createMany({ data: targetsToCreate });
     }
   }
 

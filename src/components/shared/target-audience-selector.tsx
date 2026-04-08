@@ -1,0 +1,220 @@
+"use client";
+
+import { useState, useEffect } from "react";
+
+interface Department {
+  id: string;
+  name: string;
+  code: string;
+}
+
+interface User {
+  id: string;
+  name: string;
+  role: string;
+  email: string;
+}
+
+export type TargetRole = "OPERATOR" | "HOD" | "HOTEL_MANAGER";
+
+export interface TargetAudienceState {
+  allDepartments: boolean;            // ROLE/OPERATOR su tutta la property
+  departmentIds: string[];            // DEPARTMENT/<id>
+  roles: TargetRole[];                // ROLE/<role>
+  userIds: string[];                  // USER/<id>
+}
+
+interface TargetAudienceSelectorProps {
+  propertyId: string;
+  userRole: string;                   // ruolo dell'utente che sta creando
+  userDepartmentId?: string | null;
+  value: TargetAudienceState;
+  onChange: (value: TargetAudienceState) => void;
+}
+
+const ROLE_LABELS: Record<TargetRole, string> = {
+  OPERATOR: "Tutti gli operatori",
+  HOD: "Tutti gli HOD (Head of Department)",
+  HOTEL_MANAGER: "Hotel Manager",
+};
+
+export function TargetAudienceSelector({
+  propertyId,
+  userRole,
+  userDepartmentId,
+  value,
+  onChange,
+}: TargetAudienceSelectorProps) {
+  const [departments, setDepartments] = useState<Department[]>([]);
+  const [users, setUsers] = useState<User[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [userSearch, setUserSearch] = useState("");
+
+  useEffect(() => {
+    async function load() {
+      setLoading(true);
+      try {
+        const [deptRes, usersRes] = await Promise.all([
+          fetch(`/api/properties/${propertyId}/departments`),
+          fetch(`/api/users?propertyId=${propertyId}&isActive=true&pageSize=50`),
+        ]);
+        if (deptRes.ok) {
+          const j = await deptRes.json();
+          setDepartments(j.data || []);
+        }
+        if (usersRes.ok) {
+          const j = await usersRes.json();
+          setUsers(j.data || []);
+        }
+      } finally { setLoading(false); }
+    }
+    if (propertyId) load();
+  }, [propertyId]);
+
+  // HOD: ruolo limitato — può creare contenuti solo per il proprio reparto.
+  // Mostra un selettore semplificato (read-only sul proprio reparto).
+  if (userRole === "HOD") {
+    const ownDept = departments.find((d) => d.id === userDepartmentId);
+    return (
+      <div>
+        <label className="block text-sm font-ui font-medium text-charcoal mb-1.5">Destinatari</label>
+        <div className="border border-ivory-dark bg-ivory-medium/30 px-3 py-2 text-sm text-charcoal">
+          {ownDept?.name || "Il tuo reparto"}
+        </div>
+        <p className="text-xs text-charcoal/40 mt-1">Come Capo Reparto puoi creare contenuti solo per il tuo reparto.</p>
+      </div>
+    );
+  }
+
+  const toggleAllDepartments = () => {
+    onChange({ ...value, allDepartments: !value.allDepartments });
+  };
+
+  const toggleDepartment = (deptId: string) => {
+    const isSelected = value.departmentIds.includes(deptId);
+    const next = isSelected
+      ? value.departmentIds.filter((id) => id !== deptId)
+      : [...value.departmentIds, deptId];
+    onChange({ ...value, departmentIds: next });
+  };
+
+  const toggleRole = (role: TargetRole) => {
+    const isSelected = value.roles.includes(role);
+    const next = isSelected
+      ? value.roles.filter((r) => r !== role)
+      : [...value.roles, role];
+    onChange({ ...value, roles: next });
+  };
+
+  const toggleUser = (userId: string) => {
+    const isSelected = value.userIds.includes(userId);
+    const next = isSelected
+      ? value.userIds.filter((id) => id !== userId)
+      : [...value.userIds, userId];
+    onChange({ ...value, userIds: next });
+  };
+
+  const filteredUsers = userSearch.trim().length >= 2
+    ? users.filter((u) =>
+        u.name.toLowerCase().includes(userSearch.toLowerCase()) ||
+        u.email.toLowerCase().includes(userSearch.toLowerCase())
+      )
+    : users;
+
+  const totalSelected =
+    (value.allDepartments ? 1 : 0) +
+    value.departmentIds.length +
+    value.roles.length +
+    value.userIds.length;
+
+  if (loading) return <div className="text-sm text-charcoal/40 font-ui">Caricamento destinatari...</div>;
+
+  return (
+    <div className="space-y-4">
+      <label className="block text-sm font-ui font-medium text-charcoal">Destinatari</label>
+      <p className="text-xs text-charcoal/45 -mt-3">
+        Seleziona uno o più tipi di destinatari. Il contenuto sarà visibile a chi corrisponde ad almeno una delle scelte.
+      </p>
+
+      {/* SEZIONE 1 — Tutti gli operatori */}
+      <div>
+        <label className="flex items-center gap-3 py-2.5 px-3 border border-ivory-dark cursor-pointer hover:bg-ivory-medium/30 transition-colors">
+          <input type="checkbox" checked={value.allDepartments} onChange={toggleAllDepartments} className="w-4 h-4 accent-terracotta" />
+          <div>
+            <span className="text-sm font-ui font-medium text-charcoal">Tutti gli operatori</span>
+            <p className="text-xs text-charcoal/45">Visibile a ogni operatore della struttura</p>
+          </div>
+        </label>
+      </div>
+
+      {/* SEZIONE 2 — Reparti specifici */}
+      <div>
+        <p className="text-xs font-ui font-semibold uppercase tracking-wider text-charcoal/55 mb-1.5">Reparti</p>
+        <div className="border border-ivory-dark divide-y divide-ivory-dark/50 max-h-[200px] overflow-y-auto">
+          {departments.map((dept) => (
+            <label key={dept.id} className="flex items-center gap-3 py-2 px-3 cursor-pointer hover:bg-ivory-medium/30 transition-colors">
+              <input type="checkbox"
+                checked={value.departmentIds.includes(dept.id)}
+                onChange={() => toggleDepartment(dept.id)}
+                className="w-4 h-4 accent-terracotta" />
+              <span className="text-sm font-ui text-charcoal">{dept.name}</span>
+              <span className="text-xs text-charcoal/40 ml-auto font-ui">{dept.code}</span>
+            </label>
+          ))}
+          {departments.length === 0 && (
+            <p className="px-3 py-2 text-xs font-ui text-charcoal/40 italic">Nessun reparto configurato</p>
+          )}
+        </div>
+      </div>
+
+      {/* SEZIONE 3 — Ruoli trasversali */}
+      <div>
+        <p className="text-xs font-ui font-semibold uppercase tracking-wider text-charcoal/55 mb-1.5">Ruoli trasversali</p>
+        <div className="border border-ivory-dark divide-y divide-ivory-dark/50">
+          {(["HOD", "HOTEL_MANAGER"] as TargetRole[]).map((role) => (
+            <label key={role} className="flex items-center gap-3 py-2 px-3 cursor-pointer hover:bg-ivory-medium/30 transition-colors">
+              <input type="checkbox"
+                checked={value.roles.includes(role)}
+                onChange={() => toggleRole(role)}
+                className="w-4 h-4 accent-terracotta" />
+              <span className="text-sm font-ui text-charcoal">{ROLE_LABELS[role]}</span>
+            </label>
+          ))}
+        </div>
+      </div>
+
+      {/* SEZIONE 4 — Utenti specifici */}
+      <div>
+        <p className="text-xs font-ui font-semibold uppercase tracking-wider text-charcoal/55 mb-1.5">Utenti specifici</p>
+        <input type="text" value={userSearch} onChange={(e) => setUserSearch(e.target.value)}
+          placeholder="Cerca per nome o email..."
+          className="w-full px-3 py-2 text-sm font-ui border border-ivory-dark mb-1.5" />
+        <div className="border border-ivory-dark divide-y divide-ivory-dark/50 max-h-[180px] overflow-y-auto">
+          {filteredUsers.length === 0 ? (
+            <p className="px-3 py-2 text-xs font-ui text-charcoal/40 italic">Nessun utente trovato</p>
+          ) : (
+            filteredUsers.map((u) => (
+              <label key={u.id} className="flex items-center gap-3 py-2 px-3 cursor-pointer hover:bg-ivory-medium/30 transition-colors">
+                <input type="checkbox"
+                  checked={value.userIds.includes(u.id)}
+                  onChange={() => toggleUser(u.id)}
+                  className="w-4 h-4 accent-terracotta" />
+                <span className="text-sm font-ui text-charcoal">{u.name}</span>
+                <span className="text-[10px] font-ui text-charcoal/40 ml-auto uppercase tracking-wider">{u.role}</span>
+              </label>
+            ))
+          )}
+        </div>
+      </div>
+
+      {totalSelected === 0 && (
+        <p className="text-xs text-alert-red font-ui">Seleziona almeno un destinatario</p>
+      )}
+      {totalSelected > 0 && (
+        <p className="text-xs text-charcoal/40 font-ui">
+          {totalSelected} {totalSelected === 1 ? "selezione" : "selezioni"} attiva/e
+        </p>
+      )}
+    </div>
+  );
+}

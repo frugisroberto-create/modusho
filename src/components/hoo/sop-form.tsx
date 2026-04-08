@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
-import { DepartmentTargetSelector } from "@/components/shared/department-target-selector";
+import { TargetAudienceSelector, type TargetAudienceState, type TargetRole } from "@/components/shared/target-audience-selector";
 import { AttachmentUploader } from "@/components/shared/attachment-uploader";
 import { SopEditor } from "@/components/shared/sop-editor";
 
@@ -27,10 +27,12 @@ export function SopForm({ mode, contentId, initialData, userRole, userDepartment
   const [body, setBody] = useState(initialData?.body || "");
   const [propertyId, setPropertyId] = useState(initialData?.propertyId || "");
   const [departmentId, setDepartmentId] = useState(initialData?.departmentId || "");
-  const [targetDepartmentIds, setTargetDepartmentIds] = useState<string[]>(
-    initialData?.departmentId ? [initialData.departmentId] : []
-  );
-  const [targetAllDepartments, setTargetAllDepartments] = useState(!initialData?.departmentId);
+  const [targetAudience, setTargetAudience] = useState<TargetAudienceState>({
+    allDepartments: !initialData?.departmentId,
+    departmentIds: initialData?.departmentId ? [initialData.departmentId] : [],
+    roles: [],
+    userIds: [],
+  });
   const [properties, setProperties] = useState<Property[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
@@ -84,25 +86,25 @@ export function SopForm({ mode, contentId, initialData, userRole, userDepartment
     fetchHods();
   }, [canInvolveHod, propertyId]);
 
-  // In edit mode, load existing targets
+  // In edit mode, load existing targets (tutti i tipi: ROLE, DEPARTMENT, USER)
   useEffect(() => {
     if (mode === "edit" && contentId) {
       async function loadTargets() {
         const res = await fetch(`/api/content/${contentId}`);
         if (res.ok) {
           const json = await res.json();
-          const targets = json.data.targetAudience || [];
-          const hasRoleTarget = targets.some((t: { targetType: string }) => t.targetType === "ROLE");
-          if (hasRoleTarget) {
-            setTargetAllDepartments(true);
-            setTargetDepartmentIds([]);
-          } else {
-            const deptIds = targets
-              .filter((t: { targetType: string }) => t.targetType === "DEPARTMENT")
-              .map((t: { targetDepartmentId: string }) => t.targetDepartmentId);
-            setTargetDepartmentIds(deptIds);
-            setTargetAllDepartments(false);
-          }
+          const targets: { targetType: string; targetRole?: string; targetDepartmentId?: string; targetUserId?: string }[] = json.data.targetAudience || [];
+          const allDepartments = targets.some(t => t.targetType === "ROLE" && t.targetRole === "OPERATOR");
+          const roles = targets
+            .filter(t => t.targetType === "ROLE" && t.targetRole && t.targetRole !== "OPERATOR")
+            .map(t => t.targetRole as TargetRole);
+          const departmentIds = targets
+            .filter(t => t.targetType === "DEPARTMENT" && t.targetDepartmentId)
+            .map(t => t.targetDepartmentId as string);
+          const userIds = targets
+            .filter(t => t.targetType === "USER" && t.targetUserId)
+            .map(t => t.targetUserId as string);
+          setTargetAudience({ allDepartments, departmentIds, roles, userIds });
         }
       }
       loadTargets();
@@ -111,6 +113,12 @@ export function SopForm({ mode, contentId, initialData, userRole, userDepartment
 
   const selectedProperty = properties.find(p => p.id === propertyId);
   const departments = selectedProperty?.departments || [];
+
+  const totalTargets =
+    (targetAudience.allDepartments ? 1 : 0) +
+    targetAudience.departmentIds.length +
+    targetAudience.roles.length +
+    targetAudience.userIds.length;
 
   const handleSubmit = async () => {
     setError("");
@@ -122,8 +130,8 @@ export function SopForm({ mode, contentId, initialData, userRole, userDepartment
       setError("Seleziona il reparto della SOP");
       return;
     }
-    if (!targetAllDepartments && targetDepartmentIds.length === 0) {
-      setError("Seleziona almeno un reparto destinatario");
+    if (totalTargets === 0) {
+      setError("Seleziona almeno un destinatario");
       return;
     }
     if (involveHod && !hodUserId) {
@@ -139,8 +147,10 @@ export function SopForm({ mode, contentId, initialData, userRole, userDepartment
           title, body, propertyId, departmentId,
           involveHod,
           ...(involveHod && hodUserId ? { hodUserId } : {}),
-          targetDepartmentIds: targetAllDepartments ? [] : targetDepartmentIds,
-          targetAllDepartments,
+          targetAllDepartments: targetAudience.allDepartments,
+          targetDepartmentIds: targetAudience.departmentIds,
+          targetRoles: targetAudience.roles,
+          targetUserIds: targetAudience.userIds,
         };
         const res = await fetch("/api/sop-workflow", {
           method: "POST",
@@ -161,8 +171,10 @@ export function SopForm({ mode, contentId, initialData, userRole, userDepartment
         const payload = {
           title, body,
           departmentId: departmentId || null,
-          targetDepartmentIds: targetAllDepartments ? [] : targetDepartmentIds,
-          targetAllDepartments,
+          targetAllDepartments: targetAudience.allDepartments,
+          targetDepartmentIds: targetAudience.departmentIds,
+          targetRoles: targetAudience.roles,
+          targetUserIds: targetAudience.userIds,
         };
         const res = await fetch(`/api/content/${contentId}`, {
           method: "PUT",
@@ -180,7 +192,7 @@ export function SopForm({ mode, contentId, initialData, userRole, userDepartment
     } finally { setLoading(false); }
   };
 
-  const isValid = title.trim() && body.trim() && propertyId && departmentId && (targetAllDepartments || targetDepartmentIds.length > 0);
+  const isValid = title.trim() && body.trim() && propertyId && departmentId && totalTargets > 0;
 
   return (
     <div className="max-w-3xl space-y-6">
@@ -198,8 +210,7 @@ export function SopForm({ mode, contentId, initialData, userRole, userDepartment
           onChange={(e) => {
             const newPropId = e.target.value;
             setPropertyId(newPropId);
-            setTargetDepartmentIds([]);
-            setTargetAllDepartments(false);
+            setTargetAudience({ allDepartments: false, departmentIds: [], roles: [], userIds: [] });
             setInvolveHod(false);
             setHodUserId("");
             // Auto-select department if only one
@@ -264,15 +275,12 @@ export function SopForm({ mode, contentId, initialData, userRole, userDepartment
 
       {/* Destinatari */}
       {propertyId && (
-        <DepartmentTargetSelector
+        <TargetAudienceSelector
           propertyId={propertyId}
           userRole={effectiveRole}
           userDepartmentId={userDepartmentId}
-          selectedDepartmentIds={targetDepartmentIds}
-          onChange={(ids, all) => {
-            setTargetDepartmentIds(ids);
-            setTargetAllDepartments(all);
-          }}
+          value={targetAudience}
+          onChange={setTargetAudience}
         />
       )}
 
@@ -308,7 +316,7 @@ export function SopForm({ mode, contentId, initialData, userRole, userDepartment
           {!body.trim() && <p>— Inserisci il contenuto</p>}
           {!propertyId && <p>— Seleziona una struttura</p>}
           {!departmentId && <p>— Seleziona il reparto della SOP</p>}
-          {!targetAllDepartments && targetDepartmentIds.length === 0 && <p>— Seleziona almeno un reparto destinatario</p>}
+          {totalTargets === 0 && <p>— Seleziona almeno un destinatario</p>}
         </div>
       )}
 
