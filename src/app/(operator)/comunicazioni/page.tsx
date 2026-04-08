@@ -18,7 +18,7 @@ export default function MemoListPage() {
   const { data: session } = useSession();
   const userId = session?.user?.id || "";
   const { currentPropertyId, userRole } = useOperatorContext();
-  const canCreate = ["HOTEL_MANAGER", "ADMIN", "SUPER_ADMIN"].includes(userRole);
+  const canCreate = ["HOD", "HOTEL_MANAGER", "ADMIN", "SUPER_ADMIN"].includes(userRole);
 
   const [memos, setMemos] = useState<MemoItem[]>([]);
   const [total, setTotal] = useState(0);

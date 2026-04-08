@@ -82,8 +82,8 @@ export default function MemoManagementPage() {
   return (
     <div className="max-w-4xl space-y-4">
       <div className="flex items-center justify-between">
-        <h1 className="text-xl font-bold text-gray-900">Memo</h1>
-        <Link href="/memo/new" className="px-4 py-2 text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 ">
+        <h1 className="text-xl font-heading font-medium text-charcoal-dark">Memo</h1>
+        <Link href="/memo/new" className="btn-primary">
           Nuovo memo
         </Link>
       </div>
