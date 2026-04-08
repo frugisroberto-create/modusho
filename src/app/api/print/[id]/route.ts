@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
-import { checkAccess, getAccessibleDepartmentIds } from "@/lib/rbac";
+import { canUserAccessContent } from "@/lib/rbac";
 
 const TYPE_LABELS: Record<string, string> = { SOP: "SOP", DOCUMENT: "Documento", MEMO: "Memo" };
 
@@ -34,25 +34,13 @@ export async function GET(
     return new NextResponse("Contenuto non trovato", { status: 404 });
   }
 
-  const userRole = session.user.role;
-  const hasAccess = await checkAccess(session.user.id, "OPERATOR", content.propertyId);
-  if (!hasAccess) {
-    return new NextResponse("Accesso negato", { status: 403 });
-  }
-
-  // RBAC fine per OPERATOR/HOD: match su targetAudience
-  if (userRole === "OPERATOR" || userRole === "HOD") {
-    const accessibleDepts = await getAccessibleDepartmentIds(session.user.id, content.propertyId);
-    const isInTarget = content.targetAudience.some((t) => {
-      if (t.targetType === "ROLE" && t.targetRole === "OPERATOR") return true;
-      if (t.targetType === "ROLE" && t.targetRole === userRole) return true;
-      if (t.targetType === "USER" && t.targetUserId === session.user.id) return true;
-      if (t.targetType === "DEPARTMENT" && t.targetDepartmentId && accessibleDepts.includes(t.targetDepartmentId)) return true;
-      return false;
-    });
-    if (!isInTarget && !(userRole === "HOD" && content.createdBy.id === session.user.id)) {
-      return new NextResponse("Contenuto non trovato", { status: 404 });
-    }
+  const canAccess = await canUserAccessContent(session.user.id, session.user.role, {
+    propertyId: content.propertyId,
+    createdById: content.createdBy.id,
+    targetAudience: content.targetAudience,
+  });
+  if (!canAccess) {
+    return new NextResponse("Contenuto non trovato", { status: 404 });
   }
 
   const typeLabel = TYPE_LABELS[content.type] || content.type;

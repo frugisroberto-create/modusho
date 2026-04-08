@@ -189,3 +189,65 @@ export async function getAccessibleDepartmentIds(
     .filter((a) => a.departmentId !== null)
     .map((a) => a.departmentId!);
 }
+
+/**
+ * Shape minima del contenuto necessaria per il check di visibility.
+ * Ogni caller deve selezionare questi campi nella sua query Prisma.
+ */
+export interface ContentVisibilityInput {
+  propertyId: string;
+  createdById: string;
+  targetAudience: Array<{
+    targetType: "ROLE" | "DEPARTMENT" | "USER";
+    targetRole: Role | null;
+    targetDepartmentId: string | null;
+    targetUserId: string | null;
+  }>;
+}
+
+/**
+ * Verifica se un utente può accedere a un contenuto specifico.
+ *
+ * Regole (allineate con /api/content GET list):
+ *  1. SUPER_ADMIN → sempre sì
+ *  2. Accesso coarse alla property richiesto (tramite checkAccess)
+ *  3. HM, ADMIN → accesso coarse basta (vedono tutto nella property)
+ *  4. OPERATOR, HOD → deve esserci un match nel targetAudience:
+ *       - ROLE/OPERATOR (tutti gli operatori)
+ *       - ROLE/<userRole> (es. ROLE/HOD)
+ *       - USER/<userId> (target utente specifico)
+ *       - DEPARTMENT/<deptId> dove deptId è tra quelli accessibili
+ *     HOD vede sempre i propri contenuti (createdById === userId),
+ *     anche se fuori dal targetAudience.
+ *
+ * IMPORTANTE: è la visibility "base" — alcuni endpoint hanno regole
+ * extra sopra (es. HOD può scrivere note solo sui propri contenuti)
+ * e le applicano come controllo aggiuntivo.
+ */
+export async function canUserAccessContent(
+  userId: string,
+  userRole: Role,
+  content: ContentVisibilityInput
+): Promise<boolean> {
+  // SUPER_ADMIN bypassa tutto
+  if (userRole === "SUPER_ADMIN") return true;
+
+  // Accesso coarse alla property
+  const hasProperty = await checkAccess(userId, "OPERATOR", content.propertyId);
+  if (!hasProperty) return false;
+
+  // HM e ADMIN hanno accesso coarse basato sulla property
+  if (userRole === "HOTEL_MANAGER" || userRole === "ADMIN") return true;
+
+  // OPERATOR/HOD: devono essere autori (solo HOD) o in targetAudience
+  if (userRole === "HOD" && content.createdById === userId) return true;
+
+  const accessibleDepts = await getAccessibleDepartmentIds(userId, content.propertyId);
+  return content.targetAudience.some((t) => {
+    if (t.targetType === "ROLE" && t.targetRole === "OPERATOR") return true;
+    if (t.targetType === "ROLE" && t.targetRole === userRole) return true;
+    if (t.targetType === "USER" && t.targetUserId === userId) return true;
+    if (t.targetType === "DEPARTMENT" && t.targetDepartmentId && accessibleDepts.includes(t.targetDepartmentId)) return true;
+    return false;
+  });
+}

@@ -1,7 +1,7 @@
 import { notFound, redirect } from "next/navigation";
 import { getSessionUser } from "@/lib/session";
 import { prisma } from "@/lib/prisma";
-import { checkAccess, getAccessibleDepartmentIds } from "@/lib/rbac";
+import { canUserAccessContent } from "@/lib/rbac";
 import { AcknowledgeButton } from "@/components/operator/acknowledge-button";
 import Link from "next/link";
 
@@ -26,24 +26,12 @@ export default async function StandardBookDetailPage({ params }: Props) {
 
   if (!content || content.status !== "PUBLISHED" || content.type !== "STANDARD_BOOK") notFound();
 
-  // RBAC coarse: property access (no departmentId).
-  const hasAccess = await checkAccess(user.id, "OPERATOR", content.propertyId);
-  if (!hasAccess) notFound();
-
-  // RBAC fine per OPERATOR/HOD: match su targetAudience.
-  if (user.role === "OPERATOR" || user.role === "HOD") {
-    const accessibleDepts = await getAccessibleDepartmentIds(user.id, content.propertyId);
-    const isInTarget = content.targetAudience.some((t) => {
-      if (t.targetType === "ROLE" && t.targetRole === "OPERATOR") return true;
-      if (t.targetType === "ROLE" && t.targetRole === user.role) return true;
-      if (t.targetType === "USER" && t.targetUserId === user.id) return true;
-      if (t.targetType === "DEPARTMENT" && t.targetDepartmentId && accessibleDepts.includes(t.targetDepartmentId)) return true;
-      return false;
-    });
-    if (!isInTarget && !(user.role === "HOD" && content.createdBy.id === user.id)) {
-      notFound();
-    }
-  }
+  const canAccess = await canUserAccessContent(user.id, user.role, {
+    propertyId: content.propertyId,
+    createdById: content.createdBy.id,
+    targetAudience: content.targetAudience,
+  });
+  if (!canAccess) notFound();
 
   const acknowledged = content.acknowledgments.length > 0;
   const acknowledgedAt = content.acknowledgments[0]?.acknowledgedAt?.toISOString() ?? null;

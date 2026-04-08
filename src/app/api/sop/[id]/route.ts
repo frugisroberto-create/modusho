@@ -10,7 +10,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
-import { checkAccess, getAccessibleDepartmentIds } from "@/lib/rbac";
+import { canUserAccessContent } from "@/lib/rbac";
 import {
   getRaciRole,
   isInvolved,
@@ -66,27 +66,13 @@ export async function GET(
     return NextResponse.json({ error: "SOP non trovata" }, { status: 404 });
   }
 
-  // RBAC coarse: property access (no departmentId — visibility fine via
-  // targetAudience subito sotto, allineato con /api/content e detail pages).
-  const userRole = session.user.role;
-  const hasAccess = await checkAccess(userId, "OPERATOR", content.propertyId);
-  if (!hasAccess) {
+  const canAccess = await canUserAccessContent(userId, session.user.role, {
+    propertyId: content.propertyId,
+    createdById: content.createdBy.id,
+    targetAudience: content.targetAudience,
+  });
+  if (!canAccess) {
     return NextResponse.json({ error: "SOP non trovata" }, { status: 404 });
-  }
-
-  // RBAC fine per OPERATOR/HOD: match su targetAudience
-  if (userRole === "OPERATOR" || userRole === "HOD") {
-    const accessibleDepts = await getAccessibleDepartmentIds(userId, content.propertyId);
-    const isInTarget = content.targetAudience.some((t) => {
-      if (t.targetType === "ROLE" && t.targetRole === "OPERATOR") return true;
-      if (t.targetType === "ROLE" && t.targetRole === userRole) return true;
-      if (t.targetType === "USER" && t.targetUserId === userId) return true;
-      if (t.targetType === "DEPARTMENT" && t.targetDepartmentId && accessibleDepts.includes(t.targetDepartmentId)) return true;
-      return false;
-    });
-    if (!isInTarget && !(userRole === "HOD" && content.createdBy.id === userId)) {
-      return NextResponse.json({ error: "SOP non trovata" }, { status: 404 });
-    }
   }
 
   const wf = content.sopWorkflow;

@@ -19,7 +19,7 @@
 import { NextResponse } from "next/server";
 import { getSessionUser } from "@/lib/session";
 import { prisma } from "@/lib/prisma";
-import { checkAccess, getAccessibleDepartmentIds } from "@/lib/rbac";
+import { canUserAccessContent } from "@/lib/rbac";
 import { deleteFromStorage } from "@/lib/attachments/storage";
 
 interface RouteParams {
@@ -62,24 +62,9 @@ export async function GET(request: Request, { params }: RouteParams) {
       return NextResponse.json({ error: "Contenuto non trovato" }, { status: 404 });
     }
 
-    const hasAccess = await checkAccess(user.id, "OPERATOR", content.propertyId);
-    if (!hasAccess) {
-      return NextResponse.json({ error: "Accesso negato" }, { status: 403 });
-    }
-
-    // RBAC fine per OPERATOR/HOD: match su targetAudience (o autore HOD)
-    if (user.role === "OPERATOR" || user.role === "HOD") {
-      const accessibleDepts = await getAccessibleDepartmentIds(user.id, content.propertyId);
-      const isInTarget = content.targetAudience.some((t) => {
-        if (t.targetType === "ROLE" && t.targetRole === "OPERATOR") return true;
-        if (t.targetType === "ROLE" && t.targetRole === user.role) return true;
-        if (t.targetType === "USER" && t.targetUserId === user.id) return true;
-        if (t.targetType === "DEPARTMENT" && t.targetDepartmentId && accessibleDepts.includes(t.targetDepartmentId)) return true;
-        return false;
-      });
-      if (!isInTarget && !(user.role === "HOD" && content.createdById === user.id)) {
-        return NextResponse.json({ error: "Contenuto non trovato" }, { status: 404 });
-      }
+    const canAccess = await canUserAccessContent(user.id, user.role, content);
+    if (!canAccess) {
+      return NextResponse.json({ error: "Contenuto non trovato" }, { status: 404 });
     }
 
     // Parse query params

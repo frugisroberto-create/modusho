@@ -1,7 +1,7 @@
 import { notFound, redirect } from "next/navigation";
 import { getSessionUser } from "@/lib/session";
 import { prisma } from "@/lib/prisma";
-import { checkAccess, getAccessibleDepartmentIds } from "@/lib/rbac";
+import { canUserAccessContent } from "@/lib/rbac";
 import { AcknowledgeButton } from "@/components/operator/acknowledge-button";
 import { SopViewTracker } from "@/components/operator/sop-view-tracker";
 import { ContentActions } from "@/components/hoo/content-actions";
@@ -40,30 +40,12 @@ export default async function SopDetailPage({ params }: Props) {
 
   if (!content || content.status !== "PUBLISHED") notFound();
 
-  // RBAC coarse: l'utente deve poter accedere alla property del contenuto.
-  // NB: NON passiamo content.departmentId qui — la visibility per OPERATOR/HOD
-  // viene poi verificata tramite targetAudience (una SOP può essere targetata
-  // su uno specifico USER o su un DEPARTMENT diverso da quello del content).
-  const hasAccess = await checkAccess(user.id, "OPERATOR", content.propertyId);
-  if (!hasAccess) notFound();
-
-  // RBAC fine per OPERATOR/HOD: deve esserci un ContentTarget che matcha
-  // (ROLE OPERATOR, ROLE <userRole>, USER <userId>, o DEPARTMENT accessibile).
-  // Allinea la visibility del dettaglio con quella della lista /api/content.
-  if (user.role === "OPERATOR" || user.role === "HOD") {
-    const accessibleDepts = await getAccessibleDepartmentIds(user.id, content.propertyId);
-    const isInTarget = content.targetAudience.some((t) => {
-      if (t.targetType === "ROLE" && t.targetRole === "OPERATOR") return true;
-      if (t.targetType === "ROLE" && t.targetRole === user.role) return true;
-      if (t.targetType === "USER" && t.targetUserId === user.id) return true;
-      if (t.targetType === "DEPARTMENT" && t.targetDepartmentId && accessibleDepts.includes(t.targetDepartmentId)) return true;
-      return false;
-    });
-    // HOD può comunque vedere i propri contenuti (anche se non nel target)
-    if (!isInTarget && !(user.role === "HOD" && content.createdBy.id === user.id)) {
-      notFound();
-    }
-  }
+  const canAccess = await canUserAccessContent(user.id, user.role, {
+    propertyId: content.propertyId,
+    createdById: content.createdBy.id,
+    targetAudience: content.targetAudience,
+  });
+  if (!canAccess) notFound();
 
   const isOperator = user.role === "OPERATOR";
   const isHod = user.role === "HOD";
