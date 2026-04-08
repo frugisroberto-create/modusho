@@ -10,7 +10,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
-import { checkAccess } from "@/lib/rbac";
+import { checkAccess, getAccessibleDepartmentIds } from "@/lib/rbac";
 import {
   getRaciRole,
   isInvolved,
@@ -54,6 +54,8 @@ export async function GET(
         select: {
           targetType: true,
           targetRole: true,
+          targetDepartmentId: true,
+          targetUserId: true,
           targetDepartment: { select: { name: true } },
         },
       },
@@ -64,10 +66,27 @@ export async function GET(
     return NextResponse.json({ error: "SOP non trovata" }, { status: 404 });
   }
 
-  // RBAC: property/department access
-  const hasAccess = await checkAccess(userId, "OPERATOR", content.propertyId, content.departmentId ?? undefined);
+  // RBAC coarse: property access (no departmentId — visibility fine via
+  // targetAudience subito sotto, allineato con /api/content e detail pages).
+  const userRole = session.user.role;
+  const hasAccess = await checkAccess(userId, "OPERATOR", content.propertyId);
   if (!hasAccess) {
     return NextResponse.json({ error: "SOP non trovata" }, { status: 404 });
+  }
+
+  // RBAC fine per OPERATOR/HOD: match su targetAudience
+  if (userRole === "OPERATOR" || userRole === "HOD") {
+    const accessibleDepts = await getAccessibleDepartmentIds(userId, content.propertyId);
+    const isInTarget = content.targetAudience.some((t) => {
+      if (t.targetType === "ROLE" && t.targetRole === "OPERATOR") return true;
+      if (t.targetType === "ROLE" && t.targetRole === userRole) return true;
+      if (t.targetType === "USER" && t.targetUserId === userId) return true;
+      if (t.targetType === "DEPARTMENT" && t.targetDepartmentId && accessibleDepts.includes(t.targetDepartmentId)) return true;
+      return false;
+    });
+    if (!isInTarget && !(userRole === "HOD" && content.createdBy.id === userId)) {
+      return NextResponse.json({ error: "SOP non trovata" }, { status: 404 });
+    }
   }
 
   const wf = content.sopWorkflow;
