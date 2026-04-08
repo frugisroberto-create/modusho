@@ -99,19 +99,21 @@ export async function GET(request: NextRequest) {
     : Prisma.sql`AND c.status != 'ARCHIVED'`;
 
   // Visibility filter:
-  //  - OPERATOR: filter by ContentTarget (targetAudience): ROLE/OPERATOR, ROLE/<userRole>,
-  //    USER/<userId>, DEPARTMENT in perimeter.
-  //  - HOD/HM/ADMIN/SUPER_ADMIN: legacy department-based filter (search in drafts perimeter).
+  //  - OPERATOR: filter by ContentTarget (targetAudience): ROLE/OPERATOR,
+  //    USER/<userId>, DEPARTMENT in perimeter. Il check ROLE/<userRole> è
+  //    ridondante quando userRole === OPERATOR (già coperto dalla prima
+  //    condizione), quindi evitiamo il parametro enum — Postgres non fa cast
+  //    implicito text → "Role" dentro prepared statements.
+  //  - HOD/HM/ADMIN/SUPER_ADMIN: legacy department-based filter (search in
+  //    drafts perimeter).
   const isOperator = session.user.role === "OPERATOR";
   const userIdParam = session.user.id;
-  const userRoleParam = session.user.role;
   const visibilityCondition = isOperator
     ? Prisma.sql`AND EXISTS (
         SELECT 1 FROM "ContentTarget" ct
         WHERE ct."contentId" = c.id
           AND (
             (ct."targetType" = 'ROLE' AND ct."targetRole" = 'OPERATOR')
-            OR (ct."targetType" = 'ROLE' AND ct."targetRole" = ${userRoleParam})
             OR (ct."targetType" = 'USER' AND ct."targetUserId" = ${userIdParam})
             OR (ct."targetType" = 'DEPARTMENT' AND ct."targetDepartmentId" = ANY(${departmentFilter}))
           )
