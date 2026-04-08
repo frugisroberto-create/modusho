@@ -32,9 +32,8 @@ L'operatore deve trovare subito quello che gli serve. Non naviga, non esplora. C
 Funzioni:
 - Ricerca full-text in home page (barra centrale, cerca nel contenuto non solo nei titoli)
 - Contenuti da prendere visione (presa visione obbligatoria) — scompare se non ci sono elementi
-- Contenuti in evidenza (flag isFeatured, curati da HM/Admin) — stessa grafica di "Da prendere visione", scompare se vuoto
-- Stat box linkate (contatori SOP/Documenti/Memo del reparto, cliccabili verso le rispettive sezioni)
-- Ultime 3 per categoria (SOP/Documenti/Memo — feed automatico degli ultimi caricati, uguale per tutti i ruoli)
+
+**Principio "inbox zero operativa"**: la home operatore mostra **solo** ciò che richiede azione. Quando l'operatore ha confermato la visione di tutti i contenuti pendenti, la home si riduce all'hero + barra di ricerca. Nessun feed cronologico, nessuna sezione editoriale — chi vuole consultare contenuti già letti usa il menu (SOP / Documenti / Memo / Standard Book) o la ricerca.
 
 **La home è il centro dell'esperienza, non i menu o le liste.**
 
@@ -168,9 +167,6 @@ Content {
   isDeleted         // SOFT DELETE — default false. Se true, il contenuto è eliminato.
   deletedAt         // timestamp eliminazione
   deletedById       // chi ha eliminato
-  isFeatured        // Boolean, default false — flag "In evidenza" gestito da HM/ADMIN/SUPER_ADMIN
-  featuredAt        // timestamp di quando è stato messo in evidenza
-  featuredById      // chi ha messo in evidenza
   createdAt
   updatedAt
 
@@ -279,7 +275,6 @@ Memo {
   contentId         // relazione 1:1 con Content di tipo MEMO
   propertyId
   expiresAt         // memo hanno scadenza
-  isPinned
 }
 ```
 
@@ -435,23 +430,6 @@ Dopo la pubblicazione, i ruoli HOTEL_MANAGER, ADMIN e SUPER_ADMIN possono:
 - L'eliminazione è reversibile solo da SUPER_ADMIN
 
 **Queste regole valgono per TUTTI i tipi di contenuto**: SOP, DOCUMENT, MEMO.
-
-## Contenuti in evidenza (isFeatured)
-
-Il sistema supporta contenuti "in evidenza" selezionati manualmente da HOTEL_MANAGER, ADMIN o SUPER_ADMIN.
-
-**Campi nel modello Content:**
-- `isFeatured: Boolean` (default false) — flag per contenuti in evidenza
-- `featuredAt: DateTime?` — timestamp di quando è stato messo in evidenza
-- `featuredById: String?` — relazione con User che ha messo in evidenza
-
-**Regole:**
-1. Solo contenuti con status PUBLISHED possono essere messi in evidenza
-2. Solo HOTEL_MANAGER (della struttura), ADMIN e SUPER_ADMIN possono attivare/disattivare il flag
-3. API: POST `/api/content/[id]/feature` (attiva) e DELETE `/api/content/[id]/feature` (disattiva)
-4. Nella home operatore, la sezione "In evidenza" mostra i contenuti con `isFeatured=true` ordinati per `featuredAt desc`
-5. Se non ci sono contenuti in evidenza, la sezione scompare dal DOM (return null)
-6. La sezione "In evidenza" ha la stessa identica grafica di "Da prendere visione" (lista verticale, righe orizzontali)
 
 ## Archiviazione automatica SOP — REGOLE
 
@@ -624,22 +602,7 @@ La home HOO è la prima pagina che vedono HOTEL_MANAGER, ADMIN e SUPER_ADMIN dop
 - Numero: Playfair Display 36px, weight 500, colore `#964733` (tranne "In attesa": `#E65100`)
 - Label: Inter 11px, uppercase, letter-spacing 1.5px, `rgba(51,51,51,0.5)`
 
-**2. In evidenza** — rendering condizionale (scompare se vuoto)
-- Header: titolo Playfair Display 22px + link "GESTISCI" terracotta uppercase
-- Lista verticale, sfondo `white`, bordo `#E8E5DC`
-- Ogni riga: barra verticale 4px terracotta + badge tipo (SOP viola `#EDE7F6`/`#5E35B1`, Documento blu `#E3F2FD`/`#1565C0`, Memo arancio `#FFF3E0`/`#E65100`) + titolo + meta + data "in evidenza da"
-- Hover: sfondo `#FAFAF7`
-
-**3. Tre colonne affiancate** — Ultime SOP / Ultimi Documenti / Ultimi Memo
-- Grid 3 colonne, gap 24px
-- Ogni pannello: sfondo `white`, bordo `#E8E5DC`
-- **Header pannello**: sfondo `#FAF9F5`, border-bottom `#E8E5DC`, titolo Playfair Display 16px + link "VEDI TUTTE" terracotta uppercase
-- Ogni item: titolo Inter 13px + codice terracotta (solo SOP) + meta con badge stato + reparto + data
-- Badge stato: DRAFT grigio, REVIEW_HM malva, REVIEW_ADMIN terracotta, PUBLISHED verde, RETURNED rosso
-
-**4. Tabella ultime SOP** (opzionale, sotto le 3 colonne)
-- Tabella con header `#FAF9F5`, colonne: Codice, Titolo, Reparto, Stato, Autore, Data
-- Hover righe: sfondo `#FAFAF7`
+**Nota**: la dashboard HOO `/dashboard` usa una home governance-focused con coda approvazioni, alert critici, KPI e confronti per hotel/reparto. Le sezioni "In evidenza" e "Ultime per tipo" sono state rimosse da tutte le home (operator e HOO) per evitare la duplicazione di segnali e tenere la home focalizzata sulle azioni pendenti. Dettagli della governance dashboard nella sezione "Analytics HOO" più sotto.
 
 ### Differenze chiave tra Home Operatore e Home HOO
 
@@ -648,8 +611,7 @@ La home HOO è la prima pagina che vedono HOTEL_MANAGER, ADMIN e SUPER_ADMIN dop
 | Header nav voci | 5 | 5 | 6 | 7 | 7 |
 | Sub-nav | No | 3 voci | 3 voci | 5 voci | 6 voci (+ Cestino) |
 | Stat box | 3 | 4 | 4 | 4 | 4 |
-| "Da prendere visione" | Sì | No | No | No | No |
-| "In evidenza" | No | Sì (senza "Gestisci") | Sì (senza "Gestisci") | Sì (con "Gestisci") | Sì (con "Gestisci") |
+| "Da prendere visione" | Sì | Sì | Sì | Sì | Sì |
 | Badge stato nelle colonne | No | Sì | Sì | Sì | Sì |
 | Analytics integrate nella home `/dashboard` | No | No | No | Sì | Sì |
 | Gestione utenti in sub-nav | No | No | No | Sì | Sì |
@@ -783,31 +745,22 @@ La home operatore deve avere ESATTAMENTE questa struttura.
    - Lista verticale con righe orizzontali
    - Ogni riga: pallino terracotta + badge tipo (SOP/Documento/Memo) + titolo + meta (codice, reparto, data) + bottone "Leggi"
    - Counter badge rosso nel titolo sezione
+   - Quando l'operatore conferma l'ultimo contenuto pendente, la sezione scompare dal DOM (return null)
 
-2. **In evidenza** — rendering condizionale: scompare se zero contenuti con isFeatured=true
-   - Stessa identica grafica di "Da prendere visione" (lista verticale, righe orizzontali)
-   - Ogni riga: pallino terracotta + badge tipo + titolo + meta + bottone "Leggi"
-   - NO counter badge nel titolo
+2. **Attività SOP** — solo per HOD+ (auto-hide per OPERATOR)
+   - Lista delle SOP dove l'utente è R/C/A nel workflow RACI con azioni pendenti
+   - Auto-hide quando non ci sono attività pendenti
 
-3. **Stat box linkate** — sempre visibili, 3 box orizzontali
-   - SOP del reparto → link a /sop
-   - Documenti → link a /documents
-   - Memo attivi → link a /memo (nota: nella vista HM/Admin c'è anche "In attesa di approvazione")
-   - Numero grande (font-heading terracotta) + label sotto (font-ui uppercase)
+3. **Alert scadenza SOP** — solo HOD+ desktop, auto-hide quando non ci sono scadenze
 
-4. **Ultime 3 per categoria** — sempre visibili, 3 colonne affiancate
-   - "Ultime SOP" / "Ultimi Documenti" / "Ultimi Memo"
-   - Header con titolo + link "Vedi tutte/tutti"
-   - Ogni colonna mostra gli ultimi 3 contenuti PUBLISHED
-   - Uguale per TUTTI i ruoli
+**Principio "inbox zero"**: la home operatore NON contiene feed cronologici ("Ultime SOP", "Ultimi Memo"), NON contiene sezioni editoriali ("In evidenza"), NON contiene stat box di conteggio. Ogni sezione esiste solo per dire "hai questa azione pendente"; quando non ce ne sono, la home si riduce all'hero con la barra di ricerca. Per consultare contenuti già letti o cercare liberamente, l'operatore usa la barra di ricerca o i menu (SOP / Documenti / Memo / Standard Book).
 
 **Regole precise:**
 1. Tagline SOPRA il nome hotel — MAI sotto
 2. Sfondo hero: `#FAF9F5`, sfondo pagina: `#F0EFE9`
 3. Spaziatura generosa: almeno 30px sopra la tagline, 15px tra tagline e nome, 40px tra nome e barra ricerca
 4. Tutto centrato orizzontalmente nel hero
-5. Sezioni "Da prendere visione" e "In evidenza" scompaiono dal DOM se vuote (return null)
-6. Le stat box nella vista HM/Admin/Super Admin includono anche "In attesa di approvazione" (arancione)
+5. Ogni sezione dopo l'hero scompare dal DOM quando vuota (return null) — la home non mostra mai "placeholder" o liste vuote
 
 
 ### Palette colori
@@ -953,7 +906,6 @@ ModusHO/
 │   │   │   │   ├── [id]/route.ts      # GET/PUT/DELETE singolo contenuto
 │   │   │   │   ├── [id]/revisions/    # GET cronologia revisioni (ContentRevision)
 │   │   │   │   ├── [id]/notes/        # GET/POST note sul contenuto (ContentNote)
-│   │   │   │   ├── [id]/feature/      # POST/DELETE toggle isFeatured
 │   │   │   │   └── submit-actions/    # GET azioni disponibili per ruolo corrente
 │   │   │   ├── search/
 │   │   │   ├── users/
