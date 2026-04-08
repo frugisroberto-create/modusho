@@ -4,7 +4,6 @@ import { authOptions } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { getAccessiblePropertyIds, getAccessibleDepartmentIds, checkAccess, canUserManageContentType } from "@/lib/rbac";
 import { sendContentPublishedPush } from "@/lib/push-notification";
-import { sanitizeHtml } from "@/lib/sanitize-html";
 import { z } from "zod/v4";
 
 const memoQuerySchema = z.object({
@@ -101,25 +100,22 @@ export async function GET(request: NextRequest) {
     prisma.memo.count({ where }),
   ]);
 
-  return NextResponse.json(
-    {
-      data: memos.map((m) => ({
-        id: m.id,
-        contentId: m.contentId,
-        title: m.content.title,
-        body: m.content.body,
-        publishedAt: m.content.publishedAt,
-        author: m.content.createdBy.name,
-        isPinned: m.isPinned,
-        expiresAt: m.expiresAt,
-        isFeatured: m.content.isFeatured,
-        acknowledged: m.content.acknowledgments.length > 0,
-        acknowledgedAt: m.content.acknowledgments[0]?.acknowledgedAt ?? null,
-      })),
-      meta: { page, pageSize, total },
-    },
-    { headers: { "Cache-Control": "no-store, no-cache, must-revalidate, private" } }
-  );
+  return NextResponse.json({
+    data: memos.map((m) => ({
+      id: m.id,
+      contentId: m.contentId,
+      title: m.content.title,
+      body: m.content.body,
+      publishedAt: m.content.publishedAt,
+      author: m.content.createdBy.name,
+      isPinned: m.isPinned,
+      expiresAt: m.expiresAt,
+      isFeatured: m.content.isFeatured,
+      acknowledged: m.content.acknowledgments.length > 0,
+      acknowledgedAt: m.content.acknowledgments[0]?.acknowledgedAt ?? null,
+    })),
+    meta: { page, pageSize, total },
+  });
 }
 
 // --- POST: Crea memo ---
@@ -148,9 +144,7 @@ export async function POST(request: NextRequest) {
   const parsed = createMemoSchema.safeParse(body);
   if (!parsed.success) return NextResponse.json({ error: "Parametri non validi", details: parsed.error.issues }, { status: 400 });
 
-  const { title, body: rawMemoBody, propertyId, expiresAt, isPinned, targetAllDepartments, targetDepartmentIds, targetRoles, targetUserIds } = parsed.data;
-  // SEC: sanitizza HTML lato server
-  const memoBody = sanitizeHtml(rawMemoBody);
+  const { title, body: memoBody, propertyId, expiresAt, isPinned, targetAllDepartments, targetDepartmentIds, targetRoles, targetUserIds } = parsed.data;
 
   // Verifica permesso sul tipo MEMO
   const canManageMemo = await canUserManageContentType(session.user.id, "MEMO");
@@ -186,13 +180,6 @@ export async function POST(request: NextRequest) {
     }
   }
 
-  // Governance "In evidenza" (Content.isFeatured):
-  // solo HOTEL_MANAGER, ADMIN, SUPER_ADMIN possono attivare il flag in creazione.
-  // Per gli altri ruoli, isPinned resta un'opzione locale al Memo model (pin interno
-  // alla lista /comunicazioni) ma NON promuove automaticamente a "In evidenza".
-  const canFeature = role === "HOTEL_MANAGER" || role === "ADMIN" || role === "SUPER_ADMIN";
-  const shouldFeature = Boolean(isPinned) && canFeature;
-
   // Crea Content + Memo + StatusHistory in transazione
   const now = new Date();
   const content = await prisma.content.create({
@@ -205,7 +192,7 @@ export async function POST(request: NextRequest) {
       createdById: userId,
       updatedById: userId,
       publishedAt: now,
-      ...(shouldFeature ? { isFeatured: true, featuredAt: now, featuredById: userId } : {}),
+      ...(isPinned ? { isFeatured: true, featuredAt: now, featuredById: userId } : {}),
     },
   });
 
@@ -214,7 +201,6 @@ export async function POST(request: NextRequest) {
       contentId: content.id,
       propertyId,
       expiresAt: expiresAt ? new Date(expiresAt) : null,
-      // isPinned resta sul Memo model come pin locale, indipendente da isFeatured.
       isPinned: isPinned ?? false,
     },
   });

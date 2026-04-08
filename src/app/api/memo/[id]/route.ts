@@ -3,7 +3,6 @@ import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { checkAccess } from "@/lib/rbac";
-import { sanitizeHtml } from "@/lib/sanitize-html";
 import { z } from "zod/v4";
 
 const updateMemoSchema = z.object({
@@ -47,9 +46,7 @@ export async function PUT(
   const hasAccess = await checkAccess(session.user.id, "HOTEL_MANAGER", memo.content.propertyId);
   if (!hasAccess) return NextResponse.json({ error: "Accesso negato" }, { status: 403 });
 
-  const { title, body: rawBodyInput, expiresAt, isPinned, archive } = parsed.data;
-  // SEC: sanitizza HTML lato server
-  const body = rawBodyInput !== undefined ? sanitizeHtml(rawBodyInput) : undefined;
+  const { title, body, expiresAt, isPinned, archive } = parsed.data;
 
   // Archivia
   if (archive) {

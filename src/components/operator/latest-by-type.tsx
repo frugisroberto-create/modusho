@@ -38,11 +38,10 @@ export function LatestByType() {
   const fetchLatest = useCallback(async () => {
     setLoading(true);
     try {
-      // cache: no-store — contenuti dipendono da targetAudience dell'utente corrente.
       const [sopRes, docRes, memoRes] = await Promise.all([
-        fetch(`/api/content?propertyId=${currentPropertyId}&type=SOP&status=PUBLISHED&pageSize=3`, { cache: "no-store" }),
-        fetch(`/api/content?propertyId=${currentPropertyId}&type=DOCUMENT&status=PUBLISHED&pageSize=3`, { cache: "no-store" }),
-        fetch(`/api/memo?propertyId=${currentPropertyId}&pageSize=3`, { cache: "no-store" }),
+        fetch(`/api/content?propertyId=${currentPropertyId}&type=SOP&status=PUBLISHED&pageSize=3`),
+        fetch(`/api/content?propertyId=${currentPropertyId}&type=DOCUMENT&status=PUBLISHED&pageSize=3`),
+        fetch(`/api/memo?propertyId=${currentPropertyId}&pageSize=3`),
       ]);
 
       const sopData: ContentItem[] = sopRes.ok ? (await sopRes.json()).data : [];

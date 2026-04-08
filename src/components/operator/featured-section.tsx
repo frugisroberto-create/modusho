@@ -35,12 +35,8 @@ export function FeaturedSection() {
     if (!currentPropertyId) return;
     setLoading(true);
     try {
-      // Escludi i contenuti già confermati dall'operatore:
-      // coerente con "Da prendere visione", evita di rimostrare ciò che è già stato letto.
-      // cache: no-store — la lista dipende dall'ack dell'utente ed è dinamica per richiesta.
       const res = await fetch(
-        `/api/content?propertyId=${currentPropertyId}&status=PUBLISHED&featured=true&acknowledged=false&pageSize=20`,
-        { cache: "no-store" }
+        `/api/content?propertyId=${currentPropertyId}&status=PUBLISHED&featured=true&pageSize=20`
       );
       if (res.ok) { const json = await res.json(); setItems(json.data); }
     } finally { setLoading(false); }

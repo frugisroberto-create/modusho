@@ -6,7 +6,6 @@ import { getAccessiblePropertyIds, getAccessibleDepartmentIds, checkAccess, canU
 import { changeContentStatus } from "@/lib/content-status";
 import { getSubmitTargetStatus } from "@/lib/content-workflow";
 import { sendContentPublishedPush } from "@/lib/push-notification";
-import { sanitizeHtml } from "@/lib/sanitize-html";
 import { z } from "zod/v4";
 
 const contentQuerySchema = z.object({
@@ -206,30 +205,27 @@ export async function GET(request: NextRequest) {
     prisma.content.count({ where }),
   ]);
 
-  return NextResponse.json(
-    {
-      data: contents.map((c) => ({
-        id: c.id,
-        code: c.code,
-        type: c.type,
-        title: c.title,
-        status: c.status,
-        version: c.version,
-        isFeatured: c.isFeatured,
-        publishedAt: c.publishedAt,
-        createdAt: c.createdAt,
-        propertyId: c.propertyId,
-        department: c.department,
-        property: c.property,
-        acknowledged: c.acknowledgments.length > 0,
-        acknowledgedAt: c.acknowledgments[0]?.acknowledgedAt ?? null,
-        updatedBy: c.updatedBy,
-        targetAudience: c.targetAudience,
-      })),
-      meta: { page, pageSize, total },
-    },
-    { headers: { "Cache-Control": "no-store, no-cache, must-revalidate, private" } }
-  );
+  return NextResponse.json({
+    data: contents.map((c) => ({
+      id: c.id,
+      code: c.code,
+      type: c.type,
+      title: c.title,
+      status: c.status,
+      version: c.version,
+      isFeatured: c.isFeatured,
+      publishedAt: c.publishedAt,
+      createdAt: c.createdAt,
+      propertyId: c.propertyId,
+      department: c.department,
+      property: c.property,
+      acknowledged: c.acknowledgments.length > 0,
+      acknowledgedAt: c.acknowledgments[0]?.acknowledgedAt ?? null,
+      updatedBy: c.updatedBy,
+      targetAudience: c.targetAudience,
+    })),
+    meta: { page, pageSize, total },
+  });
 }
 
 // --- POST: Crea nuovo contenuto ---
@@ -265,9 +261,7 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: "Parametri non validi", details: parsed.error.issues }, { status: 400 });
   }
 
-  const { type, title, body: rawContentBody, propertyId, departmentId, sendToReview, publishDirectly } = parsed.data;
-  // SEC: sanitizza HTML lato server prima di qualsiasi persistenza
-  const contentBody = sanitizeHtml(rawContentBody);
+  const { type, title, body: contentBody, propertyId, departmentId, sendToReview, publishDirectly } = parsed.data;
   const userId = session.user.id;
   const role = session.user.role;
 

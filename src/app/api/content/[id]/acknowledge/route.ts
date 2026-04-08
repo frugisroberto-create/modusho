@@ -1,5 +1,4 @@
 import { NextRequest, NextResponse } from "next/server";
-import { revalidatePath } from "next/cache";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
@@ -68,11 +67,6 @@ export async function POST(
       required: true,
     },
   });
-
-  // Invalida la home operatore e la lista comunicazioni in modo che
-  // "Da prendere visione" e "In evidenza" rimuovano subito il contenuto appena visionato.
-  revalidatePath("/");
-  revalidatePath("/comunicazioni");
 
   return NextResponse.json({
     data: {

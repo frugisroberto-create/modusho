@@ -10,7 +10,6 @@ import {
   needsReview,
 } from "@/lib/sop-workflow";
 import { checkAccess } from "@/lib/rbac";
-import { sanitizeHtml } from "@/lib/sanitize-html";
 import { z } from "zod/v4";
 
 type RouteParams = { params: Promise<{ id: string }> };
@@ -148,9 +147,7 @@ export async function PUT(request: NextRequest, { params }: RouteParams) {
     return NextResponse.json({ error: "Parametri non validi", details: parsed.error.issues }, { status: 400 });
   }
 
-  const { title, body: rawBody, expectedVersionCount } = parsed.data;
-  // SEC: sanitizza HTML lato server prima di persistere qualsiasi versione
-  const body = sanitizeHtml(rawBody);
+  const { title, body, expectedVersionCount } = parsed.data;
 
   const wf = await prisma.sopWorkflow.findUnique({
     where: { id },
