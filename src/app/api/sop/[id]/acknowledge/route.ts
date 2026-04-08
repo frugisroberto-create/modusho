@@ -47,8 +47,10 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
     return NextResponse.json({ error: "SOP non trovata o non pubblicata" }, { status: 404 });
   }
 
-  // RBAC: verifica accesso alla property
-  const hasAccess = await checkAccess(userId, "OPERATOR", content.propertyId, content.departmentId ?? undefined);
+  // RBAC coarse: accesso alla property (no departmentId — la visibility
+  // fine è decisa da targetAudience subito sotto, allineando questo
+  // endpoint con il detail page e la list /api/content).
+  const hasAccess = await checkAccess(userId, "OPERATOR", content.propertyId);
   if (!hasAccess) {
     return NextResponse.json({ error: "Accesso negato" }, { status: 403 });
   }
