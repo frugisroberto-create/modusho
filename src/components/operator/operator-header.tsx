@@ -26,7 +26,10 @@ const NAV_ITEMS: { href: string; label: string; minRole?: string }[] = [
   { href: "/documents", label: "Documenti" },
   { href: "/comunicazioni", label: "Memo" },
   { href: "/brand-book", label: "Brand Book", minRole: "HOTEL_MANAGER" },
-  { href: "/standard-book", label: "Standard Book", minRole: "HOTEL_MANAGER" },
+  // Standard Book è visibile a tutti i ruoli: la lista lato server filtra
+  // per targetAudience, quindi OPERATOR/HOD vedono solo le sezioni del
+  // proprio perimetro (reparto/ruolo/utente).
+  { href: "/standard-book", label: "Standard Book" },
 ];
 
 const ROLE_LEVEL: Record<string, number> = {
@@ -166,7 +169,8 @@ export function OperatorHeader({
 
 const MORE_ITEMS: { href: string; label: string; minRole?: string }[] = [
   { href: "/brand-book", label: "Brand Book", minRole: "HOTEL_MANAGER" },
-  { href: "/standard-book", label: "Standard Book", minRole: "HOTEL_MANAGER" },
+  // Standard Book visibile a tutti — lista filtrata server-side per targetAudience
+  { href: "/standard-book", label: "Standard Book" },
 ];
 
 function MobileBottomNav({ pathname, userRole }: { pathname: string; userRole: string }) {
@@ -174,6 +178,9 @@ function MobileBottomNav({ pathname, userRole }: { pathname: string; userRole: s
 
   const visibleMoreItems = MORE_ITEMS.filter(i => !i.minRole || (ROLE_LEVEL[userRole] ?? 0) >= (ROLE_LEVEL[i.minRole] ?? 0));
   const isMoreActive = visibleMoreItems.some(i => pathname.startsWith(i.href));
+  // Se nessuna voce è visibile al ruolo, nascondi del tutto il bottone "Altro"
+  // per evitare un pannello vuoto (regressione storica).
+  const showMoreButton = visibleMoreItems.length > 0;
 
   return (
     <nav className="md:hidden fixed bottom-0 left-0 right-0 z-50 bg-white border-t border-ivory-dark safe-bottom">
@@ -209,16 +216,18 @@ function MobileBottomNav({ pathname, userRole }: { pathname: string; userRole: s
             </Link>
           );
         })}
-        {/* Voce "Altro" */}
-        <button onClick={() => setMoreOpen(!moreOpen)}
-          className={`flex flex-col items-center justify-center gap-0.5 flex-1 h-full transition-colors ${
-            isMoreActive || moreOpen ? "text-terracotta" : "text-charcoal/40"
-          }`}>
-          <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M5 12h.01M12 12h.01M19 12h.01M6 12a1 1 0 11-2 0 1 1 0 012 0zm7 0a1 1 0 11-2 0 1 1 0 012 0zm7 0a1 1 0 11-2 0 1 1 0 012 0z" />
-          </svg>
-          <span className="text-[10px] font-ui font-medium">Altro</span>
-        </button>
+        {/* Voce "Altro" — nascosta se non ci sono voci visibili al ruolo corrente */}
+        {showMoreButton && (
+          <button onClick={() => setMoreOpen(!moreOpen)}
+            className={`flex flex-col items-center justify-center gap-0.5 flex-1 h-full transition-colors ${
+              isMoreActive || moreOpen ? "text-terracotta" : "text-charcoal/40"
+            }`}>
+            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M5 12h.01M12 12h.01M19 12h.01M6 12a1 1 0 11-2 0 1 1 0 012 0zm7 0a1 1 0 11-2 0 1 1 0 012 0zm7 0a1 1 0 11-2 0 1 1 0 012 0z" />
+            </svg>
+            <span className="text-[10px] font-ui font-medium">Altro</span>
+          </button>
+        )}
       </div>
     </nav>
   );
