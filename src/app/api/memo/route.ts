@@ -101,22 +101,25 @@ export async function GET(request: NextRequest) {
     prisma.memo.count({ where }),
   ]);
 
-  return NextResponse.json({
-    data: memos.map((m) => ({
-      id: m.id,
-      contentId: m.contentId,
-      title: m.content.title,
-      body: m.content.body,
-      publishedAt: m.content.publishedAt,
-      author: m.content.createdBy.name,
-      isPinned: m.isPinned,
-      expiresAt: m.expiresAt,
-      isFeatured: m.content.isFeatured,
-      acknowledged: m.content.acknowledgments.length > 0,
-      acknowledgedAt: m.content.acknowledgments[0]?.acknowledgedAt ?? null,
-    })),
-    meta: { page, pageSize, total },
-  });
+  return NextResponse.json(
+    {
+      data: memos.map((m) => ({
+        id: m.id,
+        contentId: m.contentId,
+        title: m.content.title,
+        body: m.content.body,
+        publishedAt: m.content.publishedAt,
+        author: m.content.createdBy.name,
+        isPinned: m.isPinned,
+        expiresAt: m.expiresAt,
+        isFeatured: m.content.isFeatured,
+        acknowledged: m.content.acknowledgments.length > 0,
+        acknowledgedAt: m.content.acknowledgments[0]?.acknowledgedAt ?? null,
+      })),
+      meta: { page, pageSize, total },
+    },
+    { headers: { "Cache-Control": "no-store, no-cache, must-revalidate, private" } }
+  );
 }
 
 // --- POST: Crea memo ---

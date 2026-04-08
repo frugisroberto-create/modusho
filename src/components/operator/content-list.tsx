@@ -77,7 +77,9 @@ export function ContentList({ contentType, detailPath, title, description, creat
     if (departmentFilter) params.set("departmentId", departmentFilter);
     if (readFilter) params.set("acknowledged", readFilter);
     try {
-      const res = await fetch(`/api/content?${params}`);
+      // cache: no-store — la lista dipende da targetAudience e ack dell'utente corrente;
+      // Safari iOS tende a cachare aggressivamente le GET JSON senza header espliciti.
+      const res = await fetch(`/api/content?${params}`, { cache: "no-store" });
       if (res.ok) { const json = await res.json(); setItems(json.data); setTotal(json.meta.total); }
     } finally { setLoading(false); }
   }, [contentType, currentPropertyId, page, departmentFilter, readFilter]);

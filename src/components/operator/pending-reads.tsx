@@ -37,8 +37,10 @@ export function PendingReads() {
   const fetchPending = useCallback(async () => {
     setLoading(true);
     try {
+      // cache: no-store — dipende dallo stato ack corrente dell'utente.
       const res = await fetch(
-        `/api/content?propertyId=${currentPropertyId}&status=PUBLISHED&acknowledged=false&pageSize=50`
+        `/api/content?propertyId=${currentPropertyId}&status=PUBLISHED&acknowledged=false&pageSize=50`,
+        { cache: "no-store" }
       );
       if (res.ok) {
         const json = await res.json();

@@ -206,27 +206,30 @@ export async function GET(request: NextRequest) {
     prisma.content.count({ where }),
   ]);
 
-  return NextResponse.json({
-    data: contents.map((c) => ({
-      id: c.id,
-      code: c.code,
-      type: c.type,
-      title: c.title,
-      status: c.status,
-      version: c.version,
-      isFeatured: c.isFeatured,
-      publishedAt: c.publishedAt,
-      createdAt: c.createdAt,
-      propertyId: c.propertyId,
-      department: c.department,
-      property: c.property,
-      acknowledged: c.acknowledgments.length > 0,
-      acknowledgedAt: c.acknowledgments[0]?.acknowledgedAt ?? null,
-      updatedBy: c.updatedBy,
-      targetAudience: c.targetAudience,
-    })),
-    meta: { page, pageSize, total },
-  });
+  return NextResponse.json(
+    {
+      data: contents.map((c) => ({
+        id: c.id,
+        code: c.code,
+        type: c.type,
+        title: c.title,
+        status: c.status,
+        version: c.version,
+        isFeatured: c.isFeatured,
+        publishedAt: c.publishedAt,
+        createdAt: c.createdAt,
+        propertyId: c.propertyId,
+        department: c.department,
+        property: c.property,
+        acknowledged: c.acknowledgments.length > 0,
+        acknowledgedAt: c.acknowledgments[0]?.acknowledgedAt ?? null,
+        updatedBy: c.updatedBy,
+        targetAudience: c.targetAudience,
+      })),
+      meta: { page, pageSize, total },
+    },
+    { headers: { "Cache-Control": "no-store, no-cache, must-revalidate, private" } }
+  );
 }
 
 // --- POST: Crea nuovo contenuto ---
