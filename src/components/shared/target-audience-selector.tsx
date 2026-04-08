@@ -103,27 +103,34 @@ export function TargetAudienceSelector({
     };
     return (
       <div>
-        <label className="block text-sm font-ui font-medium text-charcoal mb-1.5">Destinatari (i tuoi reparti)</label>
+        <label className="block text-sm font-ui font-medium text-charcoal mb-1.5">Destinatari</label>
         <p className="text-xs font-ui text-charcoal/45 mb-2">
-          Come Capo Reparto puoi inviare contenuti solo agli operatori dei tuoi reparti.
+          Come Capo Reparto puoi pubblicare solo per gli operatori dei reparti che gestisci.
+          {myDepartments.length > 1 && " Sotto sono elencati i tuoi reparti — seleziona quelli a cui vuoi inviare il contenuto."}
         </p>
         {loading ? (
           <p className="text-xs font-ui text-charcoal/40">Caricamento...</p>
         ) : myDepartments.length === 0 ? (
           <p className="text-xs font-ui text-alert-red">Nessun reparto assegnato — contatta l&apos;amministratore.</p>
         ) : (
-          <div className="border border-ivory-dark divide-y divide-ivory-dark/50">
-            {myDepartments.map(dept => (
-              <label key={dept.id} className="flex items-center gap-3 py-2 px-3 cursor-pointer hover:bg-ivory-medium/30 transition-colors">
-                <input type="checkbox"
-                  checked={value.departmentIds.includes(dept.id)}
-                  onChange={() => toggleMyDept(dept.id)}
-                  className="w-4 h-4 accent-terracotta" />
-                <span className="text-sm font-ui text-charcoal">{dept.name}</span>
-                <span className="text-xs text-charcoal/40 ml-auto font-ui">{dept.code}</span>
-              </label>
-            ))}
-          </div>
+          <>
+            <p className="text-[11px] font-ui font-semibold uppercase tracking-wider text-charcoal/55 mb-1.5">
+              {myDepartments.length === 1 ? "Il tuo reparto" : `I tuoi reparti (${myDepartments.length})`}
+            </p>
+            <div className="border border-ivory-dark divide-y divide-ivory-dark/50">
+              {myDepartments.map(dept => (
+                <label key={dept.id} className="flex items-center gap-3 py-2 px-3 cursor-pointer hover:bg-ivory-medium/30 transition-colors">
+                  <input type="checkbox"
+                    checked={value.departmentIds.includes(dept.id)}
+                    onChange={() => toggleMyDept(dept.id)}
+                    disabled={myDepartments.length === 1}
+                    className="w-4 h-4 accent-terracotta disabled:opacity-50" />
+                  <span className="text-sm font-ui text-charcoal">{dept.name}</span>
+                  <span className="text-xs text-charcoal/40 ml-auto font-ui">{dept.code}</span>
+                </label>
+              ))}
+            </div>
+          </>
         )}
       </div>
     );
