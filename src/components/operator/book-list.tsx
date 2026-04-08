@@ -15,7 +15,12 @@ interface BookItem {
   property: { id: string; name: string; code: string };
   department: { id: string; name: string; code: string } | null;
   acknowledged: boolean;
-  targetAudience: { targetType: string; targetRole: string | null; targetDepartmentId: string | null }[];
+  targetAudience: {
+    targetType: string;
+    targetRole: string | null;
+    targetDepartmentId: string | null;
+    targetDepartment: { id: string; name: string; code: string } | null;
+  }[];
 }
 
 interface Department { id: string; name: string; code: string }
@@ -133,12 +138,25 @@ export function BookList({ contentType, basePath, title }: BookListProps) {
                     }`}>
                       {contentType === "BRAND_BOOK" ? "Brand Book" : "Standard Book"}
                     </span>
-                    {item.department && (
-                      <span className="text-[11px] font-ui text-charcoal/45">{item.department.name}</span>
-                    )}
-                    {!item.department && contentType === "STANDARD_BOOK" && (
-                      <span className="text-[11px] font-ui text-charcoal/35 italic">Trasversale</span>
-                    )}
+                    {(() => {
+                      // Etichetta reparto:
+                      //  1. Se il content ha un departmentId nativo → usa quello
+                      //  2. Altrimenti (tipico Standard Book) → deriva dai ContentTarget DEPARTMENT
+                      //  3. Se nessun target è DEPARTMENT → "Trasversale" (solo Standard Book)
+                      if (item.department) {
+                        return <span className="text-[11px] font-ui text-charcoal/45">{item.department.name}</span>;
+                      }
+                      const deptTargets = item.targetAudience
+                        .filter(t => t.targetType === "DEPARTMENT" && t.targetDepartment)
+                        .map(t => t.targetDepartment!.name);
+                      if (deptTargets.length > 0) {
+                        return <span className="text-[11px] font-ui text-charcoal/45">{deptTargets.join(", ")}</span>;
+                      }
+                      if (contentType === "STANDARD_BOOK") {
+                        return <span className="text-[11px] font-ui text-charcoal/35 italic">Trasversale</span>;
+                      }
+                      return null;
+                    })()}
                     {!item.acknowledged && (
                       <span className="text-xs font-ui font-medium px-2 py-0.5 bg-terracotta/10 text-terracotta">Da leggere</span>
                     )}
