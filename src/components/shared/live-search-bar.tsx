@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useCallback, useRef, useEffect } from "react";
+import { useState, useCallback, useEffect, useRef } from "react";
 import Link from "next/link";
 
 interface SearchResult {
@@ -39,45 +39,43 @@ export function LiveSearchBar({ propertyId, contentType, placeholder }: LiveSear
   const [total, setTotal] = useState(0);
   const [loading, setLoading] = useState(false);
   const [open, setOpen] = useState(false);
-  const debounceRef = useRef<NodeJS.Timeout | null>(null);
+  const [error, setError] = useState<string | null>(null);
   const containerRef = useRef<HTMLDivElement>(null);
 
-  const search = useCallback(
-    async (q: string) => {
-      if (q.trim().length < 2) {
-        setResults([]);
-        setTotal(0);
-        setOpen(false);
+  const runSearch = useCallback(async () => {
+    const q = query.trim();
+    if (q.length < 2) return;
+    setLoading(true);
+    setError(null);
+    try {
+      const params = new URLSearchParams({ q, pageSize: "8" });
+      if (propertyId) params.set("propertyId", propertyId);
+      if (contentType) params.set("type", contentType);
+      const res = await fetch(`/api/search?${params}`, { cache: "no-store" });
+      if (res.status === 401) {
+        window.location.href = "/login";
         return;
       }
-      setLoading(true);
-      try {
-        const params = new URLSearchParams({ q, pageSize: "8" });
-        if (propertyId) params.set("propertyId", propertyId);
-        if (contentType) params.set("type", contentType);
-        const res = await fetch(`/api/search?${params}`);
-        if (res.ok) {
-          const json = await res.json();
-          setResults(json.data);
-          setTotal(json.meta.total);
-          setOpen(true);
-        }
-      } finally {
-        setLoading(false);
+      if (!res.ok) {
+        setError("Errore nella ricerca. Riprova.");
+        setResults([]);
+        setTotal(0);
+        setOpen(true);
+        return;
       }
-    },
-    [propertyId, contentType]
-  );
-
-  const handleChange = useCallback(
-    (e: React.ChangeEvent<HTMLInputElement>) => {
-      const val = e.target.value;
-      setQuery(val);
-      if (debounceRef.current) clearTimeout(debounceRef.current);
-      debounceRef.current = setTimeout(() => search(val), 300);
-    },
-    [search]
-  );
+      const json = await res.json();
+      setResults(json.data);
+      setTotal(json.meta.total);
+      setOpen(true);
+    } catch {
+      setError("Errore di connessione. Riprova.");
+      setResults([]);
+      setTotal(0);
+      setOpen(true);
+    } finally {
+      setLoading(false);
+    }
+  }, [query, propertyId, contentType]);
 
   useEffect(() => {
     function handleClickOutside(e: MouseEvent) {
@@ -94,28 +92,35 @@ export function LiveSearchBar({ propertyId, contentType, placeholder }: LiveSear
     setQuery("");
     setResults([]);
     setOpen(false);
+    setError(null);
   }, [propertyId, contentType]);
 
   return (
     <div ref={containerRef} className="relative w-full">
-      <div className="flex border border-ivory-dark bg-white overflow-hidden">
+      <form
+        onSubmit={(e) => {
+          e.preventDefault();
+          runSearch();
+        }}
+        className="flex border border-ivory-dark bg-white"
+      >
         <input
           type="text"
           value={query}
-          onChange={handleChange}
+          onChange={(e) => setQuery(e.target.value)}
           onFocus={() => results.length > 0 && setOpen(true)}
           placeholder={placeholder || "Cerca nel contenuto..."}
-          className="flex-1 px-5 py-3 text-sm font-ui text-charcoal bg-transparent"
+          className="min-w-0 flex-1 px-5 py-3 text-sm font-ui text-charcoal bg-transparent"
           style={{ border: "none", boxShadow: "none" }}
         />
         <button
-          type="button"
-          onClick={() => search(query)}
-          className="shrink-0 bg-terracotta text-white px-6 py-3 text-[12.6px] font-ui font-semibold uppercase tracking-wider hover:bg-terracotta-dark transition-colors"
+          type="submit"
+          disabled={loading || query.trim().length < 2}
+          className="shrink-0 bg-terracotta text-white px-6 py-3 text-[12.6px] font-ui font-semibold uppercase tracking-wider hover:bg-terracotta-dark disabled:opacity-50 transition-colors"
         >
           {loading ? "..." : "Cerca"}
         </button>
-      </div>
+      </form>
 
       {open && results.length > 0 && (
         <div className="absolute top-full left-0 right-0 mt-1 bg-white border border-ivory-dark overflow-hidden z-50 max-h-[60vh] overflow-y-auto shadow-lg">
@@ -150,7 +155,13 @@ export function LiveSearchBar({ propertyId, contentType, placeholder }: LiveSear
         </div>
       )}
 
-      {open && query.trim().length >= 2 && results.length === 0 && !loading && (
+      {open && error && (
+        <div className="absolute top-full left-0 right-0 mt-1 bg-white border border-alert-red/30 p-6 text-center text-alert-red font-ui z-50 shadow-lg">
+          {error}
+        </div>
+      )}
+
+      {open && !error && query.trim().length >= 2 && results.length === 0 && !loading && (
         <div className="absolute top-full left-0 right-0 mt-1 bg-white border border-ivory-dark p-6 text-center text-charcoal/40 font-ui z-50 shadow-lg">
           Nessun risultato per &ldquo;{query}&rdquo;
         </div>
