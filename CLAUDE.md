@@ -312,12 +312,14 @@ Content {
 - **Standard Book**: visibile a TUTTI i ruoli (OPERATOR, HOD, HM, ADMIN, SUPER_ADMIN), ma con filtro `targetAudience` (ContentTarget) per OPERATOR/HOD: vedono solo le sezioni destinate ai loro reparti, ai loro ruoli o specificamente a loro.
 
 **Navigazione operatore:**
-La header nav dell'operatore ha 4 tab (Brand Book e Standard Book NON sono nella header operatore):
+La header nav dell'operatore include "Standard Book" per tutti i ruoli; "Brand Book" solo per HM+:
 ```
-Home | SOP | Documenti | Memo
+OPERATOR / HOD:       Home | SOP | Documenti | Memo | Standard Book
+HM / ADMIN / SA:      Home | SOP | Documenti | Memo | Brand Book | Standard Book
 ```
-- **OPERATOR e HOD**: non vedono Brand Book né Standard Book nell'header. Accedono allo Standard Book (quando previsto dal targetAudience) tramite la home (sezioni "in evidenza" / "ultimi per tipo") o tramite link diretti.
+- **OPERATOR e HOD**: vedono "Standard Book" come voce di navigazione diretta (desktop header + pannello "Altro" della bottom-nav mobile). La lista è filtrata server-side per `targetAudience`: ogni utente vede solo le sezioni destinate ai propri reparti/ruoli/utente specifico. NON vedono "Brand Book" in nessuna sezione — è riservato a HM+ come materiale di brand interno.
 - **HM, ADMIN, SUPER_ADMIN**: vedono "Brand Book" e "Standard Book" come voci di navigazione diretta nell'header.
+- **Bottom-nav mobile (OPERATOR/HOD)**: i 4 tab principali (Home/SOP/Documenti/Memo) + bottone "Altro" che apre un pannello con "Standard Book". Se il ruolo corrente non ha nessuna voce visibile nel pannello, il bottone "Altro" è nascosto del tutto (no pannello vuoto).
 
 L'operatore NON vede la sub-nav (nessuna funzione di gestione).
 
@@ -571,9 +573,11 @@ La home HOO è la prima pagina che vedono HOTEL_MANAGER, ADMIN e SUPER_ADMIN dop
 | Documenti | ✅ | ✅ | ✅ | ✅ | ✅ |
 | Memo | ✅ | ✅ | ✅ | ✅ | ✅ |
 | Brand Book | — | — | ✅ | ✅ | ✅ |
-| Standard Book | — | — | ✅ | ✅ | ✅ |
+| Standard Book | ✅ | ✅ | ✅ | ✅ | ✅ |
 
-**Nota Brand/Standard Book**: OPERATOR e HOD non vedono **Brand Book** in nessuna sezione (è riservato a HM+). Per **Standard Book**, OPERATOR e HOD lo vedono solo dalla home / link diretti (sezioni in evidenza / ultime per tipo) e solo se previsto dal targetAudience della sezione. HM+ vede entrambi come voci di navigazione diretta nell'header.
+**Nota Brand Book**: OPERATOR e HOD non vedono **Brand Book** in nessuna sezione — è riservato a HM+ come materiale di brand interno, bloccato sia in lista che in dettaglio server-side.
+
+**Nota Standard Book**: visibile a tutti i ruoli nell'header (desktop) e nel pannello "Altro" della bottom-nav (mobile). La lista è filtrata server-side per `targetAudience`: OPERATOR/HOD vedono solo le sezioni destinate ai loro reparti, ai loro ruoli o specificamente a loro tramite `ContentTarget`. Quando un OPERATOR/HOD non ha alcuna sezione target, la pagina `/standard-book` mostra lista vuota ma la voce di menu resta visibile.
 
 **Nota Analytics**: non c'è una voce "Analytics" separata nell'header HOO. Le funzioni analytics (KPI, alert critici, confronti hotel/reparto, coda approvazioni) sono integrate nella home HOO `/dashboard` accessibile via la voce "Home". La rotta `/analytics` esiste come alias storico e fa redirect a `/dashboard`.
 
@@ -641,7 +645,7 @@ La home HOO è la prima pagina che vedono HOTEL_MANAGER, ADMIN e SUPER_ADMIN dop
 
 | Aspetto | OPERATOR | HOD | HM | ADMIN | SUPER_ADMIN |
 |---------|----------|-----|----|-------|-------------|
-| Header nav voci | 4 | 4 | 6 | 7 | 7 |
+| Header nav voci | 5 | 5 | 6 | 7 | 7 |
 | Sub-nav | No | 3 voci | 3 voci | 5 voci | 6 voci (+ Cestino) |
 | Stat box | 3 | 4 | 4 | 4 | 4 |
 | "Da prendere visione" | Sì | No | No | No | No |
