@@ -80,12 +80,30 @@ export function ContentList({ contentType, detailPath, title, description, creat
       // cache: no-store — la lista dipende da targetAudience e ack dell'utente corrente;
       // Safari iOS tende a cachare aggressivamente le GET JSON senza header espliciti.
       const res = await fetch(`/api/content?${params}`, { cache: "no-store" });
-      if (res.ok) { const json = await res.json(); setItems(json.data); setTotal(json.meta.total); }
+      if (res.ok) {
+        const json = await res.json();
+        setItems(json.data);
+        setTotal(json.meta.total);
+      } else if (res.status === 401) {
+        // Sessione scaduta: non mostrare un muto "Nessun contenuto" ma rimanda al login.
+        window.location.href = "/login";
+      }
     } finally { setLoading(false); }
   }, [contentType, currentPropertyId, page, departmentFilter, readFilter]);
 
   useEffect(() => { fetchContent(); }, [fetchContent]);
   useEffect(() => { setPage(1); }, [departmentFilter, readFilter, currentPropertyId]);
+
+  // Safari iOS bfcache: quando l'utente torna indietro con il tasto back,
+  // la pagina viene restaurata dalla memoria senza re-eseguire gli useEffect.
+  // Il listener pageshow con event.persisted = true ci permette di rifetchare.
+  useEffect(() => {
+    const onPageShow = (e: PageTransitionEvent) => {
+      if (e.persisted) fetchContent();
+    };
+    window.addEventListener("pageshow", onPageShow);
+    return () => window.removeEventListener("pageshow", onPageShow);
+  }, [fetchContent]);
 
   const totalPages = Math.ceil(total / pageSize);
 
