@@ -73,10 +73,6 @@ export async function GET(request: NextRequest) {
   const where: Record<string, unknown> = {
     isDeleted: false,
     propertyId: { in: filteredPropertyIds },
-    OR: [
-      { departmentId: null },
-      { departmentId: { in: filteredDeptIds } },
-    ],
   };
 
   if (type) where.type = type;
@@ -87,9 +83,9 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({ data: [], meta: { page, pageSize, total: 0 } });
   }
 
-  // Standard Book: OPERATOR e HOD vedono solo le sezioni con ContentTarget che include
-  // il loro reparto oppure target "tutti i reparti" (ROLE/OPERATOR)
-  if (type === "STANDARD_BOOK" && (userRole === "OPERATOR" || userRole === "HOD")) {
+  // Visibilità per OPERATOR/HOD basata su targetAudience (ContentTarget)
+  // Vale per SOP, DOCUMENT, MEMO, STANDARD_BOOK
+  if (userRole === "OPERATOR" || userRole === "HOD") {
     where.targetAudience = {
       some: {
         OR: [
@@ -100,6 +96,13 @@ export async function GET(request: NextRequest) {
         ],
       },
     };
+  } else {
+    // HM/ADMIN/SUPER_ADMIN: vedono tutto in base alla property accessibile
+    // (logica dipartimentale legacy mantenuta come fallback opzionale)
+    where.OR = [
+      { departmentId: null },
+      { departmentId: { in: filteredDeptIds } },
+    ];
   }
 
   // Status enforcement per ruolo
