@@ -400,9 +400,9 @@ I reviewer (HM, ADMIN, SUPER_ADMIN) possono modificare direttamente il contenuto
 **Logica centralizzata in:** `src/lib/text-diff.ts` (algoritmo diff a livello di paragrafo)
 
 ### Regole RETURNED
-- Una SOP restituita torna a DRAFT.
-- Il sistema traccia chi ha restituito e quando (ContentReview + ContentStatusHistory).
-- La nota NON è obbligatoria come gate del workflow — chi restituisce può (e dovrebbe) aggiungere una ContentNote per spiegare il motivo, ma il sistema non blocca l'azione se manca.
+- Una SOP restituita torna allo stato RETURNED (visivamente distinto da DRAFT — l'autore vede subito che c'è un'azione richiesta).
+- Il sistema traccia chi ha restituito e quando (ContentReview + ContentStatusHistory + SopWorkflowEvent per le SOP).
+- **La nota è obbligatoria** come gate del workflow: senza nota la restituzione è bloccata (400 server-side, bottone disabled lato UI). La motivazione viene salvata sia nell'evento di workflow sia come ContentNote dedicata, in modo che l'autore veda subito perché il contenuto gli è tornato indietro. Questa obbligatorietà è una scelta di governance: restituire senza spiegazione crea conflitto operativo.
 
 ### Regole ARCHIVED
 - Una SOP pubblicata può essere archiviata da HOTEL_MANAGER, ADMIN o SUPER_ADMIN.
