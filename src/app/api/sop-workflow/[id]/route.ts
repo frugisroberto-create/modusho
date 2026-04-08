@@ -9,6 +9,7 @@ import {
   canViewDraft,
   needsReview,
 } from "@/lib/sop-workflow";
+import { checkAccess } from "@/lib/rbac";
 import { z } from "zod/v4";
 
 type RouteParams = { params: Promise<{ id: string }> };
@@ -67,11 +68,18 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
     submittedToA: wf.submittedToA,
   };
 
-  // Visibilita' bozza: R/C/A oppure ADMIN/SUPER_ADMIN possono vedere la bozza
+  // RBAC: l'utente deve avere accesso alla property della SOP
+  // (anche per SUPER_ADMIN, anche se di fatto SUPER_ADMIN ha accesso a tutto)
   const userRole = session.user.role;
+  const hasAccess = await checkAccess(userId, "OPERATOR", wf.content.property.id);
+  if (!hasAccess) {
+    return NextResponse.json({ error: "Accesso negato a questa struttura" }, { status: 403 });
+  }
+
+  // Visibilita' bozza: R/C/A oppure HM/ADMIN/SUPER_ADMIN possono vedere la bozza
   const contentStatus = wf.content.status;
   if (contentStatus !== "PUBLISHED" && contentStatus !== "ARCHIVED") {
-    if (userRole !== "SUPER_ADMIN" && userRole !== "ADMIN" && !canViewDraft(userId, wfInfo)) {
+    if (userRole !== "SUPER_ADMIN" && userRole !== "ADMIN" && userRole !== "HOTEL_MANAGER" && !canViewDraft(userId, wfInfo)) {
       return NextResponse.json({ error: "Non hai accesso a questa bozza" }, { status: 403 });
     }
   }
@@ -153,7 +161,7 @@ export async function PUT(request: NextRequest, { params }: RouteParams) {
       submittedToC: true,
       submittedToA: true,
       textVersionCount: true,
-      content: { select: { status: true } },
+      content: { select: { status: true, propertyId: true } },
     },
   });
 
@@ -161,10 +169,16 @@ export async function PUT(request: NextRequest, { params }: RouteParams) {
     return NextResponse.json({ error: "SOP non trovata" }, { status: 404 });
   }
 
+  // RBAC: l'utente deve avere accesso alla property della SOP
+  const userRole = session.user.role;
+  const hasAccess = await checkAccess(userId, "OPERATOR", wf.content.propertyId);
+  if (!hasAccess) {
+    return NextResponse.json({ error: "Accesso negato a questa struttura" }, { status: 403 });
+  }
+
   const wfInfo = { ...wf, contentStatus: wf.content.status };
 
-  // Solo R puo' modificare il testo (o ADMIN/SUPER_ADMIN pre-submit)
-  const userRole = session.user.role;
+  // Solo R puo' modificare il testo (o HM/ADMIN/SUPER_ADMIN pre-submit)
   if (!canEditText(userId, wfInfo, userRole)) {
     // Messaggio specifico per C/A quando la bozza e' sottoposta
     if (isInvolved(userId, wfInfo) && (wf.submittedToC || wf.submittedToA)) {

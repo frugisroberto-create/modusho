@@ -69,7 +69,10 @@ export async function PUT(
   const parsed = updateUserSchema.safeParse(body);
   if (!parsed.success) return NextResponse.json({ error: "Parametri non validi", details: parsed.error.issues }, { status: 400 });
 
-  const target = await prisma.user.findUnique({ where: { id }, select: { role: true } });
+  const target = await prisma.user.findUnique({
+    where: { id },
+    select: { role: true, canEdit: true, canApprove: true },
+  });
   if (!target) return NextResponse.json({ error: "Utente non trovato" }, { status: 404 });
 
   // Solo SUPER_ADMIN può modificare ADMIN/SUPER_ADMIN
@@ -87,16 +90,33 @@ export async function PUT(
     }
   }
 
+  // Merge dei valori finali (PUT parziale: i campi non passati restano quelli del DB)
   const finalRole = role ?? target.role;
-  const finalCanEdit = canEdit ?? false;
-  const finalCanApprove = canApprove ?? false;
+  const finalCanEdit = canEdit ?? target.canEdit;
+  let finalCanApprove = canApprove ?? target.canApprove;
 
-  // Validazioni coerenza
-  if (finalRole === "OPERATOR" && (finalCanEdit || finalCanApprove)) {
-    return NextResponse.json({ error: "Un operatore non può avere permessi di modifica o approvazione" }, { status: 400 });
+  // Coerenza ruolo↔permessi: forza i flag in conflitto invece di rifiutare
+  // (la regola dello spec è che cambiare ruolo deve allineare i permessi)
+  if (finalRole === "OPERATOR") {
+    if (finalCanEdit) {
+      return NextResponse.json({ error: "Un operatore non può avere permessi di modifica" }, { status: 400 });
+    }
+    if (finalCanApprove) {
+      // Se il caller non passa esplicitamente canApprove ma sta downgradando un HM a OPERATOR,
+      // forziamo canApprove=false per coerenza.
+      if (canApprove === undefined) {
+        finalCanApprove = false;
+      } else {
+        return NextResponse.json({ error: "Un operatore non può avere permessi di approvazione" }, { status: 400 });
+      }
+    }
   }
   if (finalRole === "HOD" && finalCanApprove) {
-    return NextResponse.json({ error: "Un HOD non può avere permessi di approvazione" }, { status: 400 });
+    if (canApprove === undefined) {
+      finalCanApprove = false;
+    } else {
+      return NextResponse.json({ error: "Un HOD non può avere permessi di approvazione" }, { status: 400 });
+    }
   }
   if (role === "ADMIN" && session.user.role !== "SUPER_ADMIN") {
     return NextResponse.json({ error: "Solo SUPER_ADMIN può assegnare ruolo ADMIN" }, { status: 403 });
@@ -120,6 +140,14 @@ export async function PUT(
   if (canView !== undefined) updateData.canView = canView;
   if (canEdit !== undefined) updateData.canEdit = canEdit;
   if (canApprove !== undefined) updateData.canApprove = canApprove;
+  // Persist forced coherence: se l'utente sta cambiando ruolo a OPERATOR/HOD
+  // e i permessi attuali nel DB sono incompatibili, allinea
+  if (role !== undefined && finalCanApprove !== target.canApprove) {
+    updateData.canApprove = finalCanApprove;
+  }
+  if (role !== undefined && finalCanEdit !== target.canEdit) {
+    updateData.canEdit = finalCanEdit;
+  }
   if (isActive !== undefined) updateData.isActive = isActive;
   if (password) updateData.passwordHash = await bcrypt.hash(password, 12);
 

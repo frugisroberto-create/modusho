@@ -3,6 +3,7 @@ import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { canReturn } from "@/lib/sop-workflow";
+import { checkAccess } from "@/lib/rbac";
 import { z } from "zod/v4";
 
 type RouteParams = { params: Promise<{ id: string }> };
@@ -47,12 +48,18 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
       accountableId: true,
       submittedToC: true,
       submittedToA: true,
-      content: { select: { status: true } },
+      content: { select: { status: true, propertyId: true } },
     },
   });
 
   if (!wf) {
     return NextResponse.json({ error: "SOP non trovata" }, { status: 404 });
+  }
+
+  // RBAC: l'utente deve avere accesso alla property
+  const hasAccess = await checkAccess(userId, "HOTEL_MANAGER", wf.content.propertyId);
+  if (!hasAccess) {
+    return NextResponse.json({ error: "Non hai accesso a questa struttura" }, { status: 403 });
   }
 
   const wfInfo = {

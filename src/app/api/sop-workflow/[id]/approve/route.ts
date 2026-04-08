@@ -3,6 +3,7 @@ import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { canApprove, calculateReviewDueDate } from "@/lib/sop-workflow";
+import { checkAccess } from "@/lib/rbac";
 import { sendSopPublishedPush } from "@/lib/push-notification";
 import { z } from "zod/v4";
 
@@ -44,7 +45,7 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
       submittedToC: true,
       submittedToA: true,
       reviewDueMonths: true,
-      content: { select: { status: true } },
+      content: { select: { status: true, propertyId: true } },
     },
   });
 
@@ -53,6 +54,15 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
   }
 
   const userRole = session.user.role;
+
+  // RBAC: l'utente deve avere accesso alla property della SOP
+  // (anche ADMIN con assegnazioni specifiche, non solo SUPER_ADMIN)
+  const hasAccess = await checkAccess(userId, "HOTEL_MANAGER", wf.content.propertyId);
+  if (!hasAccess) {
+    return NextResponse.json({
+      error: "Non hai accesso a questa struttura",
+    }, { status: 403 });
+  }
 
   const wfInfo = {
     contentStatus: wf.content.status,
@@ -71,9 +81,9 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
     }, { status: 400 });
   }
 
-  // Utenti con canApprove possono pubblicare direttamente da qualsiasi stato draft
-  // Altri ruoli (A) possono approvare solo da REVIEW_ADMIN con submittedToA=true
-  const userCanApprove = session.user.canApprove;
+  // Pubblicazione finale: solo ADMIN/SUPER_ADMIN per spec
+  // (HM con canApprove può solo gestire REVIEW_HM, non pubblicare)
+  const userCanApprove = session.user.canApprove && (userRole === "ADMIN" || userRole === "SUPER_ADMIN");
   if (!userCanApprove && !canApprove(userId, wfInfo)) {
     return NextResponse.json({
       error: "Non hai permessi per approvare questa SOP",

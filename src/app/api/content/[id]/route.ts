@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
-import { checkAccess, canUserManageContentType } from "@/lib/rbac";
+import { checkAccess, canUserManageContentType, getAccessibleDepartmentIds } from "@/lib/rbac";
 import { changeContentStatus } from "@/lib/content-status";
 import { getSubmitTargetStatus } from "@/lib/content-workflow";
 import { sendContentPublishedPush } from "@/lib/push-notification";
@@ -32,7 +32,7 @@ export async function GET(
         take: 1,
       },
       targetAudience: {
-        select: { targetType: true, targetRole: true, targetDepartmentId: true, targetDepartment: { select: { name: true } } },
+        select: { targetType: true, targetRole: true, targetDepartmentId: true, targetUserId: true, targetDepartment: { select: { name: true } } },
       },
     },
   });
@@ -65,6 +65,23 @@ export async function GET(
       return NextResponse.json({ error: "Contenuto non trovato" }, { status: 404 });
     }
     if (userRole === "HOD" && content.createdBy.id !== userId) {
+      return NextResponse.json({ error: "Contenuto non trovato" }, { status: 404 });
+    }
+  }
+
+  // Filtro targetAudience per OPERATOR/HOD anche su accesso diretto per ID
+  // (allinea il dettaglio singolo alla logica di visibilità della lista)
+  if (userRole === "OPERATOR" || userRole === "HOD") {
+    const accessibleDepts = await getAccessibleDepartmentIds(userId, content.propertyId);
+    const isInTarget = content.targetAudience.some((t) => {
+      if (t.targetType === "ROLE" && t.targetRole === "OPERATOR") return true;
+      if (t.targetType === "ROLE" && t.targetRole === userRole) return true;
+      if (t.targetType === "USER" && t.targetUserId === userId) return true;
+      if (t.targetType === "DEPARTMENT" && t.targetDepartmentId && accessibleDepts.includes(t.targetDepartmentId)) return true;
+      return false;
+    });
+    // HOD può comunque vedere i propri contenuti (anche se non target)
+    if (!isInTarget && !(userRole === "HOD" && content.createdBy.id === userId)) {
       return NextResponse.json({ error: "Contenuto non trovato" }, { status: 404 });
     }
   }
