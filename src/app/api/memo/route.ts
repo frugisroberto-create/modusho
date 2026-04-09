@@ -42,6 +42,7 @@ export async function GET(request: NextRequest) {
 
   const now = new Date();
   const contentWhere: Record<string, unknown> = {
+    isDeleted: false,
     status: (status || "PUBLISHED") as "PUBLISHED" | "ARCHIVED",
   };
 
