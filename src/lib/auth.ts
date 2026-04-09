@@ -52,7 +52,7 @@ export const authOptions: NextAuthOptions = {
   callbacks: {
     async jwt({ token, user }) {
       if (user) {
-        // Primo login: popola il token dal DB
+        // Primo login: popola il token dal DB e registra lastLoginAt
         token.id = user.id;
         token.email = user.email!;
         token.name = user.name!;
@@ -60,6 +60,10 @@ export const authOptions: NextAuthOptions = {
         token.canView = user.canView;
         token.canEdit = user.canEdit;
         token.canApprove = user.canApprove;
+        prisma.user.update({
+          where: { id: user.id },
+          data: { lastLoginAt: new Date() },
+        }).catch(() => {});
       } else if (token.id) {
         // Rinnovo token: aggiorna ruolo e permessi dal DB
         try {

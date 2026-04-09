@@ -87,7 +87,7 @@ export async function GET(request: NextRequest) {
       select: {
         id: true, email: true, name: true, role: true,
         canView: true, canEdit: true, canApprove: true,
-        isActive: true, createdAt: true,
+        isActive: true, lastLoginAt: true, createdAt: true,
         propertyAssignments: {
           include: {
             property: { select: { id: true, name: true, code: true } },

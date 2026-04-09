@@ -6,6 +6,7 @@ import Link from "next/link";
 interface UserItem {
   id: string; email: string; name: string; role: string; isActive: boolean;
   canView: boolean; canEdit: boolean; canApprove: boolean;
+  lastLoginAt: string | null;
   propertyAssignments: { property: { name: string; code: string }; department: { name: string } | null }[];
   contentPermissions: { contentType: string }[];
 }
@@ -136,6 +137,7 @@ export default function UsersPage() {
                 <th className="px-4 py-3">Strutture</th>
                 <th className="px-4 py-3">Reparti</th>
                 <th className="px-4 py-3">Contenuti</th>
+                <th className="px-4 py-3">Ultimo accesso</th>
                 <th className="px-4 py-3 text-right">Azioni</th>
               </tr>
             </thead>
@@ -178,6 +180,11 @@ export default function UsersPage() {
                         ))}
                         {ctLabels.length === 0 && <span className="text-sage-light text-xs">—</span>}
                       </div>
+                    </td>
+                    <td className="px-4 py-3 text-xs text-charcoal">
+                      {u.lastLoginAt
+                        ? new Date(u.lastLoginAt).toLocaleString("it-IT", { day: "2-digit", month: "2-digit", year: "2-digit", hour: "2-digit", minute: "2-digit" })
+                        : <span className="text-sage-light italic">Mai</span>}
                     </td>
                     <td className="px-4 py-3">
                       <div className="flex items-center justify-end gap-2">
