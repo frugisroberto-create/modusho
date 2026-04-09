@@ -108,8 +108,12 @@ export default function GovernanceDashboardPage() {
     ...data.alerts.lowAckContents.map(a => ({ ...a, _key: `lowAckContents:${a.id}` })),
   ].filter((alert) => {
     if (!departmentFilter) return true;
-    if (alert.department === undefined) return true; // alerts senza dept (es. inactive hotels) passano
-    return alert.department === null || alert.department === departments.find(d => d.id === departmentFilter)?.name;
+    // Quando un reparto è selezionato, mostra solo alert con department
+    // che matcha il filtro. Alert senza department (hotel-level come
+    // "inactive hotels" o "high return hotels") vengono nascosti perché
+    // non sono specifici del reparto selezionato.
+    const selectedDeptName = departments.find(d => d.id === departmentFilter)?.name;
+    return alert.department != null && alert.department === selectedDeptName;
   });
   const allAlerts = allAlertsRaw.filter((alert) => !dismissedAlerts.has(alert._key));
 
