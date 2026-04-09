@@ -83,7 +83,7 @@ export async function GET(request: NextRequest) {
             title: true,
             body: true,
             publishedAt: true,
-            createdBy: { select: { name: true } },
+            createdBy: { select: { id: true, name: true } },
             acknowledgments: {
               where: { userId },
               select: { acknowledgedAt: true },
@@ -107,6 +107,7 @@ export async function GET(request: NextRequest) {
       body: m.content.body,
       publishedAt: m.content.publishedAt,
       author: m.content.createdBy.name,
+      createdById: m.content.createdBy.id,
       isPinned: m.isPinned,
       expiresAt: m.expiresAt,
       acknowledged: m.content.acknowledgments.length > 0,

@@ -84,7 +84,9 @@ export default async function DocumentDetailPage({ params }: Props) {
         </div>
       )}
 
-      {user.role !== "OPERATOR" && (
+      {/* Registro presa visione: HM+ sempre, HOD solo per i propri contenuti */}
+      {(user.role === "HOTEL_MANAGER" || user.role === "ADMIN" || user.role === "SUPER_ADMIN" ||
+        (user.role === "HOD" && content.createdBy.id === user.id)) && (
         <ContentAckRegistry contentId={content.id} userRole={user.role} userId={user.id} propertyId={content.propertyId} />
       )}
     </div>

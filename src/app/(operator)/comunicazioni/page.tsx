@@ -11,7 +11,7 @@ import { LiveSearchBar } from "@/components/shared/live-search-bar";
 
 interface MemoItem {
   id: string; contentId: string; title: string; body: string;
-  publishedAt: string | null; author: string; isPinned: boolean; expiresAt: string | null;
+  publishedAt: string | null; author: string; createdById: string; isPinned: boolean; expiresAt: string | null;
   acknowledged: boolean; acknowledgedAt: string | null;
 }
 
@@ -124,7 +124,9 @@ export default function MemoListPage() {
                           <AcknowledgeButton contentId={memo.contentId} acknowledged={memo.acknowledged} acknowledgedAt={memo.acknowledgedAt?.toString() ?? null} />
                         </div>
                       )}
-                      {userRole !== "OPERATOR" && (
+                      {/* Registro presa visione: HM+ sempre, HOD solo per i propri memo */}
+                      {(userRole === "HOTEL_MANAGER" || userRole === "ADMIN" || userRole === "SUPER_ADMIN" ||
+                        (userRole === "HOD" && memo.createdById === userId)) && (
                         <ContentAckRegistry contentId={memo.contentId} userRole={userRole} userId={userId} propertyId={currentPropertyId} />
                       )}
                     </>
