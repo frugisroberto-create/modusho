@@ -40,14 +40,8 @@ export default async function SopDetailPage({ params }: Props) {
 
   if (!content) notFound();
 
-  // SOP non pubblicata: OPERATOR → 404, HOD+ → redirect al workflow editor
-  if (content.status !== "PUBLISHED") {
-    if (user.role === "OPERATOR") notFound();
-    if (content.sopWorkflow?.id) {
-      redirect(`/sop-workflow/${content.sopWorkflow.id}`);
-    }
-    notFound();
-  }
+  // OPERATOR: solo PUBLISHED. HOD+: qualsiasi stato (consultazione read-only).
+  if (content.status !== "PUBLISHED" && user.role === "OPERATOR") notFound();
 
   const canAccess = await canUserAccessContent(user.id, user.role, {
     propertyId: content.propertyId,
