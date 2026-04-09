@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
-import { getAccessiblePropertyIds } from "@/lib/rbac";
+import { getAccessiblePropertyIds, getAccessibleDepartmentIds } from "@/lib/rbac";
 import { z } from "zod/v4";
 
 export async function GET(request: NextRequest) {
@@ -20,9 +20,21 @@ export async function GET(request: NextRequest) {
     orderBy: { name: "asc" },
   });
 
+  // Per HOD: filtra i department ai soli assegnati (perimetro).
+  // HM/ADMIN/SUPER_ADMIN vedono tutti i department della property.
+  const userRole = session.user.role;
+  const needsDeptFilter = userRole === "HOD" || userRole === "OPERATOR";
+
   // Enrich with KPI
   const data = await Promise.all(
     properties.map(async (p) => {
+      // Department filtering per perimetro utente
+      let departments = p.departments;
+      if (needsDeptFilter) {
+        const accessibleDeptIds = await getAccessibleDepartmentIds(session.user.id, p.id);
+        departments = p.departments.filter(d => accessibleDeptIds.includes(d.id));
+      }
+
       const [sopTotal, sopPublished, ackCount, publishedCount] = await Promise.all([
         prisma.content.count({ where: { propertyId: p.id, type: "SOP" } }),
         prisma.content.count({ where: { propertyId: p.id, type: "SOP", status: "PUBLISHED" } }),
@@ -36,7 +48,7 @@ export async function GET(request: NextRequest) {
       return {
         id: p.id, name: p.name, code: p.code, tagline: p.tagline, city: p.city,
         address: p.address, description: p.description, website: p.website,
-        departments: p.departments,
+        departments,
         sopTotal, sopPublished,
         ackRate: expectedAcks > 0 ? Math.round((ackCount / expectedAcks) * 100) : null,
       };
