@@ -1,4 +1,5 @@
 import { redirect } from "next/navigation";
+import { headers } from "next/headers";
 import { getSessionUser } from "@/lib/session";
 import { SearchBar } from "@/components/operator/search-bar";
 import { PendingReads } from "@/components/operator/pending-reads";
@@ -14,9 +15,15 @@ export default async function OperatorHome({ searchParams }: Props) {
   const user = await getSessionUser();
   const params = await searchParams;
 
-  // ADMIN/SUPER_ADMIN: landing su dashboard (salvo vista hotel esplicita)
+  // ADMIN/SUPER_ADMIN su desktop: landing su dashboard.
+  // Su mobile: resta sulla home hotel (la dashboard è consultabile
+  // via sub-nav, ma la landing è la vista operativa dell'hotel).
   if (user && (user.role === "ADMIN" || user.role === "SUPER_ADMIN") && params.view !== "hotel") {
-    redirect("/dashboard");
+    const ua = (await headers()).get("user-agent") ?? "";
+    const isMobile = /iPhone|iPad|iPod|Android|webOS|BlackBerry|IEMobile|Opera Mini/i.test(ua);
+    if (!isMobile) {
+      redirect("/dashboard");
+    }
   }
 
   return (
