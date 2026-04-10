@@ -164,7 +164,7 @@ async function expandTargets(targets: TargetInput[], propertyId: string): Promis
       if (!propertyUserCache.has(cacheKey)) {
         const users = await prisma.user.findMany({
           where: {
-            role: t.targetRole as "OPERATOR" | "HOD",
+            role: t.targetRole as "OPERATOR" | "HOD" | "HOTEL_MANAGER",
             isActive: true,
             propertyAssignments: { some: { propertyId } },
           },

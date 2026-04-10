@@ -112,13 +112,14 @@ export async function GET(request: NextRequest) {
   const propertyUserCache: Record<string, {
     operators: string[];
     hods: string[];
+    hms: string[];
   }> = {};
 
   const departmentUserCache: Record<string, string[]> = {};
 
   async function getUsersForProperty(pid: string) {
     if (!propertyUserCache[pid]) {
-      const [operators, hods] = await Promise.all([
+      const [operators, hods, hms] = await Promise.all([
         prisma.user.findMany({
           where: {
             role: "OPERATOR",
@@ -135,10 +136,19 @@ export async function GET(request: NextRequest) {
           },
           select: { id: true },
         }),
+        prisma.user.findMany({
+          where: {
+            role: "HOTEL_MANAGER",
+            isActive: true,
+            propertyAssignments: { some: { propertyId: pid } },
+          },
+          select: { id: true },
+        }),
       ]);
       propertyUserCache[pid] = {
         operators: operators.map((u) => u.id),
         hods: hods.map((u) => u.id),
+        hms: hms.map((u) => u.id),
       };
     }
     return propertyUserCache[pid];
@@ -176,11 +186,13 @@ export async function GET(request: NextRequest) {
 
     for (const target of content.targetAudience) {
       if (target.targetType === "ROLE") {
-        const { operators, hods } = await getUsersForProperty(content.propertyId);
+        const propertyUsers = await getUsersForProperty(content.propertyId);
         if (target.targetRole === "OPERATOR") {
-          for (const uid of operators) targetUserIds.add(uid);
+          for (const uid of propertyUsers.operators) targetUserIds.add(uid);
         } else if (target.targetRole === "HOD") {
-          for (const uid of hods) targetUserIds.add(uid);
+          for (const uid of propertyUsers.hods) targetUserIds.add(uid);
+        } else if (target.targetRole === "HOTEL_MANAGER") {
+          for (const uid of propertyUsers.hms) targetUserIds.add(uid);
         }
       } else if (target.targetType === "DEPARTMENT" && target.targetDepartmentId) {
         const deptUsers = await getUsersForDepartment(target.targetDepartmentId);
