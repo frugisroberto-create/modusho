@@ -577,6 +577,7 @@ La home HOO è il pannello di governance con KPI, alert e confronti — tutto co
 |------|----------|-----|----|-------|-------------|
 | Overview | — | ✅ | ✅ | ✅ | ✅ |
 | Approvazioni (con badge count) | — | ✅ | ✅ | ✅ | ✅ |
+| Presa visione | — | ✅ | ✅ | ✅ | ✅ |
 | Report | — | ✅ | ✅ | ✅ | ✅ |
 | Gestione utenti | — | — | — | ✅ | ✅ |
 | Strutture | — | — | — | ✅ | ✅ |
@@ -614,7 +615,7 @@ La home HOO è il pannello di governance con KPI, alert e confronti — tutto co
 | Aspetto | OPERATOR | HOD | HM | ADMIN | SUPER_ADMIN |
 |---------|----------|-----|----|-------|-------------|
 | Header nav voci | 5 | 5 | 6 | 7 | 7 |
-| Sub-nav | No | 3 voci | 3 voci | 5 voci | 6 voci (+ Cestino) |
+| Sub-nav | No | 4 voci | 4 voci | 6 voci | 7 voci (+ Cestino) |
 | Stat box | 3 | 4 | 4 | 4 | 4 |
 | "Da prendere visione" | Sì | Sì | Sì | Sì | Sì |
 | Badge stato nelle colonne | No | Sì | Sì | Sì | Sì |
