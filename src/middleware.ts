@@ -57,8 +57,8 @@ export default withAuth(
       }
     }
 
-    // 4a2. Approvazioni e report: accessibili da HOD+
-    if (pathname.startsWith("/approvals") || pathname.startsWith("/reports")) {
+    // 4a2. Approvazioni, presa visione e report: accessibili da HOD+
+    if (pathname.startsWith("/approvals") || pathname.startsWith("/compliance") || pathname.startsWith("/reports")) {
       if (ROLE_HIERARCHY[userRole] < ROLE_HIERARCHY.HOD) {
         return NextResponse.redirect(new URL("/unauthorized", req.url));
       }
