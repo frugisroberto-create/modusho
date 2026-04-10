@@ -3,7 +3,6 @@ import { getSessionUser } from "@/lib/session";
 import { prisma } from "@/lib/prisma";
 import { canUserAccessContent } from "@/lib/rbac";
 import { stripEnColumnFromStandardBook } from "@/lib/standard-book";
-import { AcknowledgeButton } from "@/components/operator/acknowledge-button";
 import Link from "next/link";
 
 interface Props { params: Promise<{ id: string }> }
@@ -18,7 +17,6 @@ export default async function StandardBookDetailPage({ params }: Props) {
     include: {
       property: { select: { id: true, name: true, code: true } },
       createdBy: { select: { id: true, name: true } },
-      acknowledgments: { where: { userId: user.id }, select: { acknowledgedAt: true }, take: 1 },
       targetAudience: {
         select: { targetType: true, targetRole: true, targetDepartmentId: true, targetUserId: true },
       },
@@ -33,9 +31,6 @@ export default async function StandardBookDetailPage({ params }: Props) {
     targetAudience: content.targetAudience,
   });
   if (!canAccess) notFound();
-
-  const acknowledged = content.acknowledgments.length > 0;
-  const acknowledgedAt = content.acknowledgments[0]?.acknowledgedAt?.toISOString() ?? null;
 
   const sourceBadge = content.standardSource === "LQA"
     ? { label: "LQA Standards", bg: "#E3F2FD", color: "#1565C0" }
@@ -74,12 +69,6 @@ export default async function StandardBookDetailPage({ params }: Props) {
           leggibilità (specialmente su mobile) — era un duplicato della colonna IT. */}
       <div className="overflow-x-auto mb-8 border border-ivory-dark bg-white"
         dangerouslySetInnerHTML={{ __html: stripEnColumnFromStandardBook(content.body) }} />
-
-      {user.role === "OPERATOR" && (
-        <div className="border-t border-ivory-dark pt-6">
-          <AcknowledgeButton contentId={content.id} acknowledged={acknowledged} acknowledgedAt={acknowledgedAt} />
-        </div>
-      )}
     </div>
   );
 }

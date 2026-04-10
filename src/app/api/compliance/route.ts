@@ -12,7 +12,7 @@ const ROLE_HIERARCHY: Record<string, number> = {
 const complianceQuerySchema = z.object({
   propertyId: z.string().optional(),
   departmentId: z.string().optional(),
-  type: z.enum(["SOP", "DOCUMENT", "MEMO", "STANDARD_BOOK"]).optional(),
+  type: z.enum(["SOP", "DOCUMENT", "MEMO"]).optional(),
   page: z.coerce.number().int().min(1).default(1),
   pageSize: z.coerce.number().int().min(1).max(50).default(20),
 });
@@ -64,7 +64,13 @@ export async function GET(request: NextRequest) {
     targetAudience: { some: {} }, // must have at least one ContentTarget
   };
 
-  if (type) where.type = type;
+  // Brand Book e Standard Book sono documenti di consultazione, non soggetti
+  // a presa visione obbligatoria — esclusi dalla compliance.
+  if (type) {
+    where.type = type;
+  } else {
+    where.type = { in: ["SOP", "DOCUMENT", "MEMO"] };
+  }
   if (departmentId) where.departmentId = departmentId;
 
   // HOD: only their own content

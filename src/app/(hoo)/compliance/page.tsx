@@ -28,20 +28,18 @@ interface Property {
   departments?: Department[];
 }
 
-type ContentTypeFilter = "" | "SOP" | "DOCUMENT" | "MEMO" | "STANDARD_BOOK";
+type ContentTypeFilter = "" | "SOP" | "DOCUMENT" | "MEMO";
 
 const TYPE_LABELS: Record<string, string> = {
   SOP: "SOP",
   DOCUMENT: "Documento",
   MEMO: "Memo",
-  STANDARD_BOOK: "Standard Book",
 };
 
 const TYPE_BADGE_CLASSES: Record<string, string> = {
   SOP: "badge-sop",
   DOCUMENT: "badge-document",
   MEMO: "badge-memo",
-  STANDARD_BOOK: "bg-[#E3F2FD] text-[#1565C0] text-[10px] font-ui font-bold uppercase tracking-wider px-2 py-0.5",
 };
 
 function getDetailHref(item: ComplianceItem): string {
@@ -49,7 +47,6 @@ function getDetailHref(item: ComplianceItem): string {
     case "SOP": return `/sop/${item.id}`;
     case "DOCUMENT": return `/documents/${item.id}`;
     case "MEMO": return `/comunicazioni?open=${item.id}`;
-    case "STANDARD_BOOK": return `/standard-book/${item.id}`;
     default: return `/sop/${item.id}`;
   }
 }
@@ -57,10 +54,6 @@ function getDetailHref(item: ComplianceItem): string {
 function TypeBadge({ type }: { type: string }) {
   const badgeClass = TYPE_BADGE_CLASSES[type];
   const label = TYPE_LABELS[type] ?? type;
-
-  if (type === "STANDARD_BOOK") {
-    return <span className={badgeClass}>{label}</span>;
-  }
 
   return (
     <span className={`text-[10px] font-ui font-bold uppercase tracking-wider px-2 py-0.5 ${badgeClass}`}>
@@ -176,7 +169,6 @@ export default function CompliancePage() {
             <option value="SOP">SOP</option>
             <option value="DOCUMENT">Documento</option>
             <option value="MEMO">Memo</option>
-            <option value="STANDARD_BOOK">Standard Book</option>
           </select>
         </div>
       </div>

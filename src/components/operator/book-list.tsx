@@ -150,16 +150,8 @@ export function BookList({ contentType, basePath, title }: BookListProps) {
                     }`}>
                       {contentType === "BRAND_BOOK" ? "Brand Book" : "Standard Book"}
                     </span>
-                    {/* Per i Brand Book manteniamo l'etichetta reparto nativo se presente.
-                        Per gli Standard Book non mostriamo i reparti destinatari — in
-                        consultazione è rumore visivo: l'utente vede solo ciò che lo riguarda
-                        (filtro server-side via targetAudience) e non gli serve sapere a chi
-                        ALTRO è visibile. */}
                     {contentType === "BRAND_BOOK" && item.department && (
                       <span className="text-[11px] font-ui text-charcoal/45">{item.department.name}</span>
-                    )}
-                    {!item.acknowledged && (
-                      <span className="text-xs font-ui font-medium px-2 py-0.5 bg-terracotta/10 text-terracotta">Da leggere</span>
                     )}
                   </div>
                   <h3 className="font-ui font-medium text-charcoal-dark text-sm">{item.title}</h3>

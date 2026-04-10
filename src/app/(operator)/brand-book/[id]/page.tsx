@@ -2,7 +2,6 @@ import { notFound, redirect } from "next/navigation";
 import { getSessionUser } from "@/lib/session";
 import { prisma } from "@/lib/prisma";
 import { checkAccess } from "@/lib/rbac";
-import { AcknowledgeButton } from "@/components/operator/acknowledge-button";
 import Link from "next/link";
 
 interface Props { params: Promise<{ id: string }> }
@@ -23,7 +22,6 @@ export default async function BrandBookDetailPage({ params }: Props) {
     include: {
       property: { select: { id: true, name: true, code: true } },
       createdBy: { select: { name: true } },
-      acknowledgments: { where: { userId: user.id }, select: { acknowledgedAt: true }, take: 1 },
     },
   });
 
@@ -31,9 +29,6 @@ export default async function BrandBookDetailPage({ params }: Props) {
 
   const hasAccess = await checkAccess(user.id, "OPERATOR", content.propertyId);
   if (!hasAccess) notFound();
-
-  const acknowledged = content.acknowledgments.length > 0;
-  const acknowledgedAt = content.acknowledgments[0]?.acknowledgedAt?.toISOString() ?? null;
 
   return (
     <div className="max-w-3xl mx-auto py-6">
@@ -54,10 +49,6 @@ export default async function BrandBookDetailPage({ params }: Props) {
 
       <article className="prose prose-gray max-w-none mb-8 bg-ivory-medium border border-ivory-dark p-4 sm:p-6 font-body"
         dangerouslySetInnerHTML={{ __html: content.body }} />
-
-      {user.role === "OPERATOR" && (<div className="border-t border-ivory-dark pt-6">
-        <AcknowledgeButton contentId={content.id} acknowledged={acknowledged} acknowledgedAt={acknowledgedAt} />
-      </div>)}
     </div>
   );
 }
