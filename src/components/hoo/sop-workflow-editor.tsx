@@ -4,6 +4,7 @@ import { useState, useEffect, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import { AttachmentUploader } from "@/components/shared/attachment-uploader";
 import { SopEditor } from "@/components/shared/sop-editor";
+import { SopViewRegistry } from "@/components/shared/sop-view-registry";
 
 // ─── Types ───────────────────────────────────────────────────────────
 
@@ -519,6 +520,11 @@ export function SopWorkflowEditor({ workflowId, currentUserId, currentUserRole, 
       {/* ── Azioni post-pubblicazione (HOO / HM) ── */}
       {isPubblicata && (currentUserRole === "ADMIN" || currentUserRole === "SUPER_ADMIN" || currentUserRole === "HOTEL_MANAGER") && (
         <PublishedActions contentId={wf.contentId} workflowId={workflowId} onRefresh={fetchWorkflow} />
+      )}
+
+      {/* ── Registro presa visione (SOP pubblicata) ── */}
+      {isPubblicata && (
+        <SopViewRegistry contentId={wf.contentId} />
       )}
 
       {/* ── Tabs: Note / Versioni / Allegati / Eventi ── */}
