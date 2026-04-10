@@ -300,7 +300,7 @@ Content {
 - NON seguono il workflow SOP (no DRAFT → REVIEW_HM → ecc.)
 - Vengono pubblicati direttamente (status = PUBLISHED alla creazione)
 - propertyId nullable: se null, il contenuto è di gruppo (visibile a tutte le strutture)
-- Presa visione obbligatoria configurabile (come per le SOP)
+- Brand Book e Standard Book sono documenti di **consultazione**, NON soggetti a presa visione obbligatoria. Non compaiono nella sezione "Da prendere visione", nella pagina "Presa visione" (compliance), né hanno il bottone "Confermo presa visione" nel dettaglio.
 
 **Visibilità per tipo:**
 - **Brand Book**: visibile **solo a HOTEL_MANAGER, ADMIN, SUPER_ADMIN**. OPERATOR e HOD NON vedono il Brand Book — è materiale di brand interno destinato alla governance, non operativo. Bloccato sia in lista che in dettaglio.
