@@ -117,7 +117,7 @@ export default function MemoListPage() {
                   </button>
                   {expandedMemo === memo.id ? (
                     <>
-                      <div className="text-sm text-charcoal prose prose-sm max-w-none mt-2 p-3 bg-ivory border border-ivory-dark"
+                      <div className="text-sm text-charcoal prose prose-sm max-w-none mt-2 p-3 bg-ivory border border-ivory-dark whitespace-pre-line"
                         dangerouslySetInnerHTML={{ __html: memo.body }} />
                       {(userRole === "OPERATOR" || userRole === "HOD") && (
                         <div className="mt-3">

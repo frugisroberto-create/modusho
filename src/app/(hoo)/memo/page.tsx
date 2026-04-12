@@ -117,7 +117,7 @@ export default function MemoManagementPage() {
                     </div>
                     {expandedMemo === m.id ? (
                       <>
-                        <div className="text-sm text-charcoal prose prose-sm max-w-none mt-2 p-3 bg-ivory border border-ivory-dark"
+                        <div className="text-sm text-charcoal prose prose-sm max-w-none mt-2 p-3 bg-ivory border border-ivory-dark whitespace-pre-line"
                           dangerouslySetInnerHTML={{ __html: m.body }} />
                         <ContentAckRegistry contentId={m.contentId} userRole={userRole} userId={userId} propertyId={propertyId} />
                       </>
