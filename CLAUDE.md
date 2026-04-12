@@ -1104,5 +1104,21 @@ Il sistema deve permettere la gestione completa delle strutture.
 - LMS / quiz / certificazioni
 - Chat interna
 - BPM avanzato / workflow builder
-- Notifiche push (v1 senza notifiche, solo dashboard)
 - Integrazione con PMS
+
+## Notifiche push (PWA)
+
+Il sistema invia notifiche push via Web Push API a chi ha accettato il banner di consenso (`PushPermissionBanner`). Le notifiche sono best-effort: se l'utente non ha una `PushSubscription` attiva, nessun errore. Subscription scadute (410/404) vengono rimosse automaticamente.
+
+**Trigger e destinatari:**
+
+| Evento | Destinatari | Messaggio |
+|--------|-------------|-----------|
+| Contenuto pubblicato (SOP, Document, Memo) | Utenti target del contenuto (escluso chi pubblica) | "Nuovo [tipo]: [titolo]" |
+| Bozza SOP salvata (nuova versione) | C e A del workflow RACI (escluso R che salva) | "[codice] — [titolo]: nuova versione salvata da [nome]" |
+| Nota aggiunta su bozza SOP | R, C e A del workflow RACI (escluso autore nota) | "[codice] — [titolo]: nuova nota da [nome]" |
+| Sollecito presa visione (cron giornaliero 09:00 CET) | Utenti con contenuti PUBLISHED da >24h non confermati | "Hai N contenuti da prendere visione che attendono la tua conferma da più di 24 ore." |
+
+**Tap sulla notifica**: apre la pagina rilevante (dettaglio SOP, workflow editor, o home per i solleciti).
+
+**Cron**: `/api/cron/ack-reminder` eseguito da Vercel Cron ogni giorno alle 07:00 UTC (09:00 CEST). Protetto da `CRON_SECRET`.
