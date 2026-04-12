@@ -4,12 +4,14 @@ import { useState, useEffect, useCallback } from "react";
 import Link from "next/link";
 import { ExportPdfButton } from "@/components/shared/export-pdf-button";
 import { ContentAckRegistry } from "@/components/shared/content-ack-registry";
+import { AcknowledgeButton } from "@/components/operator/acknowledge-button";
 import { useHooContext } from "@/components/hoo/hoo-shell";
 import { useSession } from "next-auth/react";
 
 interface MemoItem {
   id: string; contentId: string; title: string; body: string;
   publishedAt: string | null; author: string; isPinned: boolean; expiresAt: string | null;
+  acknowledged: boolean; acknowledgedAt: string | null;
 }
 
 interface Property { id: string; name: string; code: string }
@@ -119,6 +121,9 @@ export default function MemoManagementPage() {
                       <>
                         <div className="text-sm text-charcoal prose prose-sm max-w-none mt-2 p-3 bg-ivory border border-ivory-dark whitespace-pre-line"
                           dangerouslySetInnerHTML={{ __html: m.body }} />
+                        <div className="mt-3">
+                          <AcknowledgeButton contentId={m.contentId} acknowledged={m.acknowledged} acknowledgedAt={m.acknowledgedAt?.toString() ?? null} />
+                        </div>
                         <ContentAckRegistry contentId={m.contentId} userRole={userRole} userId={userId} propertyId={propertyId} />
                       </>
                     ) : (
