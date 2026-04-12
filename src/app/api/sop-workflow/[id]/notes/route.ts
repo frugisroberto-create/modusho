@@ -3,6 +3,7 @@ import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { canAddNote, canViewDraft, isInvolved } from "@/lib/sop-workflow";
+import { sendWorkflowActivityPush } from "@/lib/push-notification";
 import { z } from "zod/v4";
 
 type RouteParams = { params: Promise<{ id: string }> };
@@ -112,7 +113,7 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
       accountableId: true,
       submittedToC: true,
       submittedToA: true,
-      content: { select: { status: true } },
+      content: { select: { status: true, code: true, title: true } },
     },
   });
 
@@ -156,6 +157,16 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
       },
     }),
   ]);
+
+  // Push notification ai soggetti RACI (escluso autore nota) — best-effort
+  sendWorkflowActivityPush({
+    workflowId: wf.id,
+    contentCode: wf.content.code ?? null,
+    contentTitle: wf.content.title,
+    actorName: session.user.name,
+    actorId: userId,
+    eventType: "NOTE_ADDED",
+  }).catch(() => {});
 
   return NextResponse.json({ data: note }, { status: 201 });
 }

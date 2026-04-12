@@ -94,6 +94,84 @@ export async function sendContentPublishedPush(params: {
   }
 }
 
+// ─── Push per attività workflow RACI (bozza salvata, nota aggiunta) ──
+
+/**
+ * Invia push ai soggetti R/C/A di un SopWorkflow quando qualcuno
+ * salva una nuova versione della bozza o aggiunge una nota.
+ *
+ * Esclude l'autore dell'azione (actorId) — non ti notifico di quello
+ * che hai fatto tu.
+ */
+export async function sendWorkflowActivityPush(params: {
+  workflowId: string;
+  contentCode: string | null;
+  contentTitle: string;
+  actorName: string;
+  actorId: string;
+  eventType: "TEXT_SAVED" | "NOTE_ADDED";
+}) {
+  const { workflowId, contentCode, contentTitle, actorName, actorId, eventType } = params;
+
+  if (!VAPID_PUBLIC_KEY || !VAPID_PRIVATE_KEY) return;
+
+  try {
+    const wf = await prisma.sopWorkflow.findUnique({
+      where: { id: workflowId },
+      select: { responsibleId: true, consultedId: true, accountableId: true },
+    });
+    if (!wf) return;
+
+    // Destinatari: R + C + A, escluso chi ha fatto l'azione
+    const recipientIds = [wf.responsibleId, wf.consultedId, wf.accountableId]
+      .filter((id): id is string => id !== null && id !== actorId);
+
+    if (recipientIds.length === 0) return;
+
+    const subscriptions = await prisma.pushSubscription.findMany({
+      where: { userId: { in: recipientIds } },
+      select: { id: true, endpoint: true, p256dh: true, auth: true },
+    });
+    if (subscriptions.length === 0) return;
+
+    const label = contentCode ? `${contentCode} — ${contentTitle}` : contentTitle;
+    const body = eventType === "TEXT_SAVED"
+      ? `${label}: nuova versione salvata da ${actorName}`
+      : `${label}: nuova nota da ${actorName}`;
+
+    const payload = JSON.stringify({
+      title: "ModusHO",
+      body,
+      data: { url: `/sop-workflow/${workflowId}` },
+    });
+
+    const results = await Promise.allSettled(
+      subscriptions.map(async (sub) => {
+        try {
+          await webpush.sendNotification(
+            { endpoint: sub.endpoint, keys: { p256dh: sub.p256dh, auth: sub.auth } },
+            payload
+          );
+        } catch (err: unknown) {
+          const statusCode = (err as { statusCode?: number })?.statusCode;
+          if (statusCode === 410 || statusCode === 404) {
+            await prisma.pushSubscription.delete({ where: { id: sub.id } }).catch(() => {});
+          }
+          throw err;
+        }
+      })
+    );
+
+    const sent = results.filter((r) => r.status === "fulfilled").length;
+    const failed = results.filter((r) => r.status === "rejected").length;
+    if (sent > 0 || failed > 0) {
+      console.log(`[push] workflow ${eventType} "${label}": ${sent} sent, ${failed} failed`);
+    }
+  } catch (err) {
+    console.error(`[push] Error sending workflow ${eventType} push:`, err);
+  }
+}
+
 // ─── Wrapper SOP (mantiene compatibilità Fase 1) ─────────────────────
 
 /**

@@ -10,6 +10,7 @@ import {
   needsReview,
 } from "@/lib/sop-workflow";
 import { checkAccess } from "@/lib/rbac";
+import { sendWorkflowActivityPush } from "@/lib/push-notification";
 import { z } from "zod/v4";
 
 type RouteParams = { params: Promise<{ id: string }> };
@@ -159,7 +160,7 @@ export async function PUT(request: NextRequest, { params }: RouteParams) {
       submittedToC: true,
       submittedToA: true,
       textVersionCount: true,
-      content: { select: { status: true, propertyId: true } },
+      content: { select: { status: true, propertyId: true, code: true } },
     },
   });
 
@@ -261,6 +262,16 @@ export async function PUT(request: NextRequest, { params }: RouteParams) {
 
     return updatedWf;
   });
+
+  // Push notification ai soggetti RACI (escluso chi salva) — best-effort
+  sendWorkflowActivityPush({
+    workflowId: wf.id,
+    contentCode: wf.content.code ?? null,
+    contentTitle: title,
+    actorName: session.user.name,
+    actorId: userId,
+    eventType: "TEXT_SAVED",
+  }).catch(() => {});
 
   return NextResponse.json({
     data: {
