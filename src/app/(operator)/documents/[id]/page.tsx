@@ -78,11 +78,9 @@ export default async function DocumentDetailPage({ params }: Props) {
 
       <AttachmentUploader contentId={content.id} canEdit={false} />
 
-      {(user.role === "OPERATOR" || user.role === "HOD") && (
-        <div className="border-t border-ivory-dark pt-6">
-          <AcknowledgeButton contentId={content.id} acknowledged={acknowledged} acknowledgedAt={acknowledgedAt} />
-        </div>
-      )}
+      <div className="border-t border-ivory-dark pt-6">
+        <AcknowledgeButton contentId={content.id} acknowledged={acknowledged} acknowledgedAt={acknowledgedAt} />
+      </div>
 
       {/* Registro presa visione: HM+ sempre, HOD solo per i propri contenuti */}
       {(user.role === "HOTEL_MANAGER" || user.role === "ADMIN" || user.role === "SUPER_ADMIN" ||

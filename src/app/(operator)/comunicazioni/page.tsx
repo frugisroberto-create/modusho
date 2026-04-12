@@ -119,11 +119,9 @@ export default function MemoListPage() {
                     <>
                       <div className="text-sm text-charcoal prose prose-sm max-w-none mt-2 p-3 bg-ivory border border-ivory-dark whitespace-pre-line"
                         dangerouslySetInnerHTML={{ __html: memo.body }} />
-                      {(userRole === "OPERATOR" || userRole === "HOD") && (
-                        <div className="mt-3">
-                          <AcknowledgeButton contentId={memo.contentId} acknowledged={memo.acknowledged} acknowledgedAt={memo.acknowledgedAt?.toString() ?? null} />
-                        </div>
-                      )}
+                      <div className="mt-3">
+                        <AcknowledgeButton contentId={memo.contentId} acknowledged={memo.acknowledged} acknowledgedAt={memo.acknowledgedAt?.toString() ?? null} />
+                      </div>
                       {/* Registro presa visione: HM+ sempre, HOD solo per i propri memo */}
                       {(userRole === "HOTEL_MANAGER" || userRole === "ADMIN" || userRole === "SUPER_ADMIN" ||
                         (userRole === "HOD" && memo.createdById === userId)) && (

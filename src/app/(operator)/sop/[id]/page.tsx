@@ -124,9 +124,8 @@ export default async function SopDetailPage({ params }: Props) {
         dangerouslySetInnerHTML={{ __html: content.body }}
       />
 
-      {/* ── Blocco personale presa visione — OPERATOR, HOD, HM ── */}
-      {(isOperator || isHod || user.role === "HOTEL_MANAGER") && (
-        <div className="bg-white border border-ivory-dark">
+      {/* ── Blocco personale presa visione — tutti i ruoli ── */}
+      <div className="bg-white border border-ivory-dark">
           <div className="px-5 py-3 bg-ivory border-b border-ivory-dark">
             <span className="text-xs font-ui font-semibold uppercase tracking-wider text-charcoal/50">
               Presa visione
@@ -173,8 +172,7 @@ export default async function SopDetailPage({ params }: Props) {
               </div>
             )}
           </div>
-        </div>
-      )}
+      </div>
 
       {/* ── Registro visualizzazioni — solo desktop ── */}
       <MobileHide>
