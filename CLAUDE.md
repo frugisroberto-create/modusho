@@ -1115,6 +1115,7 @@ Il sistema invia notifiche push via Web Push API a chi ha accettato il banner di
 | Evento | Destinatari | Messaggio |
 |--------|-------------|-----------|
 | Contenuto pubblicato (SOP, Document, Memo) | Utenti target del contenuto (escluso chi pubblica) | "Nuovo [tipo]: [titolo]" |
+| SOP inviata per revisione (submit) | C e A del workflow RACI (escluso R che invia) | "[codice] — [titolo]: inviata per revisione da [nome]" |
 | Bozza SOP salvata (nuova versione) | C e A del workflow RACI (escluso R che salva) | "[codice] — [titolo]: nuova versione salvata da [nome]" |
 | Nota aggiunta su bozza SOP | R, C e A del workflow RACI (escluso autore nota) | "[codice] — [titolo]: nuova nota da [nome]" |
 | Sollecito presa visione (cron giornaliero 09:00 CET) | Utenti con contenuti PUBLISHED da >24h non confermati | "Hai N contenuti da prendere visione che attendono la tua conferma da più di 24 ore." |
