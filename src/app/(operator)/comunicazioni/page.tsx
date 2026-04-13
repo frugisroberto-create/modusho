@@ -18,7 +18,7 @@ interface MemoItem {
 export default function MemoListPage() {
   const { data: session } = useSession();
   const userId = session?.user?.id || "";
-  const { currentPropertyId, userRole } = useOperatorContext();
+  const { currentPropertyId, setCurrentPropertyId, userRole } = useOperatorContext();
   const searchParams = useSearchParams();
   const openParam = searchParams.get("open");
   const canCreate = ["HOD", "HOTEL_MANAGER", "ADMIN", "SUPER_ADMIN"].includes(userRole);
@@ -51,9 +51,24 @@ export default function MemoListPage() {
   useEffect(() => { fetchMemos(); }, [fetchMemos]);
   useEffect(() => { setPage(1); }, [currentPropertyId]);
 
-  // Quando arrivano dalla home con ?open=<id>, scrolla al memo
+  // Quando arrivano dalla home con ?open=<id>, scrolla al memo.
+  // Se il memo non è nella property corrente (es. HOO con default HO1 ma memo su HO3),
+  // cerca la property giusta e switcha il contesto.
   useEffect(() => {
-    if (!openParam || expandAppliedRef.current || memos.length === 0) return;
+    if (!openParam || expandAppliedRef.current) return;
+    if (memos.length === 0 && !loading) {
+      // Memo non trovato nella property corrente — cerca la property del contenuto
+      fetch(`/api/content/${openParam}`)
+        .then(res => res.ok ? res.json() : null)
+        .then(json => {
+          if (json?.data?.propertyId && json.data.propertyId !== currentPropertyId) {
+            setCurrentPropertyId(json.data.propertyId);
+          }
+        })
+        .catch(() => {});
+      return;
+    }
+    if (memos.length === 0) return;
     const target = memos.find(m => m.contentId === openParam || m.id === openParam);
     if (target) {
       expandAppliedRef.current = true;
@@ -63,7 +78,7 @@ export default function MemoListPage() {
         if (el) el.scrollIntoView({ behavior: "smooth", block: "start" });
       }, 100);
     }
-  }, [openParam, memos]);
+  }, [openParam, memos, loading, currentPropertyId, setCurrentPropertyId]);
 
   const totalPages = Math.ceil(total / pageSize);
   const now = new Date();
