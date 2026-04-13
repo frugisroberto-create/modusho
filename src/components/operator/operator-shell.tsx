@@ -35,6 +35,8 @@ interface OperatorShellProps {
   children: React.ReactNode;
 }
 
+const PROPERTY_STORAGE_KEY = "modusho_currentPropertyId";
+
 export function OperatorShell({
   userName,
   userRole,
@@ -43,19 +45,30 @@ export function OperatorShell({
   children,
 }: OperatorShellProps) {
   const searchParams = useSearchParams();
-  const [currentPropertyId, setCurrentPropertyId] = useState(defaultPropertyId);
 
-  // Sincronizza con searchParams solo lato client, dopo l'hydration
+  // Inizializza da: 1) searchParams, 2) localStorage, 3) defaultPropertyId
+  const [currentPropertyId, setCurrentPropertyIdState] = useState(() => {
+    if (typeof window === "undefined") return defaultPropertyId;
+    const paramProp = new URLSearchParams(window.location.search).get("propertyId");
+    if (paramProp && properties.some(p => p.id === paramProp)) return paramProp;
+    const stored = localStorage.getItem(PROPERTY_STORAGE_KEY);
+    if (stored && properties.some(p => p.id === stored)) return stored;
+    return defaultPropertyId;
+  });
+
+  // Wrapper: salva in localStorage ogni volta che cambia
+  const setCurrentPropertyId = useCallback((id: string) => {
+    setCurrentPropertyIdState(id);
+    try { localStorage.setItem(PROPERTY_STORAGE_KEY, id); } catch {}
+  }, []);
+
+  // Sincronizza con searchParams (deep link con ?propertyId=)
   useEffect(() => {
     const paramPropertyId = searchParams.get("propertyId");
     if (paramPropertyId && properties.some(p => p.id === paramPropertyId)) {
       setCurrentPropertyId(paramPropertyId);
     }
-  }, [searchParams, properties]);
-
-  const handlePropertyChange = useCallback((id: string) => {
-    setCurrentPropertyId(id);
-  }, []);
+  }, [searchParams, properties, setCurrentPropertyId]);
 
   return (
     <OperatorContext.Provider value={{ currentPropertyId, setCurrentPropertyId, properties, userRole }}>
@@ -65,7 +78,7 @@ export function OperatorShell({
           userRole={userRole}
           properties={properties}
           currentPropertyId={currentPropertyId}
-          onPropertyChange={handlePropertyChange}
+          onPropertyChange={setCurrentPropertyId}
         />
         <main className="max-w-7xl mx-auto px-4 sm:px-6 pb-mobile-nav md:pb-0">
           {children}
