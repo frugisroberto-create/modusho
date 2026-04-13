@@ -75,11 +75,7 @@ export async function POST(
   const canAccess = await canUserAccessContent(session.user.id, session.user.role, content);
   if (!canAccess) return NextResponse.json({ error: "Accesso negato" }, { status: 403 });
 
-  // Regola specifica POST: HOD può scrivere note solo sui propri contenuti
-  // (canUserAccessContent permette anche HOD-in-target, che qui non basta)
-  if (session.user.role === "HOD" && content.createdById !== session.user.id) {
-    return NextResponse.json({ error: "HOD può aggiungere note solo ai propri contenuti" }, { status: 403 });
-  }
+  // HOD+ can add notes to any content they have access to (checked above)
 
   const json = await request.json();
   const parsed = noteSchema.safeParse(json);

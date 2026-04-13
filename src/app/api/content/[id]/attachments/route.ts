@@ -58,9 +58,8 @@ export async function GET(request: Request, { params }: RouteParams) {
       return NextResponse.json({ error: "Contenuto non trovato" }, { status: 404 });
     }
 
-    if (user.role === "HOD" && content.status !== "PUBLISHED" && content.createdById !== user.id) {
-      return NextResponse.json({ error: "Contenuto non trovato" }, { status: 404 });
-    }
+    // HOD can see attachments of drafts they have access to (not just own content)
+    // Access is verified below by canUserAccessContent
 
     const canAccess = await canUserAccessContent(user.id, user.role, content);
     if (!canAccess) {
