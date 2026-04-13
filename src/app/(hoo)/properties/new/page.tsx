@@ -65,7 +65,7 @@ export default function NewPropertyPage() {
   };
 
   return (
-    <div className="max-w-2xl">
+    <div className="max-w-3xl">
       <h1 className="text-xl font-heading font-semibold text-charcoal-dark mb-6">Nuova struttura</h1>
       <form onSubmit={handleSubmit} className="space-y-6">
         {/* Info base */}

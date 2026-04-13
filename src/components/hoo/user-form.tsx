@@ -351,7 +351,7 @@ export function UserForm({ mode, userId, onSuccess, initialData }: UserFormProps
   }
 
   return (
-    <div className="max-w-2xl space-y-6">
+    <div className="max-w-3xl space-y-6">
       {/* SEZIONE 1 — Anagrafica */}
       <section className="bg-ivory-medium border border-ivory-dark  p-6 space-y-4">
         <h2 className="text-base font-heading font-semibold text-charcoal-dark">Anagrafica</h2>

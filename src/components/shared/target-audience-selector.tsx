@@ -114,7 +114,7 @@ export function TargetAudienceSelector({
           <p className="text-xs font-ui text-alert-red">Nessun reparto assegnato — contatta l&apos;amministratore.</p>
         ) : (
           <>
-            <p className="text-[11px] font-ui font-semibold uppercase tracking-wider text-charcoal/55 mb-1.5">
+            <p className="text-xs font-ui font-semibold uppercase tracking-wider text-charcoal/70 mb-1.5">
               {myDepartments.length === 1 ? "Il tuo reparto" : `I tuoi reparti (${myDepartments.length})`}
             </p>
             <div className="border border-ivory-dark divide-y divide-ivory-dark/50">
@@ -186,6 +186,35 @@ export function TargetAudienceSelector({
         Seleziona uno o più tipi di destinatari. Il contenuto sarà visibile a chi corrisponde ad almeno una delle scelte.
       </p>
 
+      {/* Selection summary — always visible */}
+      {totalSelected > 0 && (
+        <div className="flex flex-wrap gap-1.5 mb-3 pb-3 border-b border-ivory-dark">
+          {value.allDepartments && (
+            <span className="text-[11px] font-ui font-medium px-2 py-1 bg-terracotta/10 text-terracotta rounded">
+              Tutti gli operatori
+            </span>
+          )}
+          {value.departmentIds.map(dId => {
+            const dept = departments.find(d => d.id === dId);
+            return dept ? (
+              <span key={dId} className="text-[11px] font-ui font-medium px-2 py-1 bg-ivory-dark text-charcoal rounded">
+                {dept.name}
+              </span>
+            ) : null;
+          })}
+          {value.roles.map(r => (
+            <span key={r} className="text-[11px] font-ui font-medium px-2 py-1 bg-mauve/15 text-mauve rounded">
+              {r === "OPERATOR" ? "Operatori" : r === "HOD" ? "HOD" : "Hotel Manager"}
+            </span>
+          ))}
+          {value.userIds.length > 0 && (
+            <span className="text-[11px] font-ui font-medium px-2 py-1 bg-sage/15 text-sage rounded">
+              {value.userIds.length} utente/i
+            </span>
+          )}
+        </div>
+      )}
+
       {/* SEZIONE 1 — Tutti gli operatori */}
       <div>
         <label className="flex items-center gap-3 py-2.5 px-3 border border-ivory-dark cursor-pointer hover:bg-ivory-medium/30 transition-colors">
@@ -199,22 +228,22 @@ export function TargetAudienceSelector({
 
       {/* SEZIONE 2 — Reparti specifici */}
       <div>
-        <p className="text-xs font-ui font-semibold uppercase tracking-wider text-charcoal/55 mb-1.5">Reparti</p>
+        <p className="text-xs font-ui font-semibold uppercase tracking-wider text-charcoal/70 mb-1.5">Reparti</p>
         <div className="border border-ivory-dark divide-y divide-ivory-dark/50 max-h-[200px] overflow-y-auto">
           {departments.map((dept) => {
             const coveredByAll = value.allDepartments;
             return (
-              <label key={dept.id} className={`flex items-center gap-3 py-2 px-3 transition-colors ${coveredByAll ? "opacity-50 cursor-not-allowed bg-ivory-medium/30" : "cursor-pointer hover:bg-ivory-medium/30"}`}>
+              <label key={dept.id} className={`flex items-center gap-3 py-2 px-3 transition-colors ${coveredByAll ? "cursor-not-allowed bg-ivory-medium/30" : "cursor-pointer hover:bg-ivory-medium/30"}`}>
                 <input type="checkbox"
                   checked={coveredByAll || value.departmentIds.includes(dept.id)}
                   disabled={coveredByAll}
                   onChange={() => toggleDepartment(dept.id)}
-                  className="w-4 h-4 accent-terracotta disabled:opacity-50" />
-                <span className="text-sm font-ui text-charcoal">{dept.name}</span>
+                  className={`w-4 h-4 accent-terracotta disabled:opacity-40 ${coveredByAll ? "opacity-40" : ""}`} />
+                <span className={`text-sm font-ui text-charcoal ${coveredByAll ? "opacity-40" : ""}`}>{dept.name}</span>
                 {coveredByAll && (
-                  <span className="text-[10px] font-ui text-charcoal/40 italic ml-1">già incluso in &quot;Tutti gli operatori&quot;</span>
+                  <span className="text-[11px] font-ui text-charcoal/40 ml-1">già incluso in &quot;Tutti gli operatori&quot;</span>
                 )}
-                <span className="text-xs text-charcoal/40 ml-auto font-ui">{dept.code}</span>
+                <span className={`text-xs text-charcoal/40 ml-auto font-ui ${coveredByAll ? "opacity-40" : ""}`}>{dept.code}</span>
               </label>
             );
           })}
@@ -226,7 +255,7 @@ export function TargetAudienceSelector({
 
       {/* SEZIONE 3 — Ruoli trasversali */}
       <div>
-        <p className="text-xs font-ui font-semibold uppercase tracking-wider text-charcoal/55 mb-1.5">Ruoli trasversali</p>
+        <p className="text-xs font-ui font-semibold uppercase tracking-wider text-charcoal/70 mb-1.5">Ruoli trasversali</p>
         <div className="border border-ivory-dark divide-y divide-ivory-dark/50">
           {(["HOD", "HOTEL_MANAGER"] as TargetRole[]).map((role) => (
             <label key={role} className="flex items-center gap-3 py-2 px-3 cursor-pointer hover:bg-ivory-medium/30 transition-colors">
@@ -242,9 +271,9 @@ export function TargetAudienceSelector({
 
       {/* SEZIONE 4 — Utenti specifici */}
       <div>
-        <p className="text-xs font-ui font-semibold uppercase tracking-wider text-charcoal/55 mb-1.5">Utenti specifici</p>
+        <p className="text-xs font-ui font-semibold uppercase tracking-wider text-charcoal/70 mb-1.5">Utenti specifici</p>
         <input type="text" value={userSearch} onChange={(e) => setUserSearch(e.target.value)}
-          placeholder="Cerca per nome o email..."
+          placeholder="Cerca per nome o email (min. 2 caratteri)..."
           className="w-full px-3 py-2 text-sm font-ui border border-ivory-dark mb-1.5" />
         <div className="border border-ivory-dark divide-y divide-ivory-dark/50 max-h-[180px] overflow-y-auto">
           {filteredUsers.length === 0 ? (

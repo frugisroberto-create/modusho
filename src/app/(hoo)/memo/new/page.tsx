@@ -77,7 +77,7 @@ export default function NewMemoPage() {
   };
 
   return (
-    <div className="max-w-2xl space-y-6">
+    <div className="max-w-3xl space-y-6">
       <h1 className="text-xl font-heading font-medium text-charcoal-dark">Nuovo memo</h1>
 
       {error && (

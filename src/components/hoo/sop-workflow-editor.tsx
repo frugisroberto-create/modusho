@@ -422,7 +422,7 @@ export function SopWorkflowEditor({ workflowId, currentUserId, currentUserRole, 
                   ))}
                 </select>
                 <button onClick={handleDelegate} disabled={!selectedHodId || delegateLoading}
-                  className="btn-primary !py-2.5 !px-5 disabled:opacity-50">
+                  className="btn-primary disabled:opacity-50">
                   {delegateLoading ? "Delega in corso..." : "Conferma delega"}
                 </button>
               </>
@@ -770,7 +770,7 @@ function ReviewDueDateSection({ wf, isA, editing, dueDateMonths, onEdit, onCance
             onChange={(e) => onMonthsChange(parseInt(e.target.value, 10) || 12)}
             className="w-20 text-sm px-2 py-1"
           />
-          <button onClick={onSave} disabled={loading} className="btn-primary !py-1.5 !px-4 !text-[11px]">
+          <button onClick={onSave} disabled={loading} className="btn-primary-sm">
             {loading ? "..." : "Salva"}
           </button>
           <button onClick={onCancel} className="text-xs text-charcoal/50 hover:text-charcoal">Annulla</button>
@@ -799,7 +799,7 @@ function ActionBar({ wf, isR, isA, isHoo, isAdminOverride, canApproveFlag, dirty
     <div className="flex items-center gap-3 flex-wrap bg-white border border-ivory-dark px-5 py-4">
       {/* Save — visibile a chiunque possa modificare il testo (R, C, A, ADMIN override) */}
       {wf.canEditText && (
-        <button onClick={onSave} disabled={saving || !dirty} className="btn-primary !py-2.5 !px-5">
+        <button onClick={onSave} disabled={saving || !dirty} className="btn-primary">
           {saving ? "Salvataggio..." : "Salva bozza"}
         </button>
       )}
@@ -808,17 +808,17 @@ function ActionBar({ wf, isR, isA, isHoo, isAdminOverride, canApproveFlag, dirty
       {isR && (
         <>
           {wf.consulted && !wf.submittedToC && (
-            <button onClick={() => onSubmit("C")} disabled={actionLoading} className="btn-outline !py-2.5 !px-5">
+            <button onClick={() => onSubmit("C")} disabled={actionLoading} className="btn-outline">
               Sottoponi a HM
             </button>
           )}
           {!wf.submittedToA && (
-            <button onClick={() => onSubmit("A")} disabled={actionLoading} className="btn-outline !py-2.5 !px-5">
+            <button onClick={() => onSubmit("A")} disabled={actionLoading} className="btn-outline">
               Sottoponi a HOO
             </button>
           )}
           {wf.consulted && !wf.submittedToC && !wf.submittedToA && (
-            <button onClick={() => onSubmit("C_AND_A")} disabled={actionLoading} className="btn-outline !py-2.5 !px-5">
+            <button onClick={() => onSubmit("C_AND_A")} disabled={actionLoading} className="btn-outline">
               Sottoponi a HM e HOO
             </button>
           )}
@@ -828,11 +828,11 @@ function ActionBar({ wf, isR, isA, isHoo, isAdminOverride, canApproveFlag, dirty
       {/* Utenti con canApprove — possono pubblicare direttamente */}
       {(isHoo || canApproveFlag) && (
         <>
-          <button onClick={onApprove} disabled={actionLoading} className="btn-primary !py-2.5 !px-5 !bg-sage hover:!bg-sage-dark">
+          <button onClick={onApprove} disabled={actionLoading} className="btn-primary !bg-sage hover:!bg-sage-dark">
             {wf.submittedToA ? "Approva e pubblica" : "Pubblica direttamente"}
           </button>
           {wf.submittedToA && (
-            <button onClick={onReturn} disabled={actionLoading} className="btn-outline !py-2.5 !px-5 !border-alert-red !text-alert-red hover:!bg-alert-red hover:!text-white">
+            <button onClick={onReturn} disabled={actionLoading} className="btn-outline !border-alert-red !text-alert-red hover:!bg-alert-red hover:!text-white">
               Restituisci
             </button>
           )}
@@ -901,7 +901,7 @@ function ConsultationStatus({ wf, isC, confirmNote, onConfirmNoteChange, onConfi
           <button
             onClick={onConfirm}
             disabled={loading}
-            className="btn-primary !py-2 !px-4 text-sm whitespace-nowrap"
+            className="btn-primary-sm whitespace-nowrap"
           >
             {loading ? "Conferma..." : "Conferma consultazione"}
           </button>
@@ -977,7 +977,7 @@ function RaciReassignPanel({ wf, propertyId, onReassigned }: {
           </p>
         </div>
         <button onClick={() => setOpen(true)}
-          className="btn-outline !py-2 !px-4 text-xs">
+          className="btn-outline-sm">
           Riassegna
         </button>
       </div>
@@ -1027,7 +1027,7 @@ function RaciReassignPanel({ wf, propertyId, onReassigned }: {
       </p>
 
       <button onClick={handleSave} disabled={loading}
-        className="btn-primary !py-2 !px-4 text-xs disabled:opacity-50">
+        className="btn-primary-sm disabled:opacity-50">
         {loading ? "Salvataggio..." : "Salva nuovi ruoli"}
       </button>
     </div>
@@ -1084,15 +1084,15 @@ function PublishedActions({ contentId, workflowId, onRefresh }: { contentId: str
     <>
       <div className="flex items-center gap-3 bg-white border border-ivory-dark px-5 py-4">
         <button onClick={() => setShowReopenModal(true)}
-          className="btn-primary !py-2.5 !px-5">
+          className="btn-primary">
           Modifica
         </button>
         <button onClick={() => setShowArchiveModal(true)}
-          className="btn-outline !py-2.5 !px-5">
+          className="btn-outline">
           Archivia
         </button>
         <button onClick={() => setShowDeleteModal(true)}
-          className="btn-outline !py-2.5 !px-5 !border-alert-red !text-alert-red hover:!bg-alert-red hover:!text-white">
+          className="btn-outline !border-alert-red !text-alert-red hover:!bg-alert-red hover:!text-white">
           Elimina
         </button>
       </div>
@@ -1216,7 +1216,7 @@ function NotesPanel({ workflowId }: { workflowId: string }) {
           className="w-full text-sm font-ui"
           placeholder="Aggiungi una nota..."
         />
-        <button onClick={handlePost} disabled={posting || !newNote.trim()} className="btn-primary !py-2 !px-4 !text-[11px]">
+        <button onClick={handlePost} disabled={posting || !newNote.trim()} className="btn-primary-sm">
           {posting ? "..." : "Aggiungi nota"}
         </button>
       </div>
@@ -1422,7 +1422,7 @@ function ReturnModal({ note, onNoteChange, onConfirm, onCancel, loading }: {
           <button
             onClick={onConfirm}
             disabled={loading || !note.trim()}
-            className="btn-primary !py-2.5 !px-5 !bg-alert-red hover:!bg-alert-red/80"
+            className="btn-primary !bg-alert-red hover:!bg-alert-red/80"
           >
             {loading ? "..." : "Restituisci"}
           </button>

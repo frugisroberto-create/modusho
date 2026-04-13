@@ -115,6 +115,11 @@
   }
   .btn-outline:hover { background: #964733; color: white; }
 
+  .btn-primary-sm {
+    @apply px-4 py-2 text-[11px] font-ui font-semibold uppercase tracking-wider text-white bg-terracotta hover:bg-terracotta-light transition-colors;
+    border-radius: 0;
+  }
+
   .btn-outline-sm {
     background: transparent;
     color: #964733;

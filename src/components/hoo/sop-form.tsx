@@ -196,85 +196,87 @@ export function SopForm({ mode, contentId, initialData, userRole, userDepartment
 
   return (
     <div className="max-w-3xl space-y-6">
-      {/* Titolo */}
-      <div>
-        <label className="block text-sm font-ui font-medium text-charcoal mb-1.5">Titolo</label>
-        <input type="text" value={title} onChange={(e) => setTitle(e.target.value)}
-          className="w-full" placeholder="Titolo della SOP" />
-      </div>
-
-      {/* Struttura */}
-      <div>
-        <label className="block text-sm font-ui font-medium text-charcoal mb-1.5">Struttura</label>
-        <select value={propertyId}
-          onChange={(e) => {
-            const newPropId = e.target.value;
-            setPropertyId(newPropId);
-            setTargetAudience({ allDepartments: false, departmentIds: [], roles: [], userIds: [] });
-            setInvolveHod(false);
-            setHodUserId("");
-            // Auto-select department if only one
-            const prop = properties.find(p => p.id === newPropId);
-            if (prop?.departments?.length === 1) {
-              setDepartmentId(prop.departments[0].id);
-            } else {
-              setDepartmentId("");
-            }
-          }}
-          disabled={mode === "edit"} className="w-full disabled:opacity-50">
-          <option value="">Seleziona struttura</option>
-          {properties.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
-        </select>
-      </div>
-
-      {/* Reparto proprietario della SOP */}
-      {propertyId && (
+      <div className="bg-white border border-ivory-dark p-5 space-y-4">
+        {/* Titolo */}
         <div>
-          <label className="block text-sm font-ui font-medium text-charcoal mb-1.5">Reparto proprietario</label>
-          <p className="text-xs font-ui text-charcoal/45 mb-2">
-            Il reparto che redige e mantiene la SOP. Serve per la generazione del codice (es. PPL-FO-001) e per la tracciabilità —
-            <strong className="text-charcoal/60"> non determina la visibilità</strong>, che è governata dai destinatari sotto.
-          </p>
-          <select value={departmentId} onChange={(e) => setDepartmentId(e.target.value)}
+          <label className="block text-sm font-ui font-medium text-charcoal mb-1.5">Titolo</label>
+          <input type="text" value={title} onChange={(e) => setTitle(e.target.value)}
+            className="w-full" placeholder="Titolo della SOP" />
+        </div>
+
+        {/* Struttura */}
+        <div>
+          <label className="block text-sm font-ui font-medium text-charcoal mb-1.5">Struttura</label>
+          <select value={propertyId}
+            onChange={(e) => {
+              const newPropId = e.target.value;
+              setPropertyId(newPropId);
+              setTargetAudience({ allDepartments: false, departmentIds: [], roles: [], userIds: [] });
+              setInvolveHod(false);
+              setHodUserId("");
+              // Auto-select department if only one
+              const prop = properties.find(p => p.id === newPropId);
+              if (prop?.departments?.length === 1) {
+                setDepartmentId(prop.departments[0].id);
+              } else {
+                setDepartmentId("");
+              }
+            }}
             disabled={mode === "edit"} className="w-full disabled:opacity-50">
-            <option value="">Seleziona reparto proprietario</option>
-            {departments.map(d => <option key={d.id} value={d.id}>{d.name} ({d.code})</option>)}
+            <option value="">Seleziona struttura</option>
+            {properties.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
           </select>
         </div>
-      )}
 
-      {/* Coinvolgimento HOD (solo HM/ADMIN/SUPER_ADMIN in creazione) */}
-      {mode === "create" && canInvolveHod && propertyId && (
-        <div className="bg-ivory border border-ivory-dark p-4 space-y-3">
-          <label className="flex items-center gap-2 cursor-pointer">
-            <input type="checkbox" checked={involveHod}
-              disabled={hodUsers.length === 0 && !hodLoading}
-              onChange={(e) => { setInvolveHod(e.target.checked); if (!e.target.checked) setHodUserId(""); }}
-              className="w-4 h-4 rounded border-ivory-dark text-terracotta focus:ring-terracotta disabled:opacity-40" />
-            <span className="text-sm font-ui font-medium text-charcoal">Coinvolgi HOD nella redazione</span>
-          </label>
-          {hodLoading ? (
-            <p className="text-xs font-ui text-charcoal/40">Caricamento HOD...</p>
-          ) : hodUsers.length === 0 ? (
-            <p className="text-xs font-ui text-charcoal/40">Nessun HOD assegnato a questa struttura</p>
-          ) : (
-            <p className="text-xs font-ui text-charcoal/45">
-              {involveHod
-                ? "L'HOD sarà il Responsabile (R) della bozza, tu sarai Consultato (C)"
-                : effectiveRole === "HOTEL_MANAGER"
-                  ? "Sarai tu il Responsabile (R) della bozza"
-                  : "L'Hotel Manager sarà il Responsabile (R) della bozza"
-              }
+        {/* Reparto proprietario della SOP */}
+        {propertyId && (
+          <div>
+            <label className="block text-sm font-ui font-medium text-charcoal mb-1.5">Reparto proprietario</label>
+            <p className="text-xs font-ui text-charcoal/45 mb-2">
+              Il reparto che redige e mantiene la SOP. Serve per la generazione del codice (es. PPL-FO-001) e per la tracciabilità —
+              <strong className="text-charcoal/60"> non determina la visibilità</strong>, che è governata dai destinatari sotto.
             </p>
-          )}
-          {involveHod && hodUsers.length > 0 && (
-            <select value={hodUserId} onChange={(e) => setHodUserId(e.target.value)} className="w-full">
-              <option value="">Seleziona HOD</option>
-              {hodUsers.map(u => <option key={u.id} value={u.id}>{u.name}</option>)}
+            <select value={departmentId} onChange={(e) => setDepartmentId(e.target.value)}
+              disabled={mode === "edit"} className="w-full disabled:opacity-50">
+              <option value="">Seleziona reparto proprietario</option>
+              {departments.map(d => <option key={d.id} value={d.id}>{d.name} ({d.code})</option>)}
             </select>
-          )}
-        </div>
-      )}
+          </div>
+        )}
+
+        {/* Coinvolgimento HOD (solo HM/ADMIN/SUPER_ADMIN in creazione) */}
+        {mode === "create" && canInvolveHod && propertyId && (
+          <div className="bg-ivory border border-ivory-dark p-4 space-y-3">
+            <label className="flex items-center gap-2 cursor-pointer">
+              <input type="checkbox" checked={involveHod}
+                disabled={hodUsers.length === 0 && !hodLoading}
+                onChange={(e) => { setInvolveHod(e.target.checked); if (!e.target.checked) setHodUserId(""); }}
+                className="w-4 h-4 rounded border-ivory-dark text-terracotta focus:ring-terracotta disabled:opacity-40" />
+              <span className="text-sm font-ui font-medium text-charcoal">Coinvolgi HOD nella redazione</span>
+            </label>
+            {hodLoading ? (
+              <p className="text-xs font-ui text-charcoal/40">Caricamento HOD...</p>
+            ) : hodUsers.length === 0 ? (
+              <p className="text-xs font-ui text-charcoal/40">Nessun HOD assegnato a questa struttura</p>
+            ) : (
+              <p className="text-xs font-ui text-charcoal/45">
+                {involveHod
+                  ? "L'HOD sarà il Responsabile (R) della bozza, tu sarai Consultato (C)"
+                  : effectiveRole === "HOTEL_MANAGER"
+                    ? "Sarai tu il Responsabile (R) della bozza"
+                    : "L'Hotel Manager sarà il Responsabile (R) della bozza"
+                }
+              </p>
+            )}
+            {involveHod && hodUsers.length > 0 && (
+              <select value={hodUserId} onChange={(e) => setHodUserId(e.target.value)} className="w-full">
+                <option value="">Seleziona HOD</option>
+                {hodUsers.map(u => <option key={u.id} value={u.id}>{u.name}</option>)}
+              </select>
+            )}
+          </div>
+        )}
+      </div>
 
       {/* Destinatari */}
       {propertyId && (
