@@ -166,7 +166,7 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
     actorName: session.user.name,
     actorId: userId,
     eventType: "NOTE_ADDED",
-  }).catch(() => {});
+  }).catch((err) => { console.error("[push] NOTE_ADDED error:", err); });
 
   return NextResponse.json({ data: note }, { status: 201 });
 }

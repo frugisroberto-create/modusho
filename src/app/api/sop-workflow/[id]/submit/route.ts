@@ -140,7 +140,7 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
     actorName: session.user.name,
     actorId: userId,
     eventType: "SUBMITTED",
-  }).catch(() => {});
+  }).catch((err) => { console.error("[push] SUBMITTED error:", err); });
 
   return NextResponse.json({
     data: { submitted: target, at: now, contentStatus: newContentStatus },

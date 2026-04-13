@@ -271,7 +271,7 @@ export async function PUT(request: NextRequest, { params }: RouteParams) {
     actorName: session.user.name,
     actorId: userId,
     eventType: "TEXT_SAVED",
-  }).catch(() => {});
+  }).catch((err) => { console.error("[push] TEXT_SAVED error:", err); });
 
   return NextResponse.json({
     data: {

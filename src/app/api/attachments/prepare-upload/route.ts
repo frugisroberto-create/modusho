@@ -89,10 +89,7 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: "Accesso negato" }, { status: 403 });
     }
 
-    // HOD can only attach to own content
-    if (user.role === "HOD" && content.createdById !== user.id) {
-      return NextResponse.json({ error: "Puoi allegare file solo ai tuoi contenuti" }, { status: 403 });
-    }
+    // HOD+ can attach to any content they have access to (checked above)
 
     // 6. Create Attachment record (generates ID for storage key)
     const attachment = await prisma.attachment.create({

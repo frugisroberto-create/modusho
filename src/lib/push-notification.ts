@@ -121,19 +121,30 @@ export async function sendWorkflowActivityPush(params: {
       where: { id: workflowId },
       select: { responsibleId: true, consultedId: true, accountableId: true },
     });
-    if (!wf) return;
+    if (!wf) {
+      console.warn(`[push] workflow ${eventType}: workflow ${workflowId} not found`);
+      return;
+    }
+
+    console.log(`[push] workflow ${eventType}: R=${wf.responsibleId}, C=${wf.consultedId}, A=${wf.accountableId}, actor=${actorId}`);
 
     // Destinatari: R + C + A, escluso chi ha fatto l'azione
     const recipientIds = [wf.responsibleId, wf.consultedId, wf.accountableId]
       .filter((id): id is string => id !== null && id !== actorId);
 
-    if (recipientIds.length === 0) return;
+    if (recipientIds.length === 0) {
+      console.warn(`[push] workflow ${eventType}: no recipients after filtering actor`);
+      return;
+    }
 
     const subscriptions = await prisma.pushSubscription.findMany({
       where: { userId: { in: recipientIds } },
-      select: { id: true, endpoint: true, p256dh: true, auth: true },
+      select: { id: true, endpoint: true, p256dh: true, auth: true, userId: true },
     });
-    if (subscriptions.length === 0) return;
+    if (subscriptions.length === 0) {
+      console.warn(`[push] workflow ${eventType}: ${recipientIds.length} recipients but 0 push subscriptions found for userIds: ${recipientIds.join(", ")}`);
+      return;
+    }
 
     const label = contentCode ? `${contentCode} — ${contentTitle}` : contentTitle;
     const body = eventType === "TEXT_SAVED"
