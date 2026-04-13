@@ -97,7 +97,7 @@ export default function UsersPage() {
     <div className="space-y-5">
       <div className="flex items-center justify-between">
         <h1 className="text-xl font-heading font-semibold text-charcoal-dark">Utenti</h1>
-        <Link href="/users/new" className="px-4 py-2 text-sm font-ui font-medium text-white bg-terracotta hover:bg-terracotta-light  transition-colors">
+        <Link href="/users/new" className="btn-primary">
           Nuovo utente
         </Link>
       </div>

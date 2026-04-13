@@ -83,7 +83,7 @@ export function HooHeader({ userName, userRole }: HooHeaderProps) {
                   : pathname.startsWith(item.href);
                 return (
                   <Link key={item.href} href={item.href}
-                    className={`text-sm font-heading py-4 relative transition-colors ${
+                    className={`text-sm font-ui py-4 relative transition-colors ${
                       isActive ? "text-white" : "text-white/75 hover:text-white"
                     }`}>
                     {item.label}
@@ -142,7 +142,7 @@ export function HooHeader({ userName, userRole }: HooHeaderProps) {
                 : pathname.startsWith(item.href);
               return (
                 <Link key={item.href} href={item.href} onClick={() => setMobileNavOpen(false)}
-                  className={`block px-6 py-3 text-sm font-heading border-b border-white/10 transition-colors ${
+                  className={`block px-6 py-3 text-sm font-ui border-b border-white/10 transition-colors ${
                     isActive ? "text-white bg-white/10" : "text-white/85 hover:bg-white/5"
                   }`}>
                   {item.label}

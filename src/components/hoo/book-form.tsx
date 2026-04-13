@@ -200,7 +200,7 @@ export function BookForm({ mode, contentType, backPath, contentId, initialData, 
             {loading ? "..." : "Salva modifiche"}
           </button>
         )}
-        <button onClick={() => router.back()} className="px-5 py-2.5 text-sm font-ui text-charcoal hover:bg-ivory-dark  transition-colors">
+        <button onClick={() => router.back()} className="btn-outline">
           Annulla
         </button>
         {mode === "edit" && canDelete && (

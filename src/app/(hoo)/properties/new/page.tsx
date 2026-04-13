@@ -129,8 +129,7 @@ export default function NewPropertyPage() {
             className="px-6 py-3 text-sm font-ui font-semibold text-white bg-terracotta hover:bg-terracotta-light  disabled:opacity-50 transition-colors">
             {loading ? "Creazione..." : "Salva"}
           </button>
-          <button type="button" onClick={() => router.back()}
-            className="px-6 py-3 text-sm font-ui text-charcoal hover:bg-ivory-dark  transition-colors">
+          <button type="button" onClick={() => router.back()} className="btn-outline">
             Annulla
           </button>
         </div>

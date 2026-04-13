@@ -85,23 +85,23 @@ export default function MemoManagementPage() {
 
       <div className="flex gap-3 flex-wrap">
         <select value={propertyId} onChange={(e) => setPropertyId(e.target.value)}
-          className="text-sm border border-gray-300  px-3 py-2 bg-white">
+          className="text-sm border border-ivory-dark  px-3 py-2 bg-white">
           {properties.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
         </select>
-        <label className="flex items-center gap-2 text-sm text-gray-600">
+        <label className="flex items-center gap-2 text-sm text-charcoal font-ui">
           <input type="checkbox" checked={showExpired} onChange={(e) => setShowExpired(e.target.checked)} />
           Mostra scaduti
         </label>
-        <label className="flex items-center gap-2 text-sm text-gray-600">
+        <label className="flex items-center gap-2 text-sm text-charcoal font-ui">
           <input type="checkbox" checked={showArchived} onChange={(e) => setShowArchived(e.target.checked)} />
           Archiviati
         </label>
       </div>
 
       {loading ? (
-        <div className="space-y-2">{[1,2,3].map(i => <div key={i} className="h-20 bg-gray-200  animate-pulse" />)}</div>
+        <div className="space-y-2">{[1,2,3].map(i => <div key={i} className="h-20 skeleton" />)}</div>
       ) : memos.length === 0 ? (
-        <p className="text-gray-500 text-sm py-8 text-center">Nessun memo</p>
+        <p className="text-charcoal/40 font-ui text-sm py-10 text-center">Nessun memo</p>
       ) : (
         <div className="space-y-2">
           {memos.map((m) => {
@@ -127,9 +127,9 @@ export default function MemoManagementPage() {
                         <ContentAckRegistry contentId={m.contentId} userRole={userRole} userId={userId} propertyId={propertyId} />
                       </>
                     ) : (
-                      <p className="text-sm text-gray-500 line-clamp-2">{stripHtml(m.body)}</p>
+                      <p className="text-sm text-charcoal/45 font-ui line-clamp-2">{stripHtml(m.body)}</p>
                     )}
-                    <div className="flex gap-3 mt-2 text-xs text-gray-400">
+                    <div className="flex gap-3 mt-2 text-xs text-charcoal/40 font-ui">
                       <span>{m.author}</span>
                       {m.publishedAt && <span>{new Date(m.publishedAt).toLocaleDateString("it-IT")}</span>}
                       {m.expiresAt && <span>Scade: {new Date(m.expiresAt).toLocaleDateString("it-IT")}</span>}
@@ -149,12 +149,12 @@ export default function MemoManagementPage() {
 
       {totalPages > 1 && (
         <div className="flex items-center justify-between">
-          <p className="text-sm text-gray-500">Pagina {page} di {totalPages}</p>
+          <p className="text-sm font-ui text-charcoal/45">Pagina {page} di {totalPages}</p>
           <div className="flex gap-2">
             <button onClick={() => setPage(p => Math.max(1, p - 1))} disabled={page <= 1}
-              className="px-3 py-1.5 text-sm border  hover:bg-gray-50 disabled:opacity-50">Precedente</button>
+              className="px-3 py-1.5 text-sm font-ui border border-ivory-dark  hover:bg-ivory-dark disabled:opacity-50">Precedente</button>
             <button onClick={() => setPage(p => Math.min(totalPages, p + 1))} disabled={page >= totalPages}
-              className="px-3 py-1.5 text-sm border  hover:bg-gray-50 disabled:opacity-50">Successivo</button>
+              className="px-3 py-1.5 text-sm font-ui border border-ivory-dark  hover:bg-ivory-dark disabled:opacity-50">Successivo</button>
           </div>
         </div>
       )}

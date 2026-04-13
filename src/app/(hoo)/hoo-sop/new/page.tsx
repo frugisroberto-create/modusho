@@ -8,7 +8,7 @@ export default async function NewSopPage() {
 
   return (
     <div>
-      <h1 className="text-xl font-bold text-gray-900 mb-6">Nuova SOP</h1>
+      <h1 className="text-xl font-heading font-medium text-charcoal-dark mb-6">Nuova SOP</h1>
       <SopForm mode="create" userRole={user.role} />
     </div>
   );

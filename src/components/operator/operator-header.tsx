@@ -77,7 +77,7 @@ export function OperatorHeader({
                 const isActive = item.href === "/" ? pathname === "/" : pathname.startsWith(item.href);
                 return (
                   <Link key={item.href} href={item.href}
-                    className={`text-[13px] font-heading py-4 relative transition-colors whitespace-nowrap ${
+                    className={`text-[13px] font-ui py-4 relative transition-colors whitespace-nowrap ${
                       isActive ? "text-white" : "text-white/70 hover:text-white"
                     }`}>
                     {item.label}

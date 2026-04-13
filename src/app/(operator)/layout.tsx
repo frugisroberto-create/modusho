@@ -29,8 +29,8 @@ export default async function OperatorLayout({
 
   if (properties.length === 0) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-gray-50">
-        <p className="text-gray-500">Nessuna struttura assegnata. Contatta l&apos;amministratore.</p>
+      <div className="min-h-screen flex items-center justify-center bg-ivory-medium">
+        <p className="text-charcoal/45 font-ui">Nessuna struttura assegnata. Contatta l&apos;amministratore.</p>
       </div>
     );
   }

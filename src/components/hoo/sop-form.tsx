@@ -329,8 +329,7 @@ export function SopForm({ mode, contentId, initialData, userRole, userDepartment
           className="btn-primary disabled:opacity-50">
           {loading ? "Salvataggio..." : mode === "create" ? "Crea bozza" : "Salva modifiche"}
         </button>
-        <button onClick={() => router.back()}
-          className="px-7 py-3 text-[12.6px] font-ui text-charcoal/60 hover:text-charcoal transition-colors">
+        <button onClick={() => router.back()} className="btn-outline">
           Annulla
         </button>
       </div>

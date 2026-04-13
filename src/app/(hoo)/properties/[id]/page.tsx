@@ -189,7 +189,7 @@ export default function PropertyDetailPage() {
           <input type="text" value={newDeptName} onChange={(e) => setNewDeptName(e.target.value)}
             placeholder="Nuovo reparto..." className="flex-1 text-sm" />
           <button onClick={handleAddDept} disabled={addingDept || !newDeptName.trim()}
-            className="px-3 py-2 text-sm font-ui font-medium text-white bg-sage hover:bg-sage-dark  disabled:opacity-50 transition-colors">
+            className="btn-primary disabled:opacity-50">
             Aggiungi
           </button>
         </div>

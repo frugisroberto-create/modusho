@@ -602,8 +602,7 @@ export function UserForm({ mode, userId, onSuccess, initialData }: UserFormProps
           className="px-6 py-3 text-sm font-ui font-semibold text-white bg-terracotta hover:bg-terracotta-light  disabled:opacity-50 transition-colors">
           {loading ? "Salvataggio..." : mode === "create" ? "Crea utente" : "Salva modifiche"}
         </button>
-        <button onClick={() => router.back()}
-          className="px-6 py-3 text-sm font-ui text-charcoal hover:bg-ivory-dark  transition-colors">
+        <button onClick={() => router.back()} className="btn-outline">
           Annulla
         </button>
       </div>
