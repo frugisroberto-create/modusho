@@ -75,9 +75,7 @@ export async function GET(
     if (userRole === "OPERATOR") {
       return NextResponse.json({ error: "Allegato non trovato" }, { status: 404 });
     }
-    if (userRole === "HOD" && content.createdById !== userId) {
-      return NextResponse.json({ error: "Allegato non trovato" }, { status: 404 });
-    }
+    // HOD can access attachments of any content in their property/department (checked below)
   }
 
   // Property/department access
