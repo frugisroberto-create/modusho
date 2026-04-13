@@ -3,6 +3,7 @@ import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { canSubmit, isInvolved } from "@/lib/sop-workflow";
+import { sendWorkflowActivityPush } from "@/lib/push-notification";
 import { z } from "zod/v4";
 
 type RouteParams = { params: Promise<{ id: string }> };
@@ -43,7 +44,7 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
       submittedToC: true,
       submittedToA: true,
       contentId: true,
-      content: { select: { id: true, status: true } },
+      content: { select: { id: true, status: true, code: true, title: true } },
     },
   });
 
@@ -130,6 +131,16 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
       },
     }),
   ]);
+
+  // Push notification ai soggetti C/A (escluso R che invia) — best-effort
+  sendWorkflowActivityPush({
+    workflowId: wf.id,
+    contentCode: wf.content.code ?? null,
+    contentTitle: wf.content.title,
+    actorName: session.user.name,
+    actorId: userId,
+    eventType: "SUBMITTED",
+  }).catch(() => {});
 
   return NextResponse.json({
     data: { submitted: target, at: now, contentStatus: newContentStatus },

@@ -98,7 +98,8 @@ export async function sendContentPublishedPush(params: {
 
 /**
  * Invia push ai soggetti R/C/A di un SopWorkflow quando qualcuno
- * salva una nuova versione della bozza o aggiunge una nota.
+ * salva una nuova versione della bozza, aggiunge una nota, o invia
+ * la SOP per revisione/approvazione.
  *
  * Esclude l'autore dell'azione (actorId) — non ti notifico di quello
  * che hai fatto tu.
@@ -109,7 +110,7 @@ export async function sendWorkflowActivityPush(params: {
   contentTitle: string;
   actorName: string;
   actorId: string;
-  eventType: "TEXT_SAVED" | "NOTE_ADDED";
+  eventType: "TEXT_SAVED" | "NOTE_ADDED" | "SUBMITTED";
 }) {
   const { workflowId, contentCode, contentTitle, actorName, actorId, eventType } = params;
 
@@ -137,6 +138,8 @@ export async function sendWorkflowActivityPush(params: {
     const label = contentCode ? `${contentCode} — ${contentTitle}` : contentTitle;
     const body = eventType === "TEXT_SAVED"
       ? `${label}: nuova versione salvata da ${actorName}`
+      : eventType === "SUBMITTED"
+      ? `${label}: inviata per revisione da ${actorName}`
       : `${label}: nuova nota da ${actorName}`;
 
     const payload = JSON.stringify({
