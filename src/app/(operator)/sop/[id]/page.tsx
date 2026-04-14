@@ -7,6 +7,7 @@ import { SopViewTracker } from "@/components/operator/sop-view-tracker";
 import { ContentActions } from "@/components/hoo/content-actions";
 import { SopViewRegistry } from "@/components/shared/sop-view-registry";
 import { ExportPdfButton } from "@/components/shared/export-pdf-button";
+import { AttachmentUploader } from "@/components/shared/attachment-uploader";
 import { MobileHide } from "@/components/mobile-hide";
 import { ValidityBadge } from "@/components/shared/validity-badge";
 import Link from "next/link";
@@ -123,6 +124,9 @@ export default async function SopDetailPage({ params }: Props) {
         className="prose prose-gray max-w-none mb-8 bg-ivory-medium border border-ivory-dark p-4 sm:p-6 font-body"
         dangerouslySetInnerHTML={{ __html: content.body }}
       />
+
+      {/* ── Allegati ── */}
+      <AttachmentUploader contentId={content.id} canEdit={false} />
 
       {/* ── Blocco personale presa visione — tutti i ruoli ── */}
       <div className="bg-white border border-ivory-dark">
