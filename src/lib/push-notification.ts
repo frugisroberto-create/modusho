@@ -156,7 +156,7 @@ export async function sendWorkflowActivityPush(params: {
     const payload = JSON.stringify({
       title: "ModusHO",
       body,
-      data: { url: `/sop-workflow/${workflowId}` },
+      data: { workflowId, url: `/sop-workflow/${workflowId}` },
     });
 
     const results = await Promise.allSettled(

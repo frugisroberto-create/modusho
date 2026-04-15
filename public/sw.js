@@ -20,7 +20,7 @@ self.addEventListener('push', (event) => {
         icon: '/icons/icon-192.svg',
         badge: '/icons/icon-192.svg',
         data: data.data || {},
-        tag: data.data?.contentId || 'modusho',
+        tag: data.data?.contentId || data.data?.workflowId || `modusho-${Date.now()}`,
       })
     );
   } catch (e) {
