@@ -269,6 +269,7 @@ export async function PUT(request: NextRequest, { params }: RouteParams) {
     contentCode: wf.content.code ?? null,
     contentTitle: title,
     actorName: session.user.name,
+    actorRole: session.user.role,
     actorId: userId,
     eventType: "TEXT_SAVED",
   }).catch((err) => { console.error("[push] TEXT_SAVED error:", err); });

@@ -138,6 +138,7 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
     contentCode: wf.content.code ?? null,
     contentTitle: wf.content.title,
     actorName: session.user.name,
+    actorRole: session.user.role,
     actorId: userId,
     eventType: "SUBMITTED",
   }).catch((err) => { console.error("[push] SUBMITTED error:", err); });

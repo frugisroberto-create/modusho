@@ -104,15 +104,24 @@ export async function sendContentPublishedPush(params: {
  * Esclude l'autore dell'azione (actorId) — non ti notifico di quello
  * che hai fatto tu.
  */
+const ROLE_LABEL: Record<string, string> = {
+  OPERATOR: "Operatore",
+  HOD: "Resp. reparto",
+  HOTEL_MANAGER: "Hotel Manager",
+  ADMIN: "HOO",
+  SUPER_ADMIN: "HOO",
+};
+
 export async function sendWorkflowActivityPush(params: {
   workflowId: string;
   contentCode: string | null;
   contentTitle: string;
   actorName: string;
+  actorRole: string;
   actorId: string;
   eventType: "TEXT_SAVED" | "NOTE_ADDED" | "SUBMITTED";
 }) {
-  const { workflowId, contentCode, contentTitle, actorName, actorId, eventType } = params;
+  const { workflowId, contentCode, contentTitle, actorName, actorRole, actorId, eventType } = params;
 
   if (!VAPID_PUBLIC_KEY || !VAPID_PRIVATE_KEY) return;
 
@@ -146,12 +155,14 @@ export async function sendWorkflowActivityPush(params: {
       return;
     }
 
+    const roleTag = ROLE_LABEL[actorRole] || actorRole;
+    const who = `${roleTag} ${actorName}`;
     const label = contentCode ? `${contentCode} — ${contentTitle}` : contentTitle;
     const body = eventType === "TEXT_SAVED"
-      ? `${label}: nuova versione salvata da ${actorName}`
+      ? `${who} ha aggiornato la bozza della procedura ${label}`
       : eventType === "SUBMITTED"
-      ? `${label}: inviata per revisione da ${actorName}`
-      : `${label}: nuova nota da ${actorName}`;
+      ? `${who} ha inviato per revisione la procedura ${label}`
+      : `${who} ha aggiunto una nota sulla procedura ${label}`;
 
     const payload = JSON.stringify({
       title: "ModusHO",

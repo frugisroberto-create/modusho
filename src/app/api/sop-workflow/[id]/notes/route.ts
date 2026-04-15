@@ -164,6 +164,7 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
     contentCode: wf.content.code ?? null,
     contentTitle: wf.content.title,
     actorName: session.user.name,
+    actorRole: session.user.role,
     actorId: userId,
     eventType: "NOTE_ADDED",
   }).catch((err) => { console.error("[push] NOTE_ADDED error:", err); });
