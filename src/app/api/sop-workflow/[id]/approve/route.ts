@@ -189,8 +189,8 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
     }
   });
 
-  // Push notification best-effort — dopo la transazione, non bloccante
-  sendSopPublishedPush({
+  // Push notification best-effort — await per Vercel serverless
+  await sendSopPublishedPush({
     contentId: wf.contentId,
     contentTitle: content?.title || "",
     actorId: userId,

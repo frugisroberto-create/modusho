@@ -264,7 +264,7 @@ export async function PUT(request: NextRequest, { params }: RouteParams) {
   });
 
   // Push notification ai soggetti RACI (escluso chi salva) — best-effort
-  sendWorkflowActivityPush({
+  await sendWorkflowActivityPush({
     workflowId: wf.id,
     contentCode: wf.content.code ?? null,
     contentTitle: title,

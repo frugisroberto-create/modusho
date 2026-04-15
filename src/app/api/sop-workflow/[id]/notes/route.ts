@@ -159,7 +159,7 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
   ]);
 
   // Push notification ai soggetti RACI (escluso autore nota) — best-effort
-  sendWorkflowActivityPush({
+  await sendWorkflowActivityPush({
     workflowId: wf.id,
     contentCode: wf.content.code ?? null,
     contentTitle: wf.content.title,
