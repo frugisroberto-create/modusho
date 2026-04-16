@@ -310,9 +310,6 @@ model ContentNote {
   authorId  String
   body      String   @db.Text
   createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-  isDeleted Boolean  @default(false)
-  deletedAt DateTime?
 
   content Content @relation(fields: [contentId], references: [id], onDelete: Cascade)
   author  User    @relation("ContentNoteAuthor", fields: [authorId], references: [id])

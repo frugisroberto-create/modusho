@@ -54,8 +54,6 @@ interface NoteItem {
   id: string;
   body: string;
   createdAt: string;
-  updatedAt: string;
-  authorId: string;
   author: UserInfo;
 }
 
@@ -572,14 +570,7 @@ export function SopWorkflowEditor({ workflowId, currentUserId, currentUserRole, 
         </div>
 
         <div className="p-5">
-          {activeTab === "note" && (
-            <NotesPanel
-              workflowId={workflowId}
-              currentUserId={currentUserId}
-              currentUserRole={currentUserRole}
-              contentStatus={wf.contentStatus}
-            />
-          )}
+          {activeTab === "note" && <NotesPanel workflowId={workflowId} />}
           {activeTab === "versioni" && <VersionsPanel workflowId={workflowId} />}
           {activeTab === "allegati" && (
             <AttachmentUploader contentId={wf.contentId} canEdit={(isR || isC || isA || isAdminOverride || isHm || isHoo) && isInLavorazione && !wf.submittedToA} />
@@ -1226,22 +1217,11 @@ function PublishedActions({ contentId, workflowId, onRefresh }: { contentId: str
 
 // ─── Notes Panel ─────────────────────────────────────────────────────
 
-function NotesPanel({ workflowId, currentUserId, currentUserRole, contentStatus }: {
-  workflowId: string;
-  currentUserId: string;
-  currentUserRole: string;
-  contentStatus: string;
-}) {
+function NotesPanel({ workflowId }: { workflowId: string }) {
   const [notes, setNotes] = useState<NoteItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [newNote, setNewNote] = useState("");
   const [posting, setPosting] = useState(false);
-  const [editingId, setEditingId] = useState<string | null>(null);
-  const [editBody, setEditBody] = useState("");
-  const [busyId, setBusyId] = useState<string | null>(null);
-
-  const isAdmin = currentUserRole === "ADMIN" || currentUserRole === "SUPER_ADMIN";
-  const inLavorazione = ["DRAFT", "REVIEW_HM", "REVIEW_ADMIN", "RETURNED"].includes(contentStatus);
 
   const fetchNotes = useCallback(async () => {
     try {
@@ -1275,40 +1255,6 @@ function NotesPanel({ workflowId, currentUserId, currentUserRole, contentStatus 
     }
   };
 
-  const handleSaveEdit = async (noteId: string) => {
-    if (!editBody.trim()) return;
-    setBusyId(noteId);
-    try {
-      const res = await fetch(`/api/sop-workflow/${workflowId}/notes/${noteId}`, {
-        method: "PUT",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ body: editBody }),
-      });
-      if (res.ok) {
-        setEditingId(null);
-        setEditBody("");
-        await fetchNotes();
-      }
-    } finally {
-      setBusyId(null);
-    }
-  };
-
-  const handleDelete = async (noteId: string) => {
-    if (!confirm("Eliminare questa nota?")) return;
-    setBusyId(noteId);
-    try {
-      const res = await fetch(`/api/sop-workflow/${workflowId}/notes/${noteId}`, {
-        method: "DELETE",
-      });
-      if (res.ok) {
-        await fetchNotes();
-      }
-    } finally {
-      setBusyId(null);
-    }
-  };
-
   if (loading) return <PanelSkeleton />;
 
   return (
@@ -1334,71 +1280,19 @@ function NotesPanel({ workflowId, currentUserId, currentUserRole, contentStatus 
         <div className="space-y-3">
           {notes.map((note) => {
             const isReturn = note.body.startsWith("[Restituzione]");
-            const isAuthor = note.authorId === currentUserId;
-            const canManage = isAdmin || (isAuthor && inLavorazione);
-            const isEditing = editingId === note.id;
-            const wasEdited = note.updatedAt && note.createdAt && new Date(note.updatedAt).getTime() - new Date(note.createdAt).getTime() > 1000;
-            const busy = busyId === note.id;
-
             return (
               <div key={note.id} className={`border-l-4 px-4 py-3 ${
                 isReturn ? "border-alert-red bg-[#FFF5F5]" : "border-ivory-dark bg-ivory"
               }`}>
-                <div className="flex items-center gap-2 mb-1 flex-wrap">
+                <div className="flex items-center gap-2 mb-1">
                   <span className="text-xs font-ui font-semibold text-charcoal-dark">{note.author.name}</span>
                   <span className="text-[10px] font-ui text-charcoal/40 uppercase">{note.author.role}</span>
                   <span className="text-[10px] font-ui text-charcoal/30">{formatRelativeDate(note.createdAt)}</span>
-                  {wasEdited && <span className="text-[10px] font-ui italic text-charcoal/40">(modificata)</span>}
                   {isReturn && <span className="text-[10px] font-ui font-bold text-alert-red uppercase">Restituzione</span>}
-                  {canManage && !isEditing && !isReturn && (
-                    <div className="ml-auto flex items-center gap-2">
-                      <button
-                        onClick={() => { setEditingId(note.id); setEditBody(note.body); }}
-                        disabled={busy}
-                        className="text-[10px] font-ui text-terracotta hover:underline disabled:opacity-50"
-                      >
-                        Modifica
-                      </button>
-                      <button
-                        onClick={() => handleDelete(note.id)}
-                        disabled={busy}
-                        className="text-[10px] font-ui text-alert-red hover:underline disabled:opacity-50"
-                      >
-                        {busy ? "..." : "Elimina"}
-                      </button>
-                    </div>
-                  )}
                 </div>
-                {isEditing ? (
-                  <div className="space-y-2">
-                    <textarea
-                      value={editBody}
-                      onChange={(e) => setEditBody(e.target.value)}
-                      rows={3}
-                      className="w-full text-sm font-ui"
-                    />
-                    <div className="flex items-center gap-2">
-                      <button
-                        onClick={() => handleSaveEdit(note.id)}
-                        disabled={busy || !editBody.trim()}
-                        className="btn-primary-sm"
-                      >
-                        {busy ? "..." : "Salva"}
-                      </button>
-                      <button
-                        onClick={() => { setEditingId(null); setEditBody(""); }}
-                        disabled={busy}
-                        className="text-xs font-ui text-charcoal hover:underline"
-                      >
-                        Annulla
-                      </button>
-                    </div>
-                  </div>
-                ) : (
-                  <p className="text-sm font-ui text-charcoal leading-relaxed whitespace-pre-wrap">
-                    {isReturn ? note.body.replace("[Restituzione] ", "") : note.body}
-                  </p>
-                )}
+                <p className="text-sm font-ui text-charcoal leading-relaxed whitespace-pre-wrap">
+                  {isReturn ? note.body.replace("[Restituzione] ", "") : note.body}
+                </p>
               </div>
             );
           })}

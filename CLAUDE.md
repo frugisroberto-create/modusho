@@ -236,20 +236,15 @@ Le note sono un **registro cronologico libero** associato a ogni contenuto. NON 
 
 **Regole:**
 1. Chiunque con accesso al contenuto (HOD+ per i contenuti del proprio reparto, HM+ per la struttura, ADMIN/SUPER_ADMIN per tutto) può aggiungere una nota in qualsiasi momento, indipendentemente dallo stato del contenuto
-2. **Modifica nota**: l'autore può modificare la propria nota **solo finché il contenuto è in lavorazione** (stati DRAFT, REVIEW_HM, REVIEW_ADMIN, RETURNED). Una volta pubblicato, le note dell'autore diventano read-only. ADMIN e SUPER_ADMIN possono modificare qualsiasi nota in qualsiasi stato.
-3. **Eliminazione nota**: stesse regole della modifica (autore solo durante lavorazione; ADMIN/SUPER_ADMIN sempre). L'eliminazione è **soft delete** — la nota viene nascosta ma resta nel DB per audit.
-4. La modifica **non mantiene history**: si aggiorna `updatedAt` e la UI mostra un tag "(modificata)" se `updatedAt > createdAt`. Non c'è versionamento delle note — sono comunicazioni informali, non contenuto formale.
-5. Le note sono ordinate cronologicamente (la più recente in alto) e filtrano automaticamente quelle eliminate (`isDeleted = false`)
-6. Ogni nota mostra: nome autore + ruolo + timestamp + testo + eventuale tag "(modificata)"
-7. Non c'è limite al numero di note su un contenuto
-8. Le note sono visibili a tutti i ruoli da HOD in su che hanno accesso al contenuto
+2. Una nota è **immutabile**: una volta creata, non si modifica né si elimina (record di audit)
+3. Le note sono ordinate cronologicamente (la più recente in alto)
+4. Ogni nota mostra: nome autore + ruolo + timestamp + testo
+5. Non c'è limite al numero di note su un contenuto
+6. Le note sono visibili a tutti i ruoli da HOD in su che hanno accesso al contenuto
 
 **API:**
-- GET `/api/content/[id]/notes` — lista note del contenuto (paginata, ordinata per createdAt desc, filtra isDeleted)
+- GET `/api/content/[id]/notes` — lista note del contenuto (paginata, ordinata per createdAt desc)
 - POST `/api/content/[id]/notes` — crea nuova nota (body: `{ body: string }`)
-- PUT `/api/content/[id]/notes/[noteId]` — modifica nota (body: `{ body: string }`)
-- DELETE `/api/content/[id]/notes/[noteId]` — soft delete della nota
-- Equivalenti per `/api/sop-workflow/[id]/notes/[noteId]` per le note della bozza SOP
 
 ### Cronologia e audit trail — Specifica UI
 
