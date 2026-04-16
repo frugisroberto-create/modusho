@@ -34,13 +34,13 @@ export async function GET(
 
   const [notes, total] = await Promise.all([
     prisma.contentNote.findMany({
-      where: { contentId: id },
+      where: { contentId: id, isDeleted: false },
       include: { author: { select: { id: true, name: true, role: true } } },
       orderBy: { createdAt: "desc" },
       skip: (page - 1) * pageSize,
       take: pageSize,
     }),
-    prisma.contentNote.count({ where: { contentId: id } }),
+    prisma.contentNote.count({ where: { contentId: id, isDeleted: false } }),
   ]);
 
   return NextResponse.json({ data: notes, meta: { page, pageSize, total } });

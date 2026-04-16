@@ -62,18 +62,20 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
 
   const [notes, total] = await Promise.all([
     prisma.contentNote.findMany({
-      where: { contentId: wf.contentId },
+      where: { contentId: wf.contentId, isDeleted: false },
       select: {
         id: true,
         body: true,
         createdAt: true,
+        updatedAt: true,
+        authorId: true,
         author: { select: { id: true, name: true, role: true } },
       },
       orderBy: { createdAt: "desc" },
       skip: (page - 1) * pageSize,
       take: pageSize,
     }),
-    prisma.contentNote.count({ where: { contentId: wf.contentId } }),
+    prisma.contentNote.count({ where: { contentId: wf.contentId, isDeleted: false } }),
   ]);
 
   return NextResponse.json({ data: notes, meta: { page, pageSize, total } });
