@@ -85,6 +85,7 @@ interface Props {
 // ─── Main Component ──────────────────────────────────────────────────
 
 export function SopWorkflowEditor({ workflowId, currentUserId, currentUserRole, currentUserCanApprove }: Props) {
+  const router = useRouter();
   const [wf, setWf] = useState<SopWorkflowData | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -105,6 +106,9 @@ export function SopWorkflowEditor({ workflowId, currentUserId, currentUserRole, 
   // Return modal
   const [showReturnModal, setShowReturnModal] = useState(false);
   const [returnNote, setReturnNote] = useState("");
+
+  // Delete draft modal
+  const [showDeleteDraftModal, setShowDeleteDraftModal] = useState(false);
 
   // Delegate to HOD
   const [showDelegatePanel, setShowDelegatePanel] = useState(false);
@@ -339,6 +343,24 @@ export function SopWorkflowEditor({ workflowId, currentUserId, currentUserRole, 
     }
   };
 
+  const handleDeleteDraft = async () => {
+    setActionLoading(true);
+    setActionMessage(null);
+    try {
+      const res = await fetch(`/api/content/${wf!.contentId}`, { method: "DELETE" });
+      if (!res.ok) {
+        const data = await res.json();
+        throw new Error(data.error || "Errore");
+      }
+      router.push("/hoo-sop");
+      router.refresh();
+    } catch (e) {
+      setActionMessage({ type: "error", text: e instanceof Error ? e.message : "Errore" });
+      setActionLoading(false);
+      setShowDeleteDraftModal(false);
+    }
+  };
+
   // ─── Render ─────────────────────────────────────────────────────────
 
   if (loading) return <LoadingSkeleton />;
@@ -507,6 +529,7 @@ export function SopWorkflowEditor({ workflowId, currentUserId, currentUserRole, 
           isHoo={isHoo}
           isAdminOverride={isAdminOverride}
           canApproveFlag={!!currentUserCanApprove}
+          canDelete={isHoo || isHm}
           dirty={dirty}
           saving={saving}
           actionLoading={actionLoading}
@@ -514,6 +537,7 @@ export function SopWorkflowEditor({ workflowId, currentUserId, currentUserRole, 
           onSubmit={handleSubmit}
           onReturn={() => setShowReturnModal(true)}
           onApprove={handleApproveClick}
+          onDelete={() => setShowDeleteDraftModal(true)}
         />
       )}
 
@@ -564,6 +588,25 @@ export function SopWorkflowEditor({ workflowId, currentUserId, currentUserRole, 
           onCancel={() => { setShowReturnModal(false); setReturnNote(""); }}
           loading={actionLoading}
         />
+      )}
+
+      {/* ── Delete draft modal ── */}
+      {showDeleteDraftModal && (
+        <div className="fixed inset-0 bg-charcoal-dark/60 flex items-center justify-center z-50 p-4">
+          <div className="bg-ivory w-full max-w-md p-6 border border-ivory-dark">
+            <h3 className="text-lg font-heading font-semibold text-alert-red mb-2">Elimina bozza SOP</h3>
+            <p className="text-sm font-ui text-charcoal mb-4">
+              La bozza verrà eliminata (soft delete). L&apos;azione è reversibile solo dal Super Admin. Sei sicuro?
+            </p>
+            <div className="flex justify-end gap-2">
+              <button onClick={() => setShowDeleteDraftModal(false)} disabled={actionLoading} className="px-4 py-2 text-sm font-ui text-charcoal hover:bg-ivory-dark">Annulla</button>
+              <button onClick={handleDeleteDraft} disabled={actionLoading}
+                className="px-4 py-2 text-sm font-ui font-medium text-white bg-alert-red hover:bg-alert-red/80 disabled:opacity-50">
+                {actionLoading ? "..." : "Elimina"}
+              </button>
+            </div>
+          </div>
+        </div>
       )}
 
       {/* ── Republication acknowledgment modal ── */}
@@ -780,12 +823,13 @@ function ReviewDueDateSection({ wf, isA, editing, dueDateMonths, onEdit, onCance
   );
 }
 
-function ActionBar({ wf, isR, isA, isHoo, isAdminOverride, canApproveFlag, dirty, saving, actionLoading, onSave, onSubmit, onReturn, onApprove }: {
+function ActionBar({ wf, isR, isA, isHoo, isAdminOverride, canApproveFlag, canDelete, dirty, saving, actionLoading, onSave, onSubmit, onReturn, onApprove, onDelete }: {
   wf: SopWorkflowData;
   isR: boolean;
   isA: boolean;
   isHoo: boolean;
   canApproveFlag: boolean;
+  canDelete: boolean;
   isAdminOverride: boolean;
   dirty: boolean;
   saving: boolean;
@@ -794,6 +838,7 @@ function ActionBar({ wf, isR, isA, isHoo, isAdminOverride, canApproveFlag, dirty
   onSubmit: (t: "C" | "A" | "C_AND_A") => void;
   onReturn: () => void;
   onApprove: () => void;
+  onDelete: () => void;
 }) {
   return (
     <div className="flex items-center gap-3 flex-wrap bg-white border border-ivory-dark px-5 py-4">
@@ -837,6 +882,13 @@ function ActionBar({ wf, isR, isA, isHoo, isAdminOverride, canApproveFlag, dirty
             </button>
           )}
         </>
+      )}
+
+      {/* Elimina bozza — solo HM / ADMIN / SUPER_ADMIN */}
+      {canDelete && (
+        <button onClick={onDelete} disabled={actionLoading} className="btn-outline !border-alert-red !text-alert-red hover:!bg-alert-red hover:!text-white ml-auto">
+          Elimina bozza
+        </button>
       )}
 
     </div>
