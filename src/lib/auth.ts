@@ -2,7 +2,7 @@ import { NextAuthOptions } from "next-auth";
 import CredentialsProvider from "next-auth/providers/credentials";
 import bcrypt from "bcryptjs";
 import { prisma } from "./prisma";
-import { checkRateLimit, recordFailedAttempt, resetAttempts } from "./rate-limit";
+import { checkRateLimit, checkEmailRateLimit, recordFailedAttempt, resetAttempts } from "./rate-limit";
 import { headers } from "next/headers";
 import "@/types";
 
@@ -24,11 +24,20 @@ export const authOptions: NextAuthOptions = {
           || req?.headers?.["x-real-ip"]?.toString()
           || "unknown";
 
-        const rateCheck = checkRateLimit(ip);
-        if (!rateCheck.allowed) {
-          const retryMin = Math.ceil(rateCheck.retryAfterMs / 60000);
-          console.warn(`[auth] BLOCKED ip=${ip} email=${credentials.email} — troppi tentativi, riprova tra ${retryMin} min`);
+        // Rate limit per IP (5 tentativi / 15 min)
+        const ipCheck = checkRateLimit(ip);
+        if (!ipCheck.allowed) {
+          const retryMin = Math.ceil(ipCheck.retryAfterMs / 60000);
+          console.warn(`[auth] BLOCKED-IP ip=${ip} email=${credentials.email} — riprova tra ${retryMin} min`);
           throw new Error(`Troppi tentativi. Riprova tra ${retryMin} minuti.`);
+        }
+
+        // Rate limit per email/account (10 tentativi / 30 min)
+        const emailCheck = checkEmailRateLimit(credentials.email);
+        if (!emailCheck.allowed) {
+          const retryMin = Math.ceil(emailCheck.retryAfterMs / 60000);
+          console.warn(`[auth] BLOCKED-ACCOUNT ip=${ip} email=${credentials.email} — account bloccato, riprova tra ${retryMin} min`);
+          throw new Error(`Account temporaneamente bloccato. Riprova tra ${retryMin} minuti.`);
         }
 
         const user = await prisma.user.findUnique({
@@ -36,7 +45,7 @@ export const authOptions: NextAuthOptions = {
         });
 
         if (!user || !user.isActive) {
-          recordFailedAttempt(ip);
+          recordFailedAttempt(ip, credentials.email);
           console.warn(`[auth] FAILED ip=${ip} email=${credentials.email} — utente non trovato o disattivato`);
           return null;
         }
@@ -47,13 +56,13 @@ export const authOptions: NextAuthOptions = {
         );
 
         if (!isPasswordValid) {
-          recordFailedAttempt(ip);
+          recordFailedAttempt(ip, credentials.email);
           console.warn(`[auth] FAILED ip=${ip} email=${credentials.email} — password errata`);
           return null;
         }
 
         // Login riuscito: reset contatore tentativi
-        resetAttempts(ip);
+        resetAttempts(ip, credentials.email);
         console.log(`[auth] OK ip=${ip} email=${credentials.email} role=${user.role}`);
 
         return {
@@ -70,6 +79,7 @@ export const authOptions: NextAuthOptions = {
   ],
   session: {
     strategy: "jwt",
+    maxAge: 24 * 60 * 60, // 24 ore — dopo scade e serve rientrare
   },
   callbacks: {
     async jwt({ token, user }) {
