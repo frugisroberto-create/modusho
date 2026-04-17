@@ -84,7 +84,7 @@ export default function LoginPage() {
   return (
     <div className="min-h-screen flex flex-col items-center justify-center bg-ivory px-4">
       <div className="mb-10">
-        <Image src="/modusho-logo-final.svg" alt="ModusHO" width={280} height={120} priority className="max-w-[280px]" />
+        <Image src="/modusho-logo-final.svg" alt="ModusHO" width={200} height={260} priority />
       </div>
       <Suspense>
         <LoginForm />
