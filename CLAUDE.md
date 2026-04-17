@@ -532,7 +532,7 @@ Eccezione unica: `SUPER_ADMIN` bypassa tutto.
 La home HOO è il pannello di governance con KPI, alert e confronti — tutto consolidato in un'unica pagina per privilegiare immediatezza e azione.
 
 **Landing per ruolo e dispositivo:**
-- ADMIN/SUPER_ADMIN su **desktop**: redirect automatico a `/dashboard` (governance first)
+- ADMIN/SUPER_ADMIN su **desktop**: redirect automatico a `/approvals` (approvazioni first)
 - ADMIN/SUPER_ADMIN su **mobile**: restano sulla home hotel operatore (search + pending reads + attività SOP). La dashboard è raggiungibile dalla sub-nav, ma la landing mobile privilegia la consultazione rapida.
 - HOTEL_MANAGER: sempre sulla home hotel operatore (desktop e mobile). Dashboard accessibile dalla sub-nav.
 
