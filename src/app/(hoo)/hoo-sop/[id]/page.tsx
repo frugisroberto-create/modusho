@@ -9,6 +9,7 @@ import { SopViewRegistry } from "@/components/shared/sop-view-registry";
 import { AttachmentUploader } from "@/components/shared/attachment-uploader";
 import { ExportPdfButton } from "@/components/shared/export-pdf-button";
 import Link from "next/link";
+import { sanitizeHtml } from "@/lib/sanitize";
 
 interface Props {
   params: Promise<{ id: string }>;
@@ -82,7 +83,7 @@ export default async function HooSopDetailPage({ params }: Props) {
       </div>
 
       <article className="prose prose-gray max-w-none bg-ivory border border-ivory-dark p-6 font-body"
-        dangerouslySetInnerHTML={{ __html: content.body }} />
+        dangerouslySetInnerHTML={{ __html: sanitizeHtml(content.body) }} />
 
       <AttachmentUploader contentId={content.id} canEdit={content.status !== "ARCHIVED"} />
 

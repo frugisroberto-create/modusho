@@ -3,6 +3,7 @@ import { getSessionUser } from "@/lib/session";
 import { prisma } from "@/lib/prisma";
 import { checkAccess } from "@/lib/rbac";
 import Link from "next/link";
+import { sanitizeHtml } from "@/lib/sanitize";
 
 interface Props { params: Promise<{ id: string }> }
 
@@ -48,7 +49,7 @@ export default async function BrandBookDetailPage({ params }: Props) {
       </div>
 
       <article className="prose prose-gray max-w-none mb-8 bg-ivory-medium border border-ivory-dark p-4 sm:p-6 font-body"
-        dangerouslySetInnerHTML={{ __html: content.body }} />
+        dangerouslySetInnerHTML={{ __html: sanitizeHtml(content.body) }} />
     </div>
   );
 }

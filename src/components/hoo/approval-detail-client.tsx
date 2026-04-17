@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { ApprovalActions } from "./approval-actions";
 import { RevisionHistory } from "./revision-history";
 import { ContentTimeline } from "@/components/shared/content-timeline";
+import { sanitizeHtml } from "@/lib/sanitize";
 
 interface ContentData {
   id: string; title: string; body: string; status: string; version: number;
@@ -100,7 +101,7 @@ export function ApprovalDetailClient({ content, userRole, canReview, canEdit }: 
         </div>
       ) : (
         <article className="prose prose-gray max-w-none bg-ivory border border-ivory-dark p-6 font-body"
-          dangerouslySetInnerHTML={{ __html: editBody }} />
+          dangerouslySetInnerHTML={{ __html: sanitizeHtml(editBody) }} />
       )}
 
       {/* Azioni */}

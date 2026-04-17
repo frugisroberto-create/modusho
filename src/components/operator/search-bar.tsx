@@ -3,6 +3,7 @@
 import { useState, useCallback, useRef, useEffect } from "react";
 import Link from "next/link";
 import { useOperatorContext } from "./operator-shell";
+import { sanitizeHtml } from "@/lib/sanitize";
 
 interface SearchResult {
   id: string;
@@ -125,7 +126,7 @@ export function SearchBar() {
                 </div>
                 <p
                   className="text-sm text-sage-light font-ui line-clamp-2 [&_mark]:bg-terracotta/20 [&_mark]:text-terracotta-dark [&_mark]:rounded-sm [&_mark]:px-0.5"
-                  dangerouslySetInnerHTML={{ __html: r.snippet }}
+                  dangerouslySetInnerHTML={{ __html: sanitizeHtml(r.snippet) }}
                 />
               </Link>
             );

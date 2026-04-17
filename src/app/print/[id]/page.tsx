@@ -3,6 +3,7 @@ import { getSessionUser } from "@/lib/session";
 import { prisma } from "@/lib/prisma";
 import { checkAccess } from "@/lib/rbac";
 import { PrintTrigger } from "@/components/shared/print-trigger";
+import { sanitizeHtml } from "@/lib/sanitize";
 
 interface Props {
   params: Promise<{ id: string }>;
@@ -74,7 +75,7 @@ export default async function PrintContentPage({ params }: Props) {
         </div>
 
         {/* Body */}
-        <article className="print-body" dangerouslySetInnerHTML={{ __html: content.body }} />
+        <article className="print-body" dangerouslySetInnerHTML={{ __html: sanitizeHtml(content.body) }} />
 
         {/* Attachments count */}
         {content._count.attachments > 0 && (

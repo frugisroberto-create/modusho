@@ -7,6 +7,7 @@ import { ContentAckRegistry } from "@/components/shared/content-ack-registry";
 import { AcknowledgeButton } from "@/components/operator/acknowledge-button";
 import { useHooContext } from "@/components/hoo/hoo-shell";
 import { useSession } from "next-auth/react";
+import { sanitizeHtml } from "@/lib/sanitize";
 
 interface MemoItem {
   id: string; contentId: string; title: string; body: string;
@@ -120,7 +121,7 @@ export default function MemoManagementPage() {
                     {expandedMemo === m.id ? (
                       <>
                         <div className="text-sm text-charcoal prose prose-sm max-w-none mt-2 p-3 bg-ivory border border-ivory-dark whitespace-pre-line"
-                          dangerouslySetInnerHTML={{ __html: m.body }} />
+                          dangerouslySetInnerHTML={{ __html: sanitizeHtml(m.body) }} />
                         <div className="mt-3">
                           <AcknowledgeButton contentId={m.contentId} acknowledged={m.acknowledged} acknowledgedAt={m.acknowledgedAt?.toString() ?? null} />
                         </div>

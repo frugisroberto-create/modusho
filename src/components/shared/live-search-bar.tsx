@@ -2,6 +2,7 @@
 
 import { useState, useCallback, useEffect, useRef } from "react";
 import Link from "next/link";
+import { sanitizeHtml } from "@/lib/sanitize";
 
 interface SearchResult {
   id: string;
@@ -142,7 +143,7 @@ export function LiveSearchBar({ propertyId, contentType, placeholder }: LiveSear
                 </div>
                 <p
                   className="text-[12px] text-charcoal/50 font-ui line-clamp-2 [&_mark]:bg-terracotta/20 [&_mark]:text-terracotta-dark [&_mark]:rounded-sm [&_mark]:px-0.5"
-                  dangerouslySetInnerHTML={{ __html: r.snippet }}
+                  dangerouslySetInnerHTML={{ __html: sanitizeHtml(r.snippet) }}
                 />
               </Link>
             );

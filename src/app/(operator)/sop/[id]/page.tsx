@@ -11,6 +11,7 @@ import { AttachmentUploader } from "@/components/shared/attachment-uploader";
 import { MobileHide } from "@/components/mobile-hide";
 import { ValidityBadge } from "@/components/shared/validity-badge";
 import Link from "next/link";
+import { sanitizeHtml } from "@/lib/sanitize";
 
 interface Props { params: Promise<{ id: string }> }
 
@@ -122,7 +123,7 @@ export default async function SopDetailPage({ params }: Props) {
       {/* ── Corpo SOP ── */}
       <article
         className="prose prose-gray max-w-none mb-8 bg-ivory-medium border border-ivory-dark p-4 sm:p-6 font-body"
-        dangerouslySetInnerHTML={{ __html: content.body }}
+        dangerouslySetInnerHTML={{ __html: sanitizeHtml(content.body) }}
       />
 
       {/* ── Allegati ── */}

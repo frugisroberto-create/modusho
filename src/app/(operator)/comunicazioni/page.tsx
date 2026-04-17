@@ -8,6 +8,7 @@ import { ExportPdfButton } from "@/components/shared/export-pdf-button";
 import { AcknowledgeButton } from "@/components/operator/acknowledge-button";
 import { ContentAckRegistry } from "@/components/shared/content-ack-registry";
 import { LiveSearchBar } from "@/components/shared/live-search-bar";
+import { sanitizeHtml } from "@/lib/sanitize";
 
 interface MemoItem {
   id: string; contentId: string; title: string; body: string;
@@ -133,7 +134,7 @@ export default function MemoListPage() {
                   {expandedMemo === memo.id ? (
                     <>
                       <div className="text-sm text-charcoal prose prose-sm max-w-none mt-2 p-3 bg-ivory border border-ivory-dark whitespace-pre-line"
-                        dangerouslySetInnerHTML={{ __html: memo.body }} />
+                        dangerouslySetInnerHTML={{ __html: sanitizeHtml(memo.body) }} />
                       <div className="mt-3">
                         <AcknowledgeButton contentId={memo.contentId} acknowledged={memo.acknowledged} acknowledgedAt={memo.acknowledgedAt?.toString() ?? null} />
                       </div>

@@ -4,6 +4,7 @@ import { prisma } from "@/lib/prisma";
 import { canUserAccessContent } from "@/lib/rbac";
 import { stripEnColumnFromStandardBook } from "@/lib/standard-book";
 import Link from "next/link";
+import { sanitizeHtml } from "@/lib/sanitize";
 
 interface Props { params: Promise<{ id: string }> }
 
@@ -68,7 +69,7 @@ export default async function StandardBookDetailPage({ params }: Props) {
           La colonna "Standard (EN)" viene rimossa server-side per migliorare la
           leggibilità (specialmente su mobile) — era un duplicato della colonna IT. */}
       <div className="overflow-x-auto mb-8 border border-ivory-dark bg-white"
-        dangerouslySetInnerHTML={{ __html: stripEnColumnFromStandardBook(content.body) }} />
+        dangerouslySetInnerHTML={{ __html: sanitizeHtml(stripEnColumnFromStandardBook(content.body)) }} />
     </div>
   );
 }

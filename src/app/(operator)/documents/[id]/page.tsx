@@ -9,6 +9,7 @@ import { ContentAckRegistry } from "@/components/shared/content-ack-registry";
 import { AttachmentUploader } from "@/components/shared/attachment-uploader";
 import { ExportPdfButton } from "@/components/shared/export-pdf-button";
 import Link from "next/link";
+import { sanitizeHtml } from "@/lib/sanitize";
 
 interface Props { params: Promise<{ id: string }> }
 
@@ -73,7 +74,7 @@ export default async function DocumentDetailPage({ params }: Props) {
 
       <article
         className="prose prose-gray max-w-none mb-8 bg-ivory-medium border border-ivory-dark p-4 sm:p-6 font-body"
-        dangerouslySetInnerHTML={{ __html: content.body }}
+        dangerouslySetInnerHTML={{ __html: sanitizeHtml(content.body) }}
       />
 
       <AttachmentUploader contentId={content.id} canEdit={false} />

@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { AttachmentUploader } from "@/components/shared/attachment-uploader";
 import { SopEditor } from "@/components/shared/sop-editor";
 import { SopViewRegistry } from "@/components/shared/sop-view-registry";
+import { sanitizeHtml } from "@/lib/sanitize";
 
 // ─── Types ───────────────────────────────────────────────────────────
 
@@ -514,7 +515,7 @@ export function SopWorkflowEditor({ workflowId, currentUserId, currentUserRole, 
           ) : (
             <article
               className="prose prose-gray max-w-none font-body leading-relaxed px-4 py-3 bg-ivory/50 min-h-[200px]"
-              dangerouslySetInnerHTML={{ __html: wf.body }}
+              dangerouslySetInnerHTML={{ __html: sanitizeHtml(wf.body) }}
             />
           )}
         </div>
@@ -1349,7 +1350,7 @@ function VersionsPanel({ workflowId }: { workflowId: string }) {
           </button>
           {expanded === v.id && (
             <div className="px-4 py-3 border-t border-ivory-dark bg-white">
-              <article className="prose prose-sm prose-gray max-w-none font-body text-sm" dangerouslySetInnerHTML={{ __html: v.body }} />
+              <article className="prose prose-sm prose-gray max-w-none font-body text-sm" dangerouslySetInnerHTML={{ __html: sanitizeHtml(v.body) }} />
             </div>
           )}
         </div>
