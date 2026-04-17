@@ -15,6 +15,8 @@ export default function EditMemoPage() {
   const [isPinned, setIsPinned] = useState(false);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+  const [showDeleteModal, setShowDeleteModal] = useState(false);
+  const [deleting, setDeleting] = useState(false);
 
   useEffect(() => {
     async function fetchMemo() {
@@ -42,6 +44,20 @@ export default function EditMemoPage() {
     } finally { setSaving(false); }
   };
 
+  const handleDelete = async () => {
+    setDeleting(true);
+    try {
+      const res = await fetch(`/api/content/${id}`, { method: "DELETE" });
+      if (res.ok) {
+        router.push("/memo");
+        router.refresh();
+      }
+    } finally {
+      setDeleting(false);
+      setShowDeleteModal(false);
+    }
+  };
+
   if (loading) return <div className="h-40 skeleton" />;
 
   return (
@@ -64,13 +80,35 @@ export default function EditMemoPage() {
 
       {contentId && <AttachmentUploader contentId={contentId} canEdit={true} />}
 
-      <div className="flex gap-3">
+      <div className="flex gap-3 flex-wrap">
         <button onClick={handleSave} disabled={saving} className="btn-primary disabled:opacity-50">
           {saving ? "Salvataggio..." : "Salva modifiche"}
         </button>
         <button onClick={() => router.back()} className="btn-outline">Annulla</button>
         {contentId && <ExportPdfButton contentId={contentId} />}
+        <button onClick={() => setShowDeleteModal(true)}
+          className="btn-outline !border-alert-red !text-alert-red hover:!bg-alert-red hover:!text-white ml-auto">
+          Elimina memo
+        </button>
       </div>
+
+      {showDeleteModal && (
+        <div className="fixed inset-0 bg-charcoal-dark/60 flex items-center justify-center z-50 p-4">
+          <div className="bg-ivory w-full max-w-md p-6 border border-ivory-dark">
+            <h3 className="text-lg font-heading font-semibold text-alert-red mb-2">Elimina memo</h3>
+            <p className="text-sm font-ui text-charcoal mb-4">
+              Il memo sparirà dalle viste operative. L&apos;azione è reversibile solo dal Super Admin. Sei sicuro?
+            </p>
+            <div className="flex justify-end gap-2">
+              <button onClick={() => setShowDeleteModal(false)} disabled={deleting} className="px-4 py-2 text-sm font-ui text-charcoal hover:bg-ivory-dark">Annulla</button>
+              <button onClick={handleDelete} disabled={deleting}
+                className="px-4 py-2 text-sm font-ui font-medium text-white bg-alert-red hover:bg-alert-red/80 disabled:opacity-50">
+                {deleting ? "..." : "Elimina"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
