@@ -3,7 +3,7 @@
 import { Suspense, useState } from "react";
 import { signIn } from "next-auth/react";
 import { useSearchParams } from "next/navigation";
-import { ModusHoLogo } from "@/components/ui/modusho-logo";
+import Image from "next/image";
 
 function LoginForm() {
   const searchParams = useSearchParams();
@@ -84,7 +84,7 @@ export default function LoginPage() {
   return (
     <div className="min-h-screen flex flex-col items-center justify-center bg-ivory px-4">
       <div className="mb-10">
-        <ModusHoLogo size="lg" />
+        <Image src="/modusho-logo-final.svg" alt="ModusHO" width={280} height={120} priority className="max-w-[280px]" />
       </div>
       <Suspense>
         <LoginForm />
