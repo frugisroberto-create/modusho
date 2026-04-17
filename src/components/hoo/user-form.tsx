@@ -3,7 +3,7 @@
 import { useState, useEffect, useCallback } from "react";
 import { useRouter } from "next/navigation";
 
-type RoleOption = "OPERATOR" | "HOD" | "HOTEL_MANAGER" | "ADMIN";
+type RoleOption = "OPERATOR" | "HOD" | "HOTEL_MANAGER" | "PRO" | "ADMIN";
 type ContentTypeOption = "SOP" | "DOCUMENT" | "MEMO";
 
 interface Property {
@@ -37,6 +37,7 @@ const ROLE_LABELS: Record<RoleOption, string> = {
   OPERATOR: "Operatore",
   HOD: "Head of Department",
   HOTEL_MANAGER: "Hotel Manager",
+  PRO: "PRO",
   ADMIN: "HOO",
 };
 
@@ -44,6 +45,7 @@ const ROLE_PRESETS: Record<RoleOption, { canEdit: boolean; canApprove: boolean; 
   OPERATOR: { canEdit: false, canApprove: false, contentTypes: [] },
   HOD: { canEdit: true, canApprove: false, contentTypes: ["SOP", "DOCUMENT", "MEMO"] },
   HOTEL_MANAGER: { canEdit: true, canApprove: true, contentTypes: ["SOP", "DOCUMENT", "MEMO"] },
+  PRO: { canEdit: false, canApprove: false, contentTypes: [] },
   ADMIN: { canEdit: true, canApprove: true, contentTypes: ["SOP", "DOCUMENT", "MEMO"] },
 };
 
@@ -109,6 +111,11 @@ export function UserForm({ mode, userId, onSuccess, initialData }: UserFormProps
     setRole(newRole);
     applyRolePreset(newRole);
     // If switching to a role that requires specific depts, convert any null departmentIds to pending
+    if (newRole === "PRO") {
+      // PRO: toggle diventa disabilitato per modifica e approvazione
+      setCanEdit(false);
+      setCanApprove(false);
+    }
     if (newRole === "OPERATOR" || newRole === "HOD") {
       setAssignments(prev => prev.map(a =>
         a.departmentId === null ? { ...a, departmentId: "__pending__" as string } : a
@@ -121,6 +128,9 @@ export function UserForm({ mode, userId, onSuccess, initialData }: UserFormProps
     const w: string[] = [];
     if (role === "OPERATOR" && (canEdit || canApprove)) {
       w.push("Un Operatore non dovrebbe avere permessi di modifica o approvazione");
+    }
+    if (role === "PRO" && (canEdit || canApprove)) {
+      w.push("Un profilo PRO non può avere permessi di modifica o approvazione");
     }
     if (role === "HOD" && canApprove) {
       w.push("Un HOD non dovrebbe avere permessi di approvazione");
@@ -452,8 +462,8 @@ export function UserForm({ mode, userId, onSuccess, initialData }: UserFormProps
       {/* SEZIONE 2 — Ruolo */}
       <section className="bg-ivory-medium border border-ivory-dark  p-6 space-y-4">
         <h2 className="text-base font-heading font-semibold text-charcoal-dark">Ruolo</h2>
-        <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
-          {(["OPERATOR", "HOD", "HOTEL_MANAGER", "ADMIN"] as RoleOption[]).map((r) => (
+        <div className="grid grid-cols-2 sm:grid-cols-5 gap-2">
+          {(["OPERATOR", "HOD", "HOTEL_MANAGER", "PRO", "ADMIN"] as RoleOption[]).map((r) => (
             <button key={r} type="button" onClick={() => handleRoleChange(r)}
               className={`px-3 py-2.5 text-sm font-ui font-medium  border transition-colors ${
                 role === r

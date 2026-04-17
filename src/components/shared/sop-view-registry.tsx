@@ -45,6 +45,7 @@ const ROLE_LABELS: Record<string, string> = {
   OPERATOR: "Operatore",
   HOD: "HOD",
   HOTEL_MANAGER: "Hotel Manager",
+  PRO: "PRO",
   ADMIN: "HOO",
   SUPER_ADMIN: "HOO",
 };

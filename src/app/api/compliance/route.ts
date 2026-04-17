@@ -6,7 +6,7 @@ import { getAccessiblePropertyIds } from "@/lib/rbac";
 import { z } from "zod/v4";
 
 const ROLE_HIERARCHY: Record<string, number> = {
-  OPERATOR: 0, HOD: 1, HOTEL_MANAGER: 2, ADMIN: 3, SUPER_ADMIN: 4,
+  OPERATOR: 0, HOD: 1, HOTEL_MANAGER: 2, PRO: 3, ADMIN: 4, SUPER_ADMIN: 5,
 };
 
 const complianceQuerySchema = z.object({

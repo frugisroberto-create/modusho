@@ -100,6 +100,7 @@ Queste quattro dimensioni NON sono intercambiabili. Ruolo e permessi NON sono la
 | OPERATOR | Consulta e conferma presa visione | sì | no | no | nessuno |
 | HOD | Autore operativo di reparto | sì | sì | no | Memo, SOP, Document |
 | HOTEL_MANAGER | Responsabile di struttura, revisiona | sì | sì | sì | Memo, SOP, Document |
+| PRO | Viewer completo (Direzione/MD). Vede tutto incluso backstage workflow, non può agire. | sì | no | no | nessuno |
 | ADMIN | Approvazione finale e pubblicazione (HOO) | sì | sì | sì | tutti |
 | SUPER_ADMIN | Override tecnico globale | sì | sì | sì | tutti |
 
@@ -117,8 +118,9 @@ La decisione di concedere o revocare `canApprove` a un HM è una scelta operativ
 ### Regole di coerenza ruolo-permessi
 
 1. OPERATOR non può avere canEdit = sì né canApprove = sì (salvo override esplicito documentato)
-2. HOD non può avere canApprove = sì
-3. Se canApprove = sì, il ruolo deve essere almeno HOTEL_MANAGER
+2. PRO non può avere canEdit = sì né canApprove = sì (viewer puro)
+3. HOD non può avere canApprove = sì
+4. Se canApprove = sì, il ruolo deve essere almeno HOTEL_MANAGER
 4. Se canEdit = no, UserContentPermission non è selezionabile (non puoi gestire contenuti che non puoi modificare)
 5. I preset sono valori iniziali suggeriti, NON vincoli assoluti — l'admin può fare override
 
@@ -612,17 +614,17 @@ La home HOO è il pannello di governance con KPI, alert e confronti — tutto co
 
 ### Differenze chiave tra Home Operatore e Home HOO
 
-| Aspetto | OPERATOR | HOD | HM | ADMIN | SUPER_ADMIN |
-|---------|----------|-----|----|-------|-------------|
-| Header nav voci | 5 | 5 | 6 | 7 | 7 |
-| Sub-nav | No | 4 voci | 4 voci | 6 voci | 7 voci (+ Cestino) |
-| Stat box | 3 | 4 | 4 | 4 | 4 |
-| "Da prendere visione" | Sì | Sì | Sì | Sì | Sì |
-| Badge stato nelle colonne | No | Sì | Sì | Sì | Sì |
-| Analytics integrate nella home `/dashboard` | No | No | No | Sì | Sì |
-| Gestione utenti in sub-nav | No | No | No | Sì | Sì |
-| Strutture in sub-nav | No | No | No | Sì | Sì |
-| Cestino in sub-nav | No | No | No | No | Sì |
+| Aspetto | OPERATOR | HOD | HM | PRO | ADMIN | SUPER_ADMIN |
+|---------|----------|-----|----|-----|-------|-------------|
+| Header nav voci | 5 | 5 | 6 | 6 | 7 | 7 |
+| Sub-nav | No | 4 voci | 4 voci | 4 voci | 6 voci | 7 voci (+ Cestino) |
+| Stat box | 3 | 4 | 4 | 4 | 4 | 4 |
+| "Da prendere visione" | Sì | Sì | Sì | Sì | Sì | Sì |
+| Badge stato nelle colonne | No | Sì | Sì | Sì | Sì | Sì |
+| Analytics integrate nella home `/dashboard` | No | No | No | Sì | Sì | Sì |
+| Gestione utenti in sub-nav | No | No | No | No | Sì | Sì |
+| Strutture in sub-nav | No | No | No | No | Sì | Sì |
+| Cestino in sub-nav | No | No | No | No | No | Sì |
 
 ---
 

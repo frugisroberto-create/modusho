@@ -40,7 +40,7 @@ function SidebarContent({ userName, userRole, userRoleLabel, pathname, onNavClic
       <nav className="flex-1 py-4 overflow-y-auto">
         {NAV_ITEMS.filter((item) => {
           if (!item.minRole) return true;
-          const roleOrder = ["HOTEL_MANAGER", "ADMIN", "SUPER_ADMIN"];
+          const roleOrder = ["HOTEL_MANAGER", "PRO", "ADMIN", "SUPER_ADMIN"];
           return roleOrder.indexOf(userRole) >= roleOrder.indexOf(item.minRole);
         }).map((item) => {
           const isActive = pathname.startsWith(item.href);

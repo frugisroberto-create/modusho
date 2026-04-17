@@ -111,6 +111,18 @@ export async function PUT(
       }
     }
   }
+  if (finalRole === "PRO") {
+    if (finalCanEdit) {
+      return NextResponse.json({ error: "Un profilo PRO non può avere permessi di modifica" }, { status: 400 });
+    }
+    if (finalCanApprove) {
+      if (canApprove === undefined) {
+        finalCanApprove = false;
+      } else {
+        return NextResponse.json({ error: "Un profilo PRO non può avere permessi di approvazione" }, { status: 400 });
+      }
+    }
+  }
   if (finalRole === "HOD" && finalCanApprove) {
     if (canApprove === undefined) {
       finalCanApprove = false;

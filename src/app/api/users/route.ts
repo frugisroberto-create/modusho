@@ -138,6 +138,9 @@ export async function POST(request: NextRequest) {
   if (role === "OPERATOR" && (canEdit || canApprove)) {
     return NextResponse.json({ error: "Un operatore non può avere permessi di modifica o approvazione" }, { status: 400 });
   }
+  if (role === "PRO" && (canEdit || canApprove)) {
+    return NextResponse.json({ error: "Un profilo PRO non può avere permessi di modifica o approvazione" }, { status: 400 });
+  }
   if (role === "HOD" && canApprove) {
     return NextResponse.json({ error: "Un HOD non può avere permessi di approvazione" }, { status: 400 });
   }

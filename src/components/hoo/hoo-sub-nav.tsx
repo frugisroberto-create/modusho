@@ -26,7 +26,7 @@ const SUB_NAV_ITEMS: { href: string; label: string; minRole?: string }[] = [
 ];
 
 const ROLE_LEVEL: Record<string, number> = {
-  OPERATOR: 0, HOD: 1, HOTEL_MANAGER: 2, ADMIN: 3, SUPER_ADMIN: 4,
+  OPERATOR: 0, HOD: 1, HOTEL_MANAGER: 2, PRO: 3, ADMIN: 4, SUPER_ADMIN: 5,
 };
 
 export function HooSubNav({ userRole, properties, currentPropertyId, onPropertyChange }: HooSubNavProps) {

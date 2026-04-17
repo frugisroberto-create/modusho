@@ -18,7 +18,7 @@ export default async function OperatorHome({ searchParams }: Props) {
   // ADMIN/SUPER_ADMIN su desktop: landing su dashboard.
   // Su mobile: resta sulla home hotel (la dashboard è consultabile
   // via sub-nav, ma la landing è la vista operativa dell'hotel).
-  if (user && (user.role === "ADMIN" || user.role === "SUPER_ADMIN") && params.view !== "hotel") {
+  if (user && (user.role === "PRO" || user.role === "ADMIN" || user.role === "SUPER_ADMIN") && params.view !== "hotel") {
     const ua = (await headers()).get("user-agent") ?? "";
     const isMobile = /iPhone|iPad|iPod|Android|webOS|BlackBerry|IEMobile|Opera Mini/i.test(ua);
     if (!isMobile) {

@@ -19,6 +19,7 @@ interface UserDetail {
 const ROLE_BADGE: Record<string, { label: string; cls: string }> = {
   SUPER_ADMIN: { label: "HOO", cls: "bg-charcoal-dark text-white" },
   ADMIN: { label: "HOO", cls: "bg-sage text-white" },
+  PRO: { label: "PRO", cls: "bg-[#5B7B8A] text-white" },
   HOTEL_MANAGER: { label: "Hotel Manager", cls: "bg-terracotta text-white" },
   HOD: { label: "HOD", cls: "bg-mauve text-white" },
   OPERATOR: { label: "Operatore", cls: "bg-ivory-dark text-charcoal" },
