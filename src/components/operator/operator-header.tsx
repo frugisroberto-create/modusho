@@ -4,6 +4,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { signOut } from "next-auth/react";
 import { useState } from "react";
+import { NotificationBell } from "@/components/shared/notification-bell";
 
 interface Property {
   id: string;
@@ -89,6 +90,8 @@ export function OperatorHeader({
 
             {/* Utility Area */}
             <div className="flex items-center gap-3 ml-auto">
+
+              <NotificationBell />
 
               {/* Property Switcher */}
               {properties.length > 1 ? (

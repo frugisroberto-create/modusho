@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import webpush from "web-push";
 import { prisma } from "@/lib/prisma";
+import { createNotifications } from "@/lib/notifications";
 
 const VAPID_PUBLIC_KEY = process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY || "";
 const VAPID_PRIVATE_KEY = process.env.VAPID_PRIVATE_KEY || "";
@@ -84,6 +85,19 @@ export async function GET(request: Request) {
     if (userPendingCount.size === 0) {
       return NextResponse.json({ sent: 0, message: "Nessun utente in ritardo" });
     }
+
+    // 2b. Crea notifiche in-app per tutti gli utenti con pendenze
+    await createNotifications(
+      [...userPendingCount.entries()].map(([userId, count]) => ({
+        userId,
+        type: "ACK_REMINDER" as const,
+        title: "ModusHO",
+        body: count === 1
+          ? "Hai 1 contenuto da prendere visione che attende la tua conferma da più di 24 ore."
+          : `Hai ${count} contenuti da prendere visione che attendono la tua conferma da più di 24 ore.`,
+        url: "/",
+      }))
+    );
 
     // 3. Per ogni utente con pendenze, trova le PushSubscription e invia.
     const userIds = [...userPendingCount.keys()];

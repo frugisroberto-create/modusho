@@ -1,5 +1,6 @@
 import webpush from "web-push";
 import { prisma } from "./prisma";
+import { createNotifications } from "./notifications";
 
 // Configura VAPID
 const VAPID_PUBLIC_KEY = process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY || "";
@@ -20,11 +21,11 @@ const CONTENT_TYPE_CONFIG: Record<string, { label: string; route: string }> = {
   STANDARD_BOOK: { label: "Standard Book", route: "/standard-book" },
 };
 
-// ─── Funzione generale: push per contenuto pubblicato ────────────────
+// ─── Funzione generale: push + notifica per contenuto pubblicato ────
 
 /**
- * Invia push notification per un contenuto appena pubblicato.
- * Best-effort: errori push non bloccano il flusso.
+ * Invia push notification E crea notifica in-app per un contenuto appena pubblicato.
+ * Best-effort: errori non bloccano il flusso.
  */
 export async function sendContentPublishedPush(params: {
   contentId: string;
@@ -35,24 +36,12 @@ export async function sendContentPublishedPush(params: {
 }) {
   const { contentId, contentTitle, contentType, actorId, isRepublication } = params;
 
-  if (!VAPID_PUBLIC_KEY || !VAPID_PRIVATE_KEY) {
-    console.warn("[push] VAPID keys not configured, skipping push");
-    return;
-  }
-
   try {
     const targetUserIds = await resolveTargetUserIds(contentId, actorId);
     if (targetUserIds.length === 0) return;
 
-    const subscriptions = await prisma.pushSubscription.findMany({
-      where: { userId: { in: targetUserIds } },
-      select: { id: true, endpoint: true, p256dh: true, auth: true },
-    });
-    if (subscriptions.length === 0) return;
-
     const config = CONTENT_TYPE_CONFIG[contentType];
     const route = config?.route || "/sop";
-    // Per memo il deep link va alla lista (non c'è pagina singola operator separata)
     const url = contentType === "MEMO" ? "/comunicazioni" : `${route}/${contentId}`;
 
     const body = isRepublication
@@ -60,6 +49,26 @@ export async function sendContentPublishedPush(params: {
       : contentType === "BRAND_BOOK" || contentType === "STANDARD_BOOK"
         ? `Aggiornamento ${config?.label}: ${contentTitle}`
         : `Nuovo ${config?.label || "contenuto"}: ${contentTitle}`;
+
+    // Notifica in-app (indipendente dalla push subscription)
+    await createNotifications(
+      targetUserIds.map((uid) => ({
+        userId: uid,
+        type: "CONTENT_PUBLISHED" as const,
+        title: "ModusHO",
+        body,
+        url,
+      }))
+    );
+
+    // Push notification (solo se VAPID configurato e subscription presente)
+    if (!VAPID_PUBLIC_KEY || !VAPID_PRIVATE_KEY) return;
+
+    const subscriptions = await prisma.pushSubscription.findMany({
+      where: { userId: { in: targetUserIds } },
+      select: { id: true, endpoint: true, p256dh: true, auth: true },
+    });
+    if (subscriptions.length === 0) return;
 
     const payload = JSON.stringify({
       title: "ModusHO",
@@ -94,16 +103,8 @@ export async function sendContentPublishedPush(params: {
   }
 }
 
-// ─── Push per attività workflow RACI (bozza salvata, nota aggiunta) ──
+// ─── Push + notifica per attività workflow RACI ─────────────────────
 
-/**
- * Invia push ai soggetti R/C/A di un SopWorkflow quando qualcuno
- * salva una nuova versione della bozza, aggiunge una nota, o invia
- * la SOP per revisione/approvazione.
- *
- * Esclude l'autore dell'azione (actorId) — non ti notifico di quello
- * che hai fatto tu.
- */
 const ROLE_LABEL: Record<string, string> = {
   OPERATOR: "Operatore",
   HOD: "Resp. reparto",
@@ -111,6 +112,12 @@ const ROLE_LABEL: Record<string, string> = {
   ADMIN: "HOO",
   SUPER_ADMIN: "HOO",
 };
+
+const EVENT_TO_NOTIF_TYPE = {
+  TEXT_SAVED: "TEXT_SAVED",
+  NOTE_ADDED: "NOTE_ADDED",
+  SUBMITTED: "SUBMITTED",
+} as const;
 
 export async function sendWorkflowActivityPush(params: {
   workflowId: string;
@@ -122,8 +129,6 @@ export async function sendWorkflowActivityPush(params: {
   eventType: "TEXT_SAVED" | "NOTE_ADDED" | "SUBMITTED";
 }) {
   const { workflowId, contentCode, contentTitle, actorName, actorRole, actorId, eventType } = params;
-
-  if (!VAPID_PUBLIC_KEY || !VAPID_PRIVATE_KEY) return;
 
   try {
     const wf = await prisma.sopWorkflow.findUnique({
@@ -146,15 +151,6 @@ export async function sendWorkflowActivityPush(params: {
       return;
     }
 
-    const subscriptions = await prisma.pushSubscription.findMany({
-      where: { userId: { in: recipientIds } },
-      select: { id: true, endpoint: true, p256dh: true, auth: true, userId: true },
-    });
-    if (subscriptions.length === 0) {
-      console.warn(`[push] workflow ${eventType}: ${recipientIds.length} recipients but 0 push subscriptions found for userIds: ${recipientIds.join(", ")}`);
-      return;
-    }
-
     const roleTag = ROLE_LABEL[actorRole] || actorRole;
     const who = `${roleTag} ${actorName}`;
     const label = contentCode ? `${contentCode} — ${contentTitle}` : contentTitle;
@@ -164,10 +160,35 @@ export async function sendWorkflowActivityPush(params: {
       ? `${who} ha inviato per revisione la procedura ${label}`
       : `${who} ha aggiunto una nota sulla procedura ${label}`;
 
+    const url = `/sop-workflow/${workflowId}`;
+
+    // Notifica in-app (indipendente dalla push subscription)
+    await createNotifications(
+      recipientIds.map((uid) => ({
+        userId: uid,
+        type: EVENT_TO_NOTIF_TYPE[eventType],
+        title: "ModusHO",
+        body,
+        url,
+      }))
+    );
+
+    // Push notification (solo se VAPID configurato e subscription presente)
+    if (!VAPID_PUBLIC_KEY || !VAPID_PRIVATE_KEY) return;
+
+    const subscriptions = await prisma.pushSubscription.findMany({
+      where: { userId: { in: recipientIds } },
+      select: { id: true, endpoint: true, p256dh: true, auth: true, userId: true },
+    });
+    if (subscriptions.length === 0) {
+      console.warn(`[push] workflow ${eventType}: ${recipientIds.length} recipients but 0 push subscriptions`);
+      return;
+    }
+
     const payload = JSON.stringify({
       title: "ModusHO",
       body,
-      data: { workflowId, url: `/sop-workflow/${workflowId}` },
+      data: { workflowId, url },
     });
 
     const results = await Promise.allSettled(
@@ -197,12 +218,8 @@ export async function sendWorkflowActivityPush(params: {
   }
 }
 
-// ─── Wrapper SOP (mantiene compatibilità Fase 1) ─────────────────────
+// ─── Wrapper SOP (mantiene compatibilita' Fase 1) ───────────────────
 
-/**
- * Invia push per SOP pubblicata.
- * Wrapper che gestisce la logica requiresNewAcknowledgment specifica delle SOP.
- */
 export async function sendSopPublishedPush(params: {
   contentId: string;
   contentTitle: string;
@@ -210,7 +227,6 @@ export async function sendSopPublishedPush(params: {
   isRepublication: boolean;
   requiresNewAcknowledgment: boolean;
 }) {
-  // Ripubblicazione senza nuova conferma → nessuna push
   if (params.isRepublication && !params.requiresNewAcknowledgment) return;
 
   return sendContentPublishedPush({
@@ -232,7 +248,6 @@ async function resolveTargetUserIds(contentId: string, excludeUserId: string): P
 
   if (!content) return [];
 
-  // Tutti gli utenti attivi della property (tutti i ruoli), escluso chi pubblica
   const users = await prisma.user.findMany({
     where: {
       isActive: true,

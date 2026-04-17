@@ -4,6 +4,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { signOut } from "next-auth/react";
 import { useState } from "react";
+import { NotificationBell } from "@/components/shared/notification-bell";
 
 interface HooProperty {
   id: string;
@@ -93,6 +94,8 @@ export function HooHeader({ userName, userRole }: HooHeaderProps) {
               })}
             </nav>
           </div>
+
+          <NotificationBell />
 
           {/* User menu */}
           <div className="relative">

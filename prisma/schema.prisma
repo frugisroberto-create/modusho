@@ -115,6 +115,7 @@ model User {
   sopWorkflowEvents    SopWorkflowEvent[]     @relation("SopWorkflowEventActor")
   sopViewRecords       SopViewRecord[]        @relation("SopViewRecordUser")
   pushSubscriptions    PushSubscription[]     @relation("PushSubscriptionUser")
+  notifications        Notification[]
 
   @@index([role])
   @@index([email])
@@ -509,4 +510,30 @@ model PushSubscription {
   user User @relation("PushSubscriptionUser", fields: [userId], references: [id], onDelete: Cascade)
 
   @@index([userId])
+}
+
+// ─── In-App Notifications ──────────────────────────────────────────
+
+enum NotificationType {
+  CONTENT_PUBLISHED
+  TEXT_SAVED
+  NOTE_ADDED
+  SUBMITTED
+  ACK_REMINDER
+}
+
+model Notification {
+  id        String           @id @default(cuid())
+  userId    String
+  type      NotificationType
+  title     String
+  body      String
+  url       String?
+  readAt    DateTime?
+  createdAt DateTime         @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, readAt])
+  @@index([userId, createdAt])
 }
