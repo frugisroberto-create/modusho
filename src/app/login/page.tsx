@@ -3,7 +3,6 @@
 import { Suspense, useState } from "react";
 import { signIn } from "next-auth/react";
 import { useSearchParams } from "next/navigation";
-import Image from "next/image";
 
 function LoginForm() {
   const searchParams = useSearchParams();
@@ -83,8 +82,9 @@ function LoginForm() {
 export default function LoginPage() {
   return (
     <div className="min-h-screen flex flex-col items-center justify-center bg-ivory px-4">
-      <div className="mb-10">
-        <Image src="/modusho-logo-final.svg" alt="ModusHO" width={200} height={260} priority />
+      <div className="mb-10 text-center">
+        <h1 className="font-heading text-5xl font-medium tracking-[0.15em] text-charcoal-dark">MODUSHO</h1>
+        <p className="mt-3 font-ui text-xs uppercase tracking-[0.35em] text-charcoal/45">where standards become action</p>
       </div>
       <Suspense>
         <LoginForm />
