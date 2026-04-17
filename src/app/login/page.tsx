@@ -83,7 +83,7 @@ export default function LoginPage() {
   return (
     <div className="min-h-screen flex flex-col items-center justify-center bg-ivory px-4">
       <div className="mb-10 text-center">
-        <h1 className="font-heading text-5xl font-medium tracking-[0.15em] text-charcoal-dark">MODUSHO</h1>
+        <h1 className="font-heading text-5xl font-medium tracking-[0.15em] text-terracotta">ModusHO</h1>
         <p className="mt-3 font-ui text-xs uppercase tracking-[0.35em] text-charcoal/45">where standards become action</p>
       </div>
       <Suspense>
