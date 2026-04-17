@@ -2,6 +2,8 @@ import { NextAuthOptions } from "next-auth";
 import CredentialsProvider from "next-auth/providers/credentials";
 import bcrypt from "bcryptjs";
 import { prisma } from "./prisma";
+import { checkRateLimit, recordFailedAttempt, resetAttempts } from "./rate-limit";
+import { headers } from "next/headers";
 import "@/types";
 
 export const authOptions: NextAuthOptions = {
@@ -12,9 +14,21 @@ export const authOptions: NextAuthOptions = {
         email: { label: "Email", type: "email" },
         password: { label: "Password", type: "password" },
       },
-      async authorize(credentials) {
+      async authorize(credentials, req) {
         if (!credentials?.email || !credentials?.password) {
           return null;
+        }
+
+        // Rate limiting per IP
+        const ip = req?.headers?.["x-forwarded-for"]?.toString().split(",")[0]?.trim()
+          || req?.headers?.["x-real-ip"]?.toString()
+          || "unknown";
+
+        const rateCheck = checkRateLimit(ip);
+        if (!rateCheck.allowed) {
+          const retryMin = Math.ceil(rateCheck.retryAfterMs / 60000);
+          console.warn(`[auth] BLOCKED ip=${ip} email=${credentials.email} — troppi tentativi, riprova tra ${retryMin} min`);
+          throw new Error(`Troppi tentativi. Riprova tra ${retryMin} minuti.`);
         }
 
         const user = await prisma.user.findUnique({
@@ -22,6 +36,8 @@ export const authOptions: NextAuthOptions = {
         });
 
         if (!user || !user.isActive) {
+          recordFailedAttempt(ip);
+          console.warn(`[auth] FAILED ip=${ip} email=${credentials.email} — utente non trovato o disattivato`);
           return null;
         }
 
@@ -31,8 +47,14 @@ export const authOptions: NextAuthOptions = {
         );
 
         if (!isPasswordValid) {
+          recordFailedAttempt(ip);
+          console.warn(`[auth] FAILED ip=${ip} email=${credentials.email} — password errata`);
           return null;
         }
+
+        // Login riuscito: reset contatore tentativi
+        resetAttempts(ip);
+        console.log(`[auth] OK ip=${ip} email=${credentials.email} role=${user.role}`);
 
         return {
           id: user.id,

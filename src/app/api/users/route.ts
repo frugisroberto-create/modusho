@@ -109,7 +109,7 @@ export async function GET(request: NextRequest) {
 const createUserSchema = z.object({
   email: z.email(),
   name: z.string().min(1).max(200),
-  password: z.string().min(6),
+  password: z.string().min(10).regex(/[A-Z]/, "Almeno una lettera maiuscola").regex(/[0-9]/, "Almeno un numero"),
   role: z.enum(["OPERATOR", "HOD", "HOTEL_MANAGER", "ADMIN"]),
   canView: z.boolean().default(true),
   canEdit: z.boolean().default(false),

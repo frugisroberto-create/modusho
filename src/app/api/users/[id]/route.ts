@@ -41,7 +41,7 @@ export async function GET(
 const updateUserSchema = z.object({
   name: z.string().min(1).max(200).optional(),
   email: z.email().optional(),
-  password: z.string().min(6).optional(),
+  password: z.string().min(10).regex(/[A-Z]/, "Almeno una lettera maiuscola").regex(/[0-9]/, "Almeno un numero").optional(),
   role: z.enum(["OPERATOR", "HOD", "HOTEL_MANAGER", "ADMIN"]).optional(),
   canView: z.boolean().optional(),
   canEdit: z.boolean().optional(),

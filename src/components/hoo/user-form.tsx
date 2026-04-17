@@ -218,8 +218,8 @@ export function UserForm({ mode, userId, onSuccess, initialData }: UserFormProps
       return;
     }
     if (mode === "create") {
-      if (password.length < 6) {
-        setError("La password deve avere almeno 6 caratteri");
+      if (password.length < 10 || !/[A-Z]/.test(password) || !/[0-9]/.test(password)) {
+        setError("La password deve avere almeno 10 caratteri, una maiuscola e un numero");
         return;
       }
       if (password !== passwordConfirm) {
@@ -373,7 +373,7 @@ export function UserForm({ mode, userId, onSuccess, initialData }: UserFormProps
               <label className="block text-sm font-ui font-medium text-charcoal mb-1.5">Password</label>
               <div className="relative">
                 <input type={showPassword ? "text" : "password"} value={password} onChange={(e) => setPassword(e.target.value)}
-                  className="w-full pr-10" placeholder="Min. 6 caratteri" />
+                  className="w-full pr-10" placeholder="Min. 10 caratteri, 1 maiuscola, 1 numero" />
                 <button type="button" onClick={() => setShowPassword(!showPassword)}
                   className="absolute right-3 top-1/2 -translate-y-1/2 text-charcoal/40 hover:text-charcoal transition-colors"
                   tabIndex={-1}>
@@ -412,7 +412,7 @@ export function UserForm({ mode, userId, onSuccess, initialData }: UserFormProps
                   <label className="block text-sm font-ui font-medium text-charcoal mb-1.5">Nuova password</label>
                   <div className="relative">
                     <input type={showPassword ? "text" : "password"} value={password} onChange={(e) => setPassword(e.target.value)}
-                      className="w-full pr-10" placeholder="Min. 6 caratteri" />
+                      className="w-full pr-10" placeholder="Min. 10 caratteri, 1 maiuscola, 1 numero" />
                     <button type="button" onClick={() => setShowPassword(!showPassword)}
                       className="absolute right-3 top-1/2 -translate-y-1/2 text-charcoal/40 hover:text-charcoal transition-colors"
                       tabIndex={-1}>
