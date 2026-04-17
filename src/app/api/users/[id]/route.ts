@@ -42,7 +42,7 @@ const updateUserSchema = z.object({
   name: z.string().min(1).max(200).optional(),
   email: z.email().optional(),
   password: z.string().min(6).optional(),
-  role: z.enum(["OPERATOR", "HOD", "HOTEL_MANAGER", "ADMIN"]).optional(),
+  role: z.enum(["OPERATOR", "HOD", "HOTEL_MANAGER", "PRO", "ADMIN"]).optional(),
   canView: z.boolean().optional(),
   canEdit: z.boolean().optional(),
   canApprove: z.boolean().optional(),
