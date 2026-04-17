@@ -11,7 +11,6 @@ enum Role {
   OPERATOR
   HOD
   HOTEL_MANAGER
-  PRO
   ADMIN
   SUPER_ADMIN
 }

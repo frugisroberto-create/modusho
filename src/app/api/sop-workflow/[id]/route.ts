@@ -79,7 +79,7 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
   // Visibilita' bozza: R/C/A oppure HM/ADMIN/SUPER_ADMIN possono vedere la bozza
   const contentStatus = wf.content.status;
   if (contentStatus !== "PUBLISHED" && contentStatus !== "ARCHIVED") {
-    if (userRole !== "SUPER_ADMIN" && userRole !== "ADMIN" && userRole !== "PRO" && userRole !== "HOTEL_MANAGER" && !canViewDraft(userId, wfInfo)) {
+    if (userRole !== "SUPER_ADMIN" && userRole !== "ADMIN" && userRole !== "HOTEL_MANAGER" && !canViewDraft(userId, wfInfo)) {
       return NextResponse.json({ error: "Non hai accesso a questa bozza" }, { status: 403 });
     }
   }

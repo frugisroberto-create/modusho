@@ -6,9 +6,8 @@ const ROLE_HIERARCHY: Record<Role, number> = {
   OPERATOR: 0,
   HOD: 1,
   HOTEL_MANAGER: 2,
-  PRO: 3,
-  ADMIN: 4,
-  SUPER_ADMIN: 5,
+  ADMIN: 3,
+  SUPER_ADMIN: 4,
 };
 
 export default withAuth(

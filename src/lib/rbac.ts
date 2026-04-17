@@ -5,9 +5,8 @@ const ROLE_HIERARCHY: Record<Role, number> = {
   OPERATOR: 0,
   HOD: 1,
   HOTEL_MANAGER: 2,
-  PRO: 3,
-  ADMIN: 4,
-  SUPER_ADMIN: 5,
+  ADMIN: 3,
+  SUPER_ADMIN: 4,
 };
 
 /**
@@ -237,8 +236,8 @@ export async function canUserAccessContent(
   const hasProperty = await checkAccess(userId, "OPERATOR", content.propertyId);
   if (!hasProperty) return false;
 
-  // HM, PRO e ADMIN hanno accesso coarse basato sulla property
-  if (userRole === "HOTEL_MANAGER" || userRole === "PRO" || userRole === "ADMIN") return true;
+  // HM e ADMIN hanno accesso coarse basato sulla property
+  if (userRole === "HOTEL_MANAGER" || userRole === "ADMIN") return true;
 
   // OPERATOR/HOD: devono essere autori (solo HOD) o in targetAudience
   if (userRole === "HOD" && content.createdById === userId) return true;

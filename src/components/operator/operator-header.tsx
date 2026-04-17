@@ -34,7 +34,7 @@ const NAV_ITEMS: { href: string; label: string; minRole?: string }[] = [
 ];
 
 const ROLE_LEVEL: Record<string, number> = {
-  OPERATOR: 0, HOD: 1, HOTEL_MANAGER: 2, PRO: 3, ADMIN: 4, SUPER_ADMIN: 5,
+  OPERATOR: 0, HOD: 1, HOTEL_MANAGER: 2, ADMIN: 3, SUPER_ADMIN: 4,
 };
 
 // Bottom nav mobile — solo sezioni contenuto principali
@@ -54,7 +54,7 @@ export function OperatorHeader({
 }: OperatorHeaderProps) {
   const pathname = usePathname();
   const [userMenuOpen, setUserMenuOpen] = useState(false);
-  const canAccessDashboard = ["HOD", "HOTEL_MANAGER", "PRO", "ADMIN", "SUPER_ADMIN"].includes(userRole);
+  const canAccessDashboard = ["HOD", "HOTEL_MANAGER", "ADMIN", "SUPER_ADMIN"].includes(userRole);
   const currentProperty = properties.find((p) => p.id === currentPropertyId);
   const initials = userName.split(" ").map(n => n[0]).join("").slice(0, 2);
 

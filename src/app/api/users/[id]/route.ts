@@ -42,7 +42,7 @@ const updateUserSchema = z.object({
   name: z.string().min(1).max(200).optional(),
   email: z.email().optional(),
   password: z.string().min(6).optional(),
-  role: z.enum(["OPERATOR", "HOD", "HOTEL_MANAGER", "PRO", "ADMIN"]).optional(),
+  role: z.enum(["OPERATOR", "HOD", "HOTEL_MANAGER", "ADMIN"]).optional(),
   canView: z.boolean().optional(),
   canEdit: z.boolean().optional(),
   canApprove: z.boolean().optional(),
@@ -108,18 +108,6 @@ export async function PUT(
         finalCanApprove = false;
       } else {
         return NextResponse.json({ error: "Un operatore non può avere permessi di approvazione" }, { status: 400 });
-      }
-    }
-  }
-  if (finalRole === "PRO") {
-    if (finalCanEdit) {
-      return NextResponse.json({ error: "Un profilo PRO non può avere permessi di modifica" }, { status: 400 });
-    }
-    if (finalCanApprove) {
-      if (canApprove === undefined) {
-        finalCanApprove = false;
-      } else {
-        return NextResponse.json({ error: "Un profilo PRO non può avere permessi di approvazione" }, { status: 400 });
       }
     }
   }

@@ -6,7 +6,7 @@ import { it } from "date-fns/locale";
 
 const ROLE_LABELS: Record<string, string> = {
   HOD: "Capo Reparto", HOTEL_MANAGER: "Hotel Manager",
-  PRO: "PRO", ADMIN: "HOO", SUPER_ADMIN: "HOO",
+  ADMIN: "HOO", SUPER_ADMIN: "HOO",
 };
 
 const STATUS_LABELS: Record<string, string> = {

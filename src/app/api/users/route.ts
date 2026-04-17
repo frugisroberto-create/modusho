@@ -6,7 +6,7 @@ import bcrypt from "bcryptjs";
 import { z } from "zod/v4";
 
 const querySchema = z.object({
-  role: z.enum(["OPERATOR", "HOD", "HOTEL_MANAGER", "PRO", "ADMIN", "SUPER_ADMIN"]).optional(),
+  role: z.enum(["OPERATOR", "HOD", "HOTEL_MANAGER", "ADMIN", "SUPER_ADMIN"]).optional(),
   propertyId: z.string().optional(),
   page: z.coerce.number().int().min(1).default(1),
   pageSize: z.coerce.number().int().min(1).max(50).default(20),
@@ -110,7 +110,7 @@ const createUserSchema = z.object({
   email: z.email(),
   name: z.string().min(1).max(200),
   password: z.string().min(6),
-  role: z.enum(["OPERATOR", "HOD", "HOTEL_MANAGER", "PRO", "ADMIN"]),
+  role: z.enum(["OPERATOR", "HOD", "HOTEL_MANAGER", "ADMIN"]),
   canView: z.boolean().default(true),
   canEdit: z.boolean().default(false),
   canApprove: z.boolean().default(false),
@@ -137,9 +137,6 @@ export async function POST(request: NextRequest) {
   // Validazioni coerenza ruolo-permessi
   if (role === "OPERATOR" && (canEdit || canApprove)) {
     return NextResponse.json({ error: "Un operatore non può avere permessi di modifica o approvazione" }, { status: 400 });
-  }
-  if (role === "PRO" && (canEdit || canApprove)) {
-    return NextResponse.json({ error: "Un profilo PRO non può avere permessi di modifica o approvazione" }, { status: 400 });
   }
   if (role === "HOD" && canApprove) {
     return NextResponse.json({ error: "Un HOD non può avere permessi di approvazione" }, { status: 400 });
