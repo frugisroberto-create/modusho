@@ -33,6 +33,8 @@ export function BookForm({ mode, contentType, backPath, contentId, initialData, 
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   const [confirmDelete, setConfirmDelete] = useState(false);
+  const [confirmArchive, setConfirmArchive] = useState(false);
+  const [archiveNote, setArchiveNote] = useState("");
 
   useEffect(() => {
     async function fetchProps() {
@@ -117,6 +119,20 @@ export function BookForm({ mode, contentType, backPath, contentId, initialData, 
       }
       router.refresh();
     } finally { setLoading(false); }
+  };
+
+  const handleArchive = async () => {
+    if (!contentId || archiveNote.length < 5) return;
+    setLoading(true); setError("");
+    try {
+      const res = await fetch(`/api/content/${contentId}/archive`, {
+        method: "PUT", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ note: archiveNote }),
+      });
+      if (!res.ok) { const j = await res.json(); setError(j.error || "Errore durante l'archiviazione"); return; }
+      router.push(backPath);
+      router.refresh();
+    } finally { setLoading(false); setConfirmArchive(false); setArchiveNote(""); }
   };
 
   const handleDelete = async () => {
@@ -204,7 +220,26 @@ export function BookForm({ mode, contentType, backPath, contentId, initialData, 
           Annulla
         </button>
         {mode === "edit" && canDelete && (
-          <div className="ml-auto">
+          <div className="ml-auto flex items-center gap-3">
+            {!confirmArchive ? (
+              <button onClick={() => setConfirmArchive(true)} disabled={loading}
+                className="px-5 py-2.5 text-sm font-ui font-medium text-charcoal hover:bg-ivory-dark transition-colors disabled:opacity-50">
+                Archivia
+              </button>
+            ) : (
+              <div className="flex items-center gap-2">
+                <input type="text" value={archiveNote} onChange={(e) => setArchiveNote(e.target.value)}
+                  placeholder="Motivo (min 5 caratteri)" className="text-sm w-48" />
+                <button onClick={handleArchive} disabled={loading || archiveNote.length < 5}
+                  className="px-4 py-2 text-sm font-ui font-semibold text-white bg-sage hover:bg-sage-dark transition-colors disabled:opacity-50">
+                  {loading ? "..." : "Conferma"}
+                </button>
+                <button onClick={() => { setConfirmArchive(false); setArchiveNote(""); }}
+                  className="px-3 py-2 text-sm font-ui text-charcoal hover:bg-ivory-dark transition-colors">
+                  Annulla
+                </button>
+              </div>
+            )}
             {!confirmDelete ? (
               <button onClick={() => setConfirmDelete(true)} disabled={loading}
                 className="px-5 py-2.5 text-sm font-ui font-medium text-alert-red hover:bg-alert-red/10 transition-colors disabled:opacity-50">
