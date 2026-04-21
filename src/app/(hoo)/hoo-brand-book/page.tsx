@@ -80,19 +80,21 @@ export default function HooBrandBookListPage() {
       ) : (
         <div className="bg-white border border-ivory-dark">
           {items.map((item, idx) => (
-            <Link key={item.id} href={`/brand-book/${item.id}`}
-              className={`flex items-center justify-between p-4 hover:bg-ivory transition-colors ${idx < items.length - 1 ? "border-b border-ivory-medium" : ""}`}>
-              <div>
+            <div key={item.id} className={`flex items-center justify-between p-4 hover:bg-ivory transition-colors ${idx < items.length - 1 ? "border-b border-ivory-medium" : ""}`}>
+              <Link href={`/brand-book/${item.id}`} className="flex-1 min-w-0">
                 <div className="flex items-center gap-2 mb-1">
                   <span className={`text-[10px] font-ui font-bold uppercase tracking-wider px-2 py-0.5 ${STATUS_BADGE[item.status] || "bg-ivory-dark text-charcoal"}`}>{item.status}</span>
                   <span className="text-[11px] font-ui text-charcoal/45">{item.property.code}</span>
                 </div>
                 <h3 className="font-ui font-medium text-charcoal-dark text-sm">{item.title}</h3>
-              </div>
-              <svg className="w-5 h-5 text-charcoal/30 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M9 5l7 7-7 7" />
-              </svg>
-            </Link>
+              </Link>
+              {canCreate && (
+                <Link href={`/hoo-brand-book/${item.id}/edit`}
+                  className="shrink-0 ml-3 px-3 py-1.5 text-xs font-ui font-medium text-terracotta border border-terracotta/30 hover:bg-terracotta/5 transition-colors">
+                  Modifica
+                </Link>
+              )}
+            </div>
           ))}
         </div>
       )}
