@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import { useRouter } from "next/navigation";
 import { AttachmentUploader } from "@/components/shared/attachment-uploader";
 import { SopEditor } from "@/components/shared/sop-editor";
@@ -96,6 +96,61 @@ export function SopWorkflowEditor({ workflowId, currentUserId, currentUserRole, 
   const [editBody, setEditBody] = useState("");
   const [saving, setSaving] = useState(false);
   const [dirty, setDirty] = useState(false);
+
+  // Avviso modifiche non salvate
+  // 1. beforeunload: chiusura/ricarica pagina
+  // 2. Intercettazione history.pushState: navigazione interna Next.js
+  const dirtyRef = useRef(false);
+  useEffect(() => { dirtyRef.current = dirty; }, [dirty]);
+
+  useEffect(() => {
+    const handleBeforeUnload = (e: BeforeUnloadEvent) => {
+      if (dirtyRef.current) {
+        e.preventDefault();
+      }
+    };
+    window.addEventListener("beforeunload", handleBeforeUnload);
+
+    // Intercetta navigazione interna Next.js (usa history.pushState)
+    const originalPushState = history.pushState.bind(history);
+    const originalReplaceState = history.replaceState.bind(history);
+
+    history.pushState = function (...args) {
+      if (dirtyRef.current) {
+        if (!confirm("Hai modifiche non salvate. Vuoi uscire senza salvare?")) {
+          return;
+        }
+      }
+      return originalPushState(...args);
+    };
+
+    history.replaceState = function (...args) {
+      if (dirtyRef.current) {
+        if (!confirm("Hai modifiche non salvate. Vuoi uscire senza salvare?")) {
+          return;
+        }
+      }
+      return originalReplaceState(...args);
+    };
+
+    // Intercetta anche back/forward del browser
+    const handlePopState = () => {
+      if (dirtyRef.current) {
+        if (!confirm("Hai modifiche non salvate. Vuoi uscire senza salvare?")) {
+          // Ripristina la posizione precedente
+          history.pushState(null, "", window.location.href);
+        }
+      }
+    };
+    window.addEventListener("popstate", handlePopState);
+
+    return () => {
+      window.removeEventListener("beforeunload", handleBeforeUnload);
+      window.removeEventListener("popstate", handlePopState);
+      history.pushState = originalPushState;
+      history.replaceState = originalReplaceState;
+    };
+  }, []);
 
   // Tab state
   const [activeTab, setActiveTab] = useState<"note" | "versioni" | "allegati" | "eventi">("note");
@@ -398,6 +453,19 @@ export function SopWorkflowEditor({ workflowId, currentUserId, currentUserRole, 
           onConfirm={handleConfirmConsultation}
           loading={confirmLoading}
         />
+      )}
+
+      {/* ── Avviso modifiche non salvate ── */}
+      {dirty && (
+        <div className="px-4 py-3 text-sm font-ui bg-[#FFF3E0] border-l-4 border-[#E65100] text-[#E65100] flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            <svg className="w-4 h-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L4.082 16.5c-.77.833.192 2.5 1.732 2.5z" />
+            </svg>
+            <span className="font-medium">Hai modifiche non salvate.</span>
+            <span>Salva prima di uscire dalla pagina.</span>
+          </div>
+        </div>
       )}
 
       {/* ── Action message ── */}
