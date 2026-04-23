@@ -120,25 +120,55 @@ export default async function SopDetailPage({ params }: Props) {
         </MobileHide>
       </div>
 
-      {/* ── Corpo SOP ── */}
-      <article
-        className="prose prose-gray max-w-none mb-8 bg-ivory-medium border border-ivory-dark p-4 sm:p-6 font-body"
-        dangerouslySetInnerHTML={{ __html: sanitizeHtml(content.body) }}
-      />
-
-      {/* ── Allegati ── */}
-      <AttachmentUploader contentId={content.id} canEdit={false} />
-
-      {/* ── Blocco personale presa visione — tutti i ruoli ── */}
-      <div className="bg-white border border-ivory-dark">
+      {/* ── Gate presa visione: se non confermata, blocca il contenuto ── */}
+      {!acknowledged ? (
+        <div className="bg-white border border-ivory-dark mb-8">
           <div className="px-5 py-3 bg-ivory border-b border-ivory-dark">
             <span className="text-xs font-ui font-semibold uppercase tracking-wider text-charcoal/50">
-              Presa visione
+              Presa visione richiesta
             </span>
           </div>
-          <div className="px-5 py-5 space-y-4">
-            {/* Stato personale */}
-            {acknowledged ? (
+          <div className="px-5 py-8 space-y-4 text-center">
+            <svg className="w-12 h-12 text-[#E65100] mx-auto" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L4.082 16.5c-.77.833.192 2.5 1.732 2.5z" />
+            </svg>
+            <div>
+              <p className="text-base font-ui font-semibold text-charcoal-dark">
+                Questa procedura richiede la tua presa visione
+              </p>
+              <p className="text-sm font-ui text-charcoal/60 mt-1">
+                Conferma per accedere al contenuto della procedura (v{currentVersion})
+              </p>
+            </div>
+            <div className="pt-2">
+              <AcknowledgeButton
+                contentId={content.id}
+                acknowledged={false}
+                acknowledgedAt={null}
+                useSopEndpoint
+              />
+            </div>
+          </div>
+        </div>
+      ) : (
+        <>
+          {/* ── Corpo SOP (visibile solo dopo presa visione) ── */}
+          <article
+            className="prose prose-gray max-w-none mb-8 bg-ivory-medium border border-ivory-dark p-4 sm:p-6 font-body"
+            dangerouslySetInnerHTML={{ __html: sanitizeHtml(content.body) }}
+          />
+
+          {/* ── Allegati ── */}
+          <AttachmentUploader contentId={content.id} canEdit={false} />
+
+          {/* ── Conferma presa visione ── */}
+          <div className="bg-white border border-ivory-dark">
+            <div className="px-5 py-3 bg-ivory border-b border-ivory-dark">
+              <span className="text-xs font-ui font-semibold uppercase tracking-wider text-charcoal/50">
+                Presa visione
+              </span>
+            </div>
+            <div className="px-5 py-5">
               <div className="flex items-center gap-3">
                 <svg className="w-5 h-5 text-[#2E7D32] shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
@@ -153,31 +183,10 @@ export default async function SopDetailPage({ params }: Props) {
                   </p>
                 </div>
               </div>
-            ) : (
-              <div className="space-y-3">
-                <div className="flex items-start gap-3">
-                  <svg className="w-5 h-5 text-[#E65100] shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L4.082 16.5c-.77.833.192 2.5 1.732 2.5z" />
-                  </svg>
-                  <div>
-                    <p className="text-sm font-ui font-medium text-[#E65100]">
-                      È richiesta la tua conferma di presa visione per questa versione
-                    </p>
-                    <p className="text-xs font-ui text-charcoal/50 mt-0.5">
-                      Versione corrente: v{currentVersion}
-                    </p>
-                  </div>
-                </div>
-                <AcknowledgeButton
-                  contentId={content.id}
-                  acknowledged={false}
-                  acknowledgedAt={null}
-                  useSopEndpoint
-                />
-              </div>
-            )}
+            </div>
           </div>
-      </div>
+        </>
+      )}
 
       {/* ── Registro visualizzazioni — solo desktop ── */}
       <MobileHide>
