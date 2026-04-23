@@ -50,9 +50,13 @@ export async function sendContentPublishedPush(params: {
         ? `Aggiornamento ${config?.label}: ${contentTitle}`
         : `Nuovo ${config?.label || "contenuto"}: ${contentTitle}`;
 
-    // Notifica in-app (indipendente dalla push subscription)
+    // Notifica in-app per tutti i destinatari + chi pubblica (come conferma)
+    const notifRecipients = targetUserIds.includes(actorId)
+      ? targetUserIds
+      : [...targetUserIds, actorId];
+
     await createNotifications(
-      targetUserIds.map((uid) => ({
+      notifRecipients.map((uid) => ({
         userId: uid,
         type: "CONTENT_PUBLISHED" as const,
         title: "ModusHO",
@@ -61,7 +65,7 @@ export async function sendContentPublishedPush(params: {
       }))
     );
 
-    // Push notification (solo se VAPID configurato e subscription presente)
+    // Push notification (escluso chi pubblica — ha appena fatto l'azione)
     if (!VAPID_PUBLIC_KEY || !VAPID_PRIVATE_KEY) return;
 
     const subscriptions = await prisma.pushSubscription.findMany({
