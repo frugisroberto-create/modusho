@@ -242,31 +242,69 @@ export async function sendSopPublishedPush(params: {
   });
 }
 
-// ─── Risoluzione destinatari ─────────────────────────────────────────
+// ─── Risoluzione destinatari (basata su ContentTarget) ──────────────
 
 async function resolveTargetUserIds(contentId: string, excludeUserId: string): Promise<string[]> {
   const content = await prisma.content.findUnique({
     where: { id: contentId },
-    select: { propertyId: true, departmentId: true },
+    select: {
+      propertyId: true,
+      targetAudience: {
+        select: { targetType: true, targetRole: true, targetDepartmentId: true, targetUserId: true },
+      },
+    },
   });
 
   if (!content) return [];
 
-  const users = await prisma.user.findMany({
-    where: {
-      isActive: true,
-      id: { not: excludeUserId },
-      propertyAssignments: {
-        some: {
-          propertyId: content.propertyId,
-          ...(content.departmentId
-            ? { OR: [{ departmentId: content.departmentId }, { departmentId: null }] }
-            : {}),
-        },
-      },
-    },
-    select: { id: true },
-  });
+  const targets = content.targetAudience;
 
-  return users.map((u) => u.id);
+  // Se non ci sono target definiti, fallback a tutti gli utenti della property
+  if (targets.length === 0) {
+    const users = await prisma.user.findMany({
+      where: {
+        isActive: true,
+        id: { not: excludeUserId },
+        propertyAssignments: { some: { propertyId: content.propertyId } },
+      },
+      select: { id: true },
+    });
+    return users.map((u) => u.id);
+  }
+
+  // Espandi i target in user IDs
+  const userIds = new Set<string>();
+
+  for (const t of targets) {
+    if (t.targetType === "USER" && t.targetUserId) {
+      const user = await prisma.user.findUnique({
+        where: { id: t.targetUserId },
+        select: { id: true, isActive: true },
+      });
+      if (user?.isActive) userIds.add(user.id);
+    } else if (t.targetType === "ROLE" && t.targetRole) {
+      const users = await prisma.user.findMany({
+        where: {
+          role: t.targetRole as "OPERATOR" | "HOD" | "HOTEL_MANAGER" | "ADMIN" | "SUPER_ADMIN",
+          isActive: true,
+          propertyAssignments: { some: { propertyId: content.propertyId } },
+        },
+        select: { id: true },
+      });
+      users.forEach((u) => userIds.add(u.id));
+    } else if (t.targetType === "DEPARTMENT" && t.targetDepartmentId) {
+      const users = await prisma.user.findMany({
+        where: {
+          isActive: true,
+          propertyAssignments: { some: { departmentId: t.targetDepartmentId } },
+        },
+        select: { id: true },
+      });
+      users.forEach((u) => userIds.add(u.id));
+    }
+  }
+
+  // Escludi chi ha pubblicato
+  userIds.delete(excludeUserId);
+  return [...userIds];
 }
