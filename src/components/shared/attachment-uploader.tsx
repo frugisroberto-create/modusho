@@ -109,7 +109,7 @@ export function AttachmentUploader({ contentId, canEdit }: AttachmentUploaderPro
 
         const uploadRes = await fetch(prepData.uploadUrl, {
           method: "PUT",
-          headers: { "Content-Type": file.type, "Content-Length": file.size.toString() },
+          headers: { "Content-Type": file.type },
           body: file,
         });
 

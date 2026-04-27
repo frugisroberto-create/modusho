@@ -32,8 +32,8 @@ export type AllowedMime = (typeof ALL_ALLOWED_MIMES)[number];
 // Size limits (bytes)
 // ---------------------------------------------------------------------------
 
-/** Max image size: 5 MB */
-export const MAX_IMAGE_SIZE = 5 * 1024 * 1024;
+/** Max image size: 10 MB */
+export const MAX_IMAGE_SIZE = 10 * 1024 * 1024;
 
 /** Max document size: 20 MB */
 export const MAX_DOCUMENT_SIZE = 20 * 1024 * 1024;

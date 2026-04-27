@@ -147,7 +147,6 @@ export async function getPresignedUploadUrl(
     Bucket: bucket,
     Key: storageKey,
     ContentType: mimeType,
-    ContentLength: fileSize,
   };
 
   const command = new PutObjectCommand(input);
