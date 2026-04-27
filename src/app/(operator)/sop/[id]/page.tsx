@@ -120,8 +120,8 @@ export default async function SopDetailPage({ params }: Props) {
         </MobileHide>
       </div>
 
-      {/* ── Gate presa visione: se non confermata, blocca il contenuto ── */}
-      {!acknowledged ? (
+      {/* ── Gate presa visione: solo OPERATOR/HOD. HM+ vede sempre il contenuto ── */}
+      {!acknowledged && !isFullGovernance ? (
         <div className="bg-white border border-ivory-dark mb-8">
           <div className="px-5 py-3 bg-ivory border-b border-ivory-dark">
             <span className="text-xs font-ui font-semibold uppercase tracking-wider text-charcoal/50">
