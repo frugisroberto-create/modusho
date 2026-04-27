@@ -161,30 +161,32 @@ export default async function SopDetailPage({ params }: Props) {
           {/* ── Allegati ── */}
           <AttachmentUploader contentId={content.id} canEdit={false} />
 
-          {/* ── Conferma presa visione ── */}
-          <div className="bg-white border border-ivory-dark">
-            <div className="px-5 py-3 bg-ivory border-b border-ivory-dark">
-              <span className="text-xs font-ui font-semibold uppercase tracking-wider text-charcoal/50">
-                Presa visione
-              </span>
-            </div>
-            <div className="px-5 py-5">
-              <div className="flex items-center gap-3">
-                <svg className="w-5 h-5 text-[#2E7D32] shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-                </svg>
-                <div>
-                  <p className="text-sm font-ui font-medium text-[#2E7D32]">
-                    Presa visione confermata
-                  </p>
-                  <p className="text-xs font-ui text-charcoal/50 mt-0.5">
-                    {acknowledgedAt && new Date(acknowledgedAt).toLocaleString("it-IT", { day: "2-digit", month: "2-digit", year: "numeric", hour: "2-digit", minute: "2-digit" })}
-                    {" "}— versione {acknowledgedCurrentVersion ? currentVersion : anyPreviousAck?.contentVersion}
-                  </p>
+          {/* ── Conferma presa visione — solo OPERATOR/HOD ── */}
+          {!isFullGovernance && acknowledged && (
+            <div className="bg-white border border-ivory-dark">
+              <div className="px-5 py-3 bg-ivory border-b border-ivory-dark">
+                <span className="text-xs font-ui font-semibold uppercase tracking-wider text-charcoal/50">
+                  Presa visione
+                </span>
+              </div>
+              <div className="px-5 py-5">
+                <div className="flex items-center gap-3">
+                  <svg className="w-5 h-5 text-[#2E7D32] shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                  </svg>
+                  <div>
+                    <p className="text-sm font-ui font-medium text-[#2E7D32]">
+                      Presa visione confermata
+                    </p>
+                    <p className="text-xs font-ui text-charcoal/50 mt-0.5">
+                      {acknowledgedAt && new Date(acknowledgedAt).toLocaleString("it-IT", { day: "2-digit", month: "2-digit", year: "numeric", hour: "2-digit", minute: "2-digit" })}
+                      {" "}— versione {acknowledgedCurrentVersion ? currentVersion : anyPreviousAck?.contentVersion}
+                    </p>
+                  </div>
                 </div>
               </div>
             </div>
-          </div>
+          )}
         </>
       )}
 
