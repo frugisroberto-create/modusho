@@ -73,12 +73,30 @@ export default async function SopDetailPage({ params }: Props) {
   const currentVersionRecord = content.sopViewRecords.find(r => r.contentVersion === currentVersion);
   const acknowledgedCurrentVersion = currentVersionRecord?.acknowledgedAt != null;
   const anyPreviousAck = content.sopViewRecords.find(r => r.acknowledgedAt != null);
-  const acknowledged = acknowledgedCurrentVersion || (!requiresNewAck && anyPreviousAck != null);
+  let acknowledged = acknowledgedCurrentVersion || (!requiresNewAck && anyPreviousAck != null);
   const acknowledgedAt = acknowledgedCurrentVersion
     ? currentVersionRecord!.acknowledgedAt!.toISOString()
     : (!requiresNewAck && anyPreviousAck != null)
       ? anyPreviousAck.acknowledgedAt!.toISOString()
       : null;
+
+  // Auto-acknowledge per HM/ADMIN/SUPER_ADMIN: aprire la SOP = presa visione
+  if (isFullGovernance && !acknowledged) {
+    const now = new Date();
+    await Promise.all([
+      prisma.sopViewRecord.upsert({
+        where: { contentId_userId_contentVersion: { contentId: content.id, userId: user.id, contentVersion: currentVersion } },
+        update: { acknowledgedAt: now, viewedAt: now },
+        create: { contentId: content.id, userId: user.id, contentVersion: currentVersion, viewedAt: now, acknowledgedAt: now },
+      }),
+      prisma.contentAcknowledgment.upsert({
+        where: { contentId_userId: { contentId: content.id, userId: user.id } },
+        update: { acknowledgedAt: now },
+        create: { contentId: content.id, userId: user.id, required: true },
+      }),
+    ]);
+    acknowledged = true;
+  }
 
   return (
     <div className="max-w-3xl mx-auto py-6">
