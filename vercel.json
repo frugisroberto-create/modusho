@@ -5,6 +5,10 @@
       "schedule": "0 7 * * *"
     },
     {
+      "path": "/api/cron/ack-reminder",
+      "schedule": "0 19 * * *"
+    },
+    {
       "path": "/api/cron/db-backup",
       "schedule": "0 5 * * *"
     },
