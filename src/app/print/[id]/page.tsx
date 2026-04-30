@@ -60,7 +60,7 @@ export default async function PrintContentPage({ params }: Props) {
             {content.code && <span className="print-code">{content.code}</span>}
           </div>
           <div className="print-header-right">
-            <span className="print-brand">ModusHO</span>
+            <span className="print-brand">{content.property.name}</span>
           </div>
         </header>
 
@@ -86,7 +86,7 @@ export default async function PrintContentPage({ params }: Props) {
 
         {/* Footer */}
         <footer className="print-footer">
-          <span>ModusHO</span>
+          <span>{content.property.name}</span>
           <span>Esportato il {exportDate}</span>
         </footer>
       </div>
