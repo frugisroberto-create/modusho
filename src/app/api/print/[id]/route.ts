@@ -53,7 +53,7 @@ export async function GET(
 <html lang="it">
 <head>
   <meta charset="utf-8">
-  <title>${content.title} — ModusHO</title>
+  <title>${content.title} — ${content.property.name}</title>
   <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@400;500;600;700&family=Inter:wght@300;400;500;600;700&family=Cardo:ital,wght@0,400;0,700;1,400&display=swap" rel="stylesheet">
   <style>
     * { margin: 0; padding: 0; box-sizing: border-box; }
@@ -96,7 +96,7 @@ export async function GET(
         <span class="badge">${typeLabel}</span>
         ${content.code ? `<span class="code">${content.code}</span>` : ""}
       </div>
-      <span class="brand">ModusHO</span>
+      <span class="brand">${content.property.name}</span>
     </div>
     <h1>${content.title}</h1>
     <div class="meta">
@@ -106,7 +106,7 @@ export async function GET(
     </div>
     <div class="body">${content.body}</div>
     ${content._count.attachments > 0 ? `<p class="att">Allegati presenti: ${content._count.attachments}</p>` : ""}
-    <div class="ftr"><span>ModusHO</span><span>Esportato il ${exportDate}</span></div>
+    <div class="ftr"><span>${content.property.name}</span><span>Esportato il ${exportDate}</span></div>
   </div>
 </body>
 </html>`;
