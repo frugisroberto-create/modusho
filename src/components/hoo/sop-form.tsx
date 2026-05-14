@@ -40,7 +40,7 @@ export function SopForm({ mode, contentId, initialData, userRole, userDepartment
   const [error, setError] = useState("");
 
   // RACI: coinvolgere HOD?
-  const canInvolveHod = effectiveRole === "HOTEL_MANAGER" || effectiveRole === "ADMIN" || effectiveRole === "SUPER_ADMIN";
+  const canInvolveHod = effectiveRole === "HOTEL_MANAGER" || effectiveRole === "CORPORATE" || effectiveRole === "ADMIN" || effectiveRole === "SUPER_ADMIN";
   const [involveHod, setInvolveHod] = useState(false);
   const [hodUserId, setHodUserId] = useState("");
   const [hodUsers, setHodUsers] = useState<{ id: string; name: string }[]>([]);
