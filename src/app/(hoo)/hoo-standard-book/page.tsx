@@ -24,8 +24,8 @@ interface TargetState {
 const STATUS_BADGE: Record<string, string> = {
   PUBLISHED: "bg-[#E8F5E9] text-[#2E7D32]",
   DRAFT: "bg-ivory-medium text-charcoal/60",
-  REVIEW_HM: "bg-[#FFF3E0] text-[#E65100]",
-  REVIEW_ADMIN: "bg-[#FFF3E0] text-[#E65100]",
+  REVIEW_HM: "bg-mauve/15 text-mauve",
+  REVIEW_ADMIN: "bg-terracotta/10 text-terracotta",
 };
 
 const STATUS_LABEL: Record<string, string> = {
