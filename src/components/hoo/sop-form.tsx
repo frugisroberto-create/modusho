@@ -17,9 +17,10 @@ interface SopFormProps {
   initialData?: { title: string; body: string; propertyId: string; departmentId: string | null };
   userRole?: string;
   userDepartmentId?: string | null;
+  userDepartmentIds?: string[];
 }
 
-export function SopForm({ mode, contentId, initialData, userRole, userDepartmentId }: SopFormProps) {
+export function SopForm({ mode, contentId, initialData, userRole, userDepartmentId, userDepartmentIds }: SopFormProps) {
   const router = useRouter();
   const effectiveRole = userRole || "OPERATOR";
 
@@ -112,7 +113,13 @@ export function SopForm({ mode, contentId, initialData, userRole, userDepartment
   }, [mode, contentId]);
 
   const selectedProperty = properties.find(p => p.id === propertyId);
-  const departments = selectedProperty?.departments || [];
+  const allDepartments = selectedProperty?.departments || [];
+  // HOD: solo il proprio reparto. CORPORATE: solo i reparti assegnati. HM/ADMIN: tutti.
+  const departments = (effectiveRole === "HOD" && userDepartmentId)
+    ? allDepartments.filter(d => d.id === userDepartmentId)
+    : (effectiveRole === "CORPORATE" && userDepartmentIds?.length)
+      ? allDepartments.filter(d => userDepartmentIds.includes(d.id))
+      : allDepartments;
 
   const totalTargets =
     (targetAudience.allDepartments ? 1 : 0) +
