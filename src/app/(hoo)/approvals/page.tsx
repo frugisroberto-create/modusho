@@ -89,10 +89,11 @@ export default function ApprovalsPage() {
     setLoading(true);
     try {
       if (tab === "in_lavorazione") {
+        const isImported = statusFilter === "IMPORTED";
         const params = new URLSearchParams({
-          contentStatus: statusFilter || "DRAFT", page: page.toString(), pageSize: pageSize.toString(),
+          contentStatus: isImported ? "DRAFT" : (statusFilter || "DRAFT"),
+          page: page.toString(), pageSize: pageSize.toString(),
         });
-        if (statusFilter) params.set("contentStatus", statusFilter);
         if (propertyFilter) params.set("propertyId", propertyFilter);
         if (departmentFilter) params.set("departmentId", departmentFilter);
         if (search) params.set("search", search);
@@ -100,10 +101,10 @@ export default function ApprovalsPage() {
         if (res.ok) {
           const json = await res.json();
           let items = json.data as WorkflowItem[];
-          if (importedOnly) items = items.filter(w => w.isImported);
+          if (isImported) items = items.filter(w => w.isImported);
           setWorkflowItems(items);
           setContentItems([]);
-          setTotal(json.meta.total);
+          setTotal(isImported ? items.length : json.meta.total);
         }
       } else if (tab === "published_by_others") {
         const params = new URLSearchParams({
@@ -182,23 +183,15 @@ export default function ApprovalsPage() {
           )}
         </select>
         {tab === "in_lavorazione" && (
-          <>
-            <select value={statusFilter} onChange={(e) => setStatusFilter(e.target.value)}
-              className="text-sm font-ui border border-ivory-dark px-3 py-[9px] bg-white">
-              <option value="">Tutti gli stati</option>
-                <option value="DRAFT">Bozza</option>
-                <option value="REVIEW_HM">In attesa di consultazione</option>
-                <option value="REVIEW_ADMIN">In approvazione Accountable</option>
-                <option value="RETURNED">Restituita</option>
-              </select>
-            <div className="flex items-end">
-              <label className="flex items-center gap-2 px-3 py-[9px] border border-ivory-dark bg-white cursor-pointer">
-                <input type="checkbox" checked={importedOnly} onChange={(e) => setImportedOnly(e.target.checked)}
-                  className="w-3.5 h-3.5 rounded border-ivory-dark text-terracotta focus:ring-terracotta" />
-                <span className="text-sm font-ui text-charcoal">Solo importate</span>
-              </label>
-            </div>
-          </>
+          <select value={statusFilter} onChange={(e) => { setStatusFilter(e.target.value); setImportedOnly(e.target.value === "IMPORTED"); }}
+            className="text-sm font-ui border border-ivory-dark px-3 py-[9px] bg-white">
+            <option value="">Tutti gli stati</option>
+            <option value="DRAFT">Bozza</option>
+            <option value="REVIEW_HM">In attesa di consultazione</option>
+            <option value="REVIEW_ADMIN">In approvazione Accountable</option>
+            <option value="RETURNED">Restituita</option>
+            <option value="IMPORTED">Importate</option>
+          </select>
         )}
         <div className="flex-1 min-w-[200px]">
           <form onSubmit={(e) => { e.preventDefault(); setSearch(searchInput); }} className="flex">
