@@ -78,7 +78,15 @@ export function SopForm({ mode, contentId, initialData, userRole, userDepartment
         const res = await fetch(`/api/users?role=HOD&propertyId=${propertyId}&pageSize=50`);
         if (res.ok) {
           const json = await res.json();
-          const users = json.data || [];
+          let users = json.data || [];
+          // CORPORATE: filtra solo HOD dei reparti nel perimetro operativo
+          if (effectiveRole === "CORPORATE" && userDepartmentIds?.length) {
+            users = users.filter((u: { propertyAssignments: { department: { id: string } | null }[] }) =>
+              u.propertyAssignments?.some((a: { department: { id: string } | null }) =>
+                a.department && userDepartmentIds!.includes(a.department.id)
+              )
+            );
+          }
           setHodUsers(users.map((u: { id: string; name: string }) => ({ id: u.id, name: u.name })));
         }
       } finally {
