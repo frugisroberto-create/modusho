@@ -166,6 +166,27 @@ export async function POST(request: NextRequest) {
     }
   }
 
+  // CORPORATE con canApprove: verifica che non esista già un altro Corporate A sugli stessi reparti
+  if (role === "CORPORATE" && canApprove) {
+    for (const assignment of propertyAssignments) {
+      if (!assignment.departmentId) continue;
+      const existing = await prisma.propertyAssignment.findFirst({
+        where: {
+          propertyId: assignment.propertyId,
+          departmentId: assignment.departmentId,
+          user: { role: "CORPORATE", canApprove: true, isActive: true },
+        },
+        select: { user: { select: { name: true } } },
+      });
+      if (existing) {
+        const dept = await prisma.department.findUnique({ where: { id: assignment.departmentId }, select: { name: true } });
+        return NextResponse.json({
+          error: `${existing.user.name} è già Accountable per il reparto ${dept?.name || assignment.departmentId}. Può esserci un solo Corporate con approvazione per reparto.`,
+        }, { status: 400 });
+      }
+    }
+  }
+
   // Solo SUPER_ADMIN può creare ADMIN
   if (role === "ADMIN" && session.user.role !== "SUPER_ADMIN") {
     return NextResponse.json({ error: "Solo SUPER_ADMIN può creare utenti ADMIN" }, { status: 403 });

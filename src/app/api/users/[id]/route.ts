@@ -122,6 +122,29 @@ export async function PUT(
     return NextResponse.json({ error: "Solo SUPER_ADMIN può assegnare ruolo ADMIN" }, { status: 403 });
   }
 
+  // CORPORATE con canApprove: un solo A per reparto
+  if (finalRole === "CORPORATE" && finalCanApprove && propertyAssignments !== undefined) {
+    const { id: currentUserId } = await params;
+    for (const assignment of propertyAssignments) {
+      if (!assignment.departmentId) continue;
+      const existing = await prisma.propertyAssignment.findFirst({
+        where: {
+          propertyId: assignment.propertyId,
+          departmentId: assignment.departmentId,
+          userId: { not: currentUserId },
+          user: { role: "CORPORATE", canApprove: true, isActive: true },
+        },
+        select: { user: { select: { name: true } } },
+      });
+      if (existing) {
+        const dept = await prisma.department.findUnique({ where: { id: assignment.departmentId }, select: { name: true } });
+        return NextResponse.json({
+          error: `${existing.user.name} è già Accountable per il reparto ${dept?.name || assignment.departmentId}. Può esserci un solo Corporate con approvazione per reparto.`,
+        }, { status: 400 });
+      }
+    }
+  }
+
   // Validazione coerenza ruolo-reparti: OPERATOR, HOD e CORPORATE devono avere departmentId specifici
   if (propertyAssignments !== undefined && (finalRole === "OPERATOR" || finalRole === "HOD" || finalRole === "CORPORATE")) {
     const hasNullDept = propertyAssignments.some(a => !a.departmentId);
