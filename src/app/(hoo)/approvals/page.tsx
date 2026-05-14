@@ -156,17 +156,25 @@ export default function ApprovalsPage() {
     <div className="max-w-5xl space-y-4">
       <h1 className="text-xl font-heading font-medium text-charcoal-dark">Approvazioni</h1>
 
-      <div className="flex gap-1 bg-ivory p-0.5 w-fit border border-ivory-dark">
-        {tabs.map(([key, label]) => (
-          <button key={key} onClick={() => setTab(key)}
-            className={`px-4 py-[9px] text-sm font-ui transition-colors ${tab === key ? "bg-white shadow-sm font-medium text-charcoal-dark" : "text-charcoal/50 hover:text-charcoal/70"}`}>
-            {label}
-          </button>
-        ))}
-      </div>
-
-      {/* Filtri */}
+      {/* Ricerca + Filtri */}
       <div className="flex items-end gap-4 flex-wrap">
+        <div className="flex-1 min-w-[200px]">
+          <form onSubmit={(e) => { e.preventDefault(); setSearch(searchInput); }} className="flex">
+            <input type="text" value={searchInput} onChange={(e) => setSearchInput(e.target.value)}
+              placeholder="Cerca nel titolo e contenuto..."
+              className="flex-1 text-sm border border-ivory-dark px-3 py-[9px] bg-white font-ui border-r-0" />
+            <button type="submit"
+              className="px-4 py-[9px] text-xs font-ui font-semibold uppercase tracking-wider bg-terracotta text-white hover:bg-terracotta-light transition-colors">
+              Cerca
+            </button>
+          </form>
+        </div>
+        {search && (
+          <button onClick={() => { setSearch(""); setSearchInput(""); }}
+            className="text-xs font-ui text-charcoal/50 hover:text-charcoal transition-colors">
+            Annulla
+          </button>
+        )}
         {properties.length > 1 && (
           <select value={propertyFilter} onChange={(e) => { setPropertyFilter(e.target.value); setDepartmentFilter(""); }}
             className="text-sm font-ui border border-ivory-dark px-3 py-[9px] bg-white">
@@ -193,23 +201,16 @@ export default function ApprovalsPage() {
             <option value="IMPORTED">Importate</option>
           </select>
         )}
-        <div className="flex-1 min-w-[200px]">
-          <form onSubmit={(e) => { e.preventDefault(); setSearch(searchInput); }} className="flex">
-            <input type="text" value={searchInput} onChange={(e) => setSearchInput(e.target.value)}
-              placeholder="Cerca nel titolo e contenuto..."
-              className="flex-1 text-sm border border-ivory-dark px-3 py-2 bg-white font-ui border-r-0" />
-            <button type="submit"
-              className="px-4 py-[9px] text-xs font-ui font-semibold uppercase tracking-wider bg-terracotta text-white hover:bg-terracotta-light transition-colors">
-              Cerca
-            </button>
-          </form>
-        </div>
-        {search && (
-          <button onClick={() => { setSearch(""); setSearchInput(""); }}
-            className="text-xs font-ui text-charcoal/50 hover:text-charcoal py-2 transition-colors">
-            Annulla ricerca
+      </div>
+
+      {/* Tabs */}
+      <div className="flex gap-1 bg-ivory p-0.5 w-fit border border-ivory-dark">
+        {tabs.map(([key, label]) => (
+          <button key={key} onClick={() => setTab(key)}
+            className={`px-4 py-[9px] text-sm font-ui transition-colors ${tab === key ? "bg-white shadow-sm font-medium text-charcoal-dark" : "text-charcoal/50 hover:text-charcoal/70"}`}>
+            {label}
           </button>
-        )}
+        ))}
       </div>
 
       {loading ? (
