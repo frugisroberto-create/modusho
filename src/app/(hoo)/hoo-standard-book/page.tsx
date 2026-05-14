@@ -31,8 +31,8 @@ const STATUS_BADGE: Record<string, string> = {
 const STATUS_LABEL: Record<string, string> = {
   PUBLISHED: "Pubblicato",
   DRAFT: "Bozza",
-  REVIEW_HM: "In revisione",
-  REVIEW_ADMIN: "In approvazione",
+  REVIEW_HM: "In attesa di consultazione",
+  REVIEW_ADMIN: "Da approvare",
 };
 
 const SOURCE_BADGE: Record<string, string> = {

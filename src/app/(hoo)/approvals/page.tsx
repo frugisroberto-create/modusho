@@ -37,8 +37,8 @@ const WF_BADGE = "text-[9px] font-ui font-bold uppercase tracking-wider px-1.5 p
 
 const STATUS_LABELS: Record<string, string> = {
   DRAFT: "Bozza",
-  REVIEW_HM: "In revisione HM",
-  REVIEW_ADMIN: "In revisione HOO",
+  REVIEW_HM: "In attesa di consultazione",
+  REVIEW_ADMIN: "Da approvare",
   RETURNED: "Restituita",
   PUBLISHED: "Pubblicata",
   ARCHIVED: "Archiviata",

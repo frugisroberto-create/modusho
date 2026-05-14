@@ -36,7 +36,7 @@ interface DashboardData {
 
 type PeriodPreset = "week" | "month" | "quarter";
 
-const STATUS_LABELS: Record<string, string> = { DRAFT: "Draft", REVIEW_HM: "Review HM", REVIEW_ADMIN: "Review HOO" };
+const STATUS_LABELS: Record<string, string> = { DRAFT: "Bozza", REVIEW_HM: "In attesa di consultazione", REVIEW_ADMIN: "Da approvare" };
 
 export default function GovernanceDashboardPage() {
   const [data, setData] = useState<DashboardData | null>(null);
@@ -318,8 +318,8 @@ export default function GovernanceDashboardPage() {
           {[
             { label: "SOP totali", value: data.kpi.sopTotal },
             { label: "Pubblicate", value: data.kpi.sopPublished },
-            { label: "Review HM", value: data.kpi.sopReviewHm },
-            { label: "Attesa approvazione", value: data.kpi.sopReviewAdmin },
+            { label: "In attesa di consultazione", value: data.kpi.sopReviewHm },
+            { label: "Da approvare", value: data.kpi.sopReviewAdmin },
             { label: "Restituite", value: data.kpi.sopReturned },
             { label: "Approvate nel periodo", value: data.kpi.sopApprovedInPeriod },
             { label: "Tempo medio workflow", value: data.kpi.avgWorkflowDays != null ? `${data.kpi.avgWorkflowDays}g` : "n/d" },
