@@ -53,6 +53,8 @@ export default function UsersPage() {
   const [activeFilter, setActiveFilter] = useState("active");
   const [properties, setProperties] = useState<Property[]>([]);
   const [togglingId, setTogglingId] = useState<string | null>(null);
+  const [searchInput, setSearchInput] = useState("");
+  const [search, setSearch] = useState("");
   const pageSize = 20;
 
   useEffect(() => {
@@ -70,14 +72,15 @@ export default function UsersPage() {
     if (propertyFilter) params.set("propertyId", propertyFilter);
     if (activeFilter === "active") params.set("isActive", "true");
     else if (activeFilter === "inactive") params.set("isActive", "false");
+    if (search) params.set("search", search);
     try {
       const res = await fetch(`/api/users?${params}`);
       if (res.ok) { const json = await res.json(); setUsers(json.data); setTotal(json.meta.total); }
     } finally { setLoading(false); }
-  }, [page, roleFilter, propertyFilter, activeFilter]);
+  }, [page, roleFilter, propertyFilter, activeFilter, search]);
 
   useEffect(() => { fetchUsers(); }, [fetchUsers]);
-  useEffect(() => { setPage(1); }, [roleFilter, propertyFilter, activeFilter]);
+  useEffect(() => { setPage(1); }, [roleFilter, propertyFilter, activeFilter, search]);
 
   const handleToggleActive = async (userId: string, currentActive: boolean) => {
     setTogglingId(userId);
@@ -103,7 +106,24 @@ export default function UsersPage() {
       </div>
 
       {/* Filtri */}
-      <div className="flex flex-wrap gap-3">
+      <div className="flex flex-wrap gap-3 items-end">
+        <div className="flex-1 min-w-[180px]">
+          <form onSubmit={(e) => { e.preventDefault(); setSearch(searchInput); }} className="flex">
+            <input type="text" value={searchInput} onChange={(e) => setSearchInput(e.target.value)}
+              placeholder="Cerca per nome..."
+              className="flex-1 text-sm border border-ivory-dark px-3 py-[7px] bg-white font-ui border-r-0" />
+            <button type="submit"
+              className="px-3 py-[7px] text-xs font-ui font-semibold uppercase tracking-wider bg-terracotta text-white hover:bg-terracotta-light transition-colors">
+              Cerca
+            </button>
+          </form>
+        </div>
+        {search && (
+          <button onClick={() => { setSearch(""); setSearchInput(""); }}
+            className="text-xs font-ui text-charcoal/50 hover:text-charcoal transition-colors">
+            Annulla
+          </button>
+        )}
         <select value={roleFilter} onChange={(e) => setRoleFilter(e.target.value)} className="text-sm font-ui">
           <option value="">Tutti i ruoli</option>
           {["OPERATOR", "HOD", "HOTEL_MANAGER", "ADMIN", "SUPER_ADMIN"].map(r => (

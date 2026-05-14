@@ -8,6 +8,7 @@ import { z } from "zod/v4";
 const querySchema = z.object({
   role: z.enum(["OPERATOR", "HOD", "HOTEL_MANAGER", "ADMIN", "SUPER_ADMIN"]).optional(),
   propertyId: z.string().optional(),
+  search: z.string().optional(),
   page: z.coerce.number().int().min(1).default(1),
   pageSize: z.coerce.number().int().min(1).max(50).default(20),
 });
@@ -28,13 +29,19 @@ export async function GET(request: NextRequest) {
   const parsed = querySchema.safeParse(params);
   if (!parsed.success) return NextResponse.json({ error: "Parametri non validi" }, { status: 400 });
 
-  const { role, propertyId, page, pageSize } = parsed.data;
+  const { role, propertyId, search, page, pageSize } = parsed.data;
   const isActiveParam = params.isActive;
 
   const where: Record<string, unknown> = {};
   if (role) where.role = role;
   if (isActiveParam === "true") where.isActive = true;
   else if (isActiveParam === "false") where.isActive = false;
+  if (search) {
+    where.OR = [
+      { name: { contains: search, mode: "insensitive" } },
+      { email: { contains: search, mode: "insensitive" } },
+    ];
+  }
 
   // HOTEL_MANAGER: accesso in sola lettura, limitato alle property assegnate
   if (isHM) {
