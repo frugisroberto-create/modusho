@@ -69,6 +69,7 @@ export default function ApprovalsPage() {
   const [searchInput, setSearchInput] = useState("");
   const [search, setSearch] = useState("");
   const [importedOnly, setImportedOnly] = useState(false);
+  const [statusFilter, setStatusFilter] = useState("");
   const pageSize = 20;
 
   useEffect(() => {
@@ -89,8 +90,9 @@ export default function ApprovalsPage() {
     try {
       if (tab === "in_lavorazione") {
         const params = new URLSearchParams({
-          contentStatus: "DRAFT", page: page.toString(), pageSize: pageSize.toString(),
+          contentStatus: statusFilter || "DRAFT", page: page.toString(), pageSize: pageSize.toString(),
         });
+        if (statusFilter) params.set("contentStatus", statusFilter);
         if (propertyFilter) params.set("propertyId", propertyFilter);
         if (departmentFilter) params.set("departmentId", departmentFilter);
         if (search) params.set("search", search);
@@ -135,10 +137,10 @@ export default function ApprovalsPage() {
         }
       }
     } finally { setLoading(false); }
-  }, [tab, page, propertyFilter, departmentFilter, search, importedOnly, currentUserId]);
+  }, [tab, page, propertyFilter, departmentFilter, search, importedOnly, statusFilter, currentUserId]);
 
   useEffect(() => { fetchItems(); }, [fetchItems]);
-  useEffect(() => { setPage(1); }, [tab, propertyFilter, departmentFilter, search, importedOnly]);
+  useEffect(() => { setPage(1); }, [tab, propertyFilter, departmentFilter, search, importedOnly, statusFilter]);
 
   const totalPages = Math.ceil(total / pageSize);
 
@@ -186,13 +188,26 @@ export default function ApprovalsPage() {
           </select>
         </div>
         {tab === "in_lavorazione" && (
-          <div className="flex items-end">
-            <label className="flex items-center gap-2 px-3 py-2 border border-ivory-dark bg-white cursor-pointer">
-              <input type="checkbox" checked={importedOnly} onChange={(e) => setImportedOnly(e.target.checked)}
-                className="w-3.5 h-3.5 rounded border-ivory-dark text-terracotta focus:ring-terracotta" />
-              <span className="text-sm font-ui text-charcoal">Solo importate</span>
-            </label>
-          </div>
+          <>
+            <div>
+              <label className="block text-[11px] font-ui uppercase tracking-wider text-charcoal/45 mb-1">Stato</label>
+              <select value={statusFilter} onChange={(e) => setStatusFilter(e.target.value)}
+                className="text-sm font-ui border border-ivory-dark px-3 py-2 bg-white">
+                <option value="">Tutti gli stati</option>
+                <option value="DRAFT">Bozza</option>
+                <option value="REVIEW_HM">In attesa di consultazione</option>
+                <option value="REVIEW_ADMIN">In approvazione HOO</option>
+                <option value="RETURNED">Restituita</option>
+              </select>
+            </div>
+            <div className="flex items-end">
+              <label className="flex items-center gap-2 px-3 py-2 border border-ivory-dark bg-white cursor-pointer">
+                <input type="checkbox" checked={importedOnly} onChange={(e) => setImportedOnly(e.target.checked)}
+                  className="w-3.5 h-3.5 rounded border-ivory-dark text-terracotta focus:ring-terracotta" />
+                <span className="text-sm font-ui text-charcoal">Solo importate</span>
+              </label>
+            </div>
+          </>
         )}
         <div className="flex-1 min-w-[200px]">
           <label className="block text-[11px] font-ui uppercase tracking-wider text-charcoal/45 mb-1">Cerca</label>
