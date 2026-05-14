@@ -121,10 +121,14 @@ export function SopForm({ mode, contentId, initialData, userRole, userDepartment
     : (effectiveRole === "CORPORATE" && userDepartmentIds?.length)
       ? allDepartments.filter(d => userDepartmentIds.includes(d.id))
       : allDepartments;
-  // Destinatari: CORPORATE con targetDepartmentIds → solo quei reparti. Altrimenti tutti.
+  // Destinatari: CORPORATE con targetDepartmentIds → solo quei reparti (della property corrente). Altrimenti tutti.
   const departments = (effectiveRole === "CORPORATE" && userTargetDepartmentIds?.length)
     ? allDepartments.filter(d => userTargetDepartmentIds.includes(d.id))
     : allDepartments;
+  // Se il filtro non trova nessun reparto della property corrente, mostra tutti (fallback)
+  const effectiveDepartments = (effectiveRole === "CORPORATE" && userTargetDepartmentIds?.length && departments.length === 0)
+    ? allDepartments
+    : departments;
 
   const totalTargets =
     (targetAudience.allDepartments ? 1 : 0) +
@@ -296,6 +300,7 @@ export function SopForm({ mode, contentId, initialData, userRole, userDepartment
           propertyId={propertyId}
           userRole={effectiveRole}
           userDepartmentId={userDepartmentId}
+          allowedDepartmentIds={effectiveRole === "CORPORATE" && userTargetDepartmentIds?.length ? userTargetDepartmentIds : undefined}
           value={targetAudience}
           onChange={setTargetAudience}
         />

@@ -28,6 +28,7 @@ interface TargetAudienceSelectorProps {
   propertyId: string;
   userRole: string;                   // ruolo dell'utente che sta creando
   userDepartmentId?: string | null;
+  allowedDepartmentIds?: string[];    // se valorizzato, mostra solo questi reparti come destinatari
   value: TargetAudienceState;
   onChange: (value: TargetAudienceState) => void;
 }
@@ -42,6 +43,7 @@ export function TargetAudienceSelector({
   propertyId,
   userRole,
   userDepartmentId: _userDepartmentId,
+  allowedDepartmentIds,
   value,
   onChange,
 }: TargetAudienceSelectorProps) {
@@ -64,7 +66,11 @@ export function TargetAudienceSelector({
         ]);
         if (deptRes.ok) {
           const j = await deptRes.json();
-          setDepartments(j.data || []);
+          const allDepts = j.data || [];
+          setDepartments(allowedDepartmentIds?.length
+            ? allDepts.filter((d: Department) => allowedDepartmentIds.includes(d.id))
+            : allDepts
+          );
         }
         if (usersRes.ok) {
           const j = await usersRes.json();
