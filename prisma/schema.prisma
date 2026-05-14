@@ -90,6 +90,7 @@ model User {
   canEdit      Boolean @default(false)
   canApprove   Boolean @default(false)
   canPublish   Boolean @default(false)
+  targetDepartmentIds String[] @default([])
   isActive     Boolean @default(true)
   lastLoginAt  DateTime?
   createdAt    DateTime @default(now())

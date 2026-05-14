@@ -6,7 +6,7 @@ import { UserForm } from "@/components/hoo/user-form";
 
 interface UserDetail {
   id: string; email: string; name: string; role: string;
-  canView: boolean; canEdit: boolean; canApprove: boolean; canPublish: boolean; isActive: boolean;
+  canView: boolean; canEdit: boolean; canApprove: boolean; canPublish: boolean; targetDepartmentIds: string[]; isActive: boolean;
   createdAt: string;
   propertyAssignments: {
     id: string;
@@ -100,6 +100,7 @@ export default function UserDetailPage() {
             canEdit: user.canEdit,
             canApprove: user.canApprove,
             canPublish: user.canPublish,
+            targetDepartmentIds: user.targetDepartmentIds || [],
             isActive: user.isActive,
             assignments,
             contentTypes,

@@ -18,9 +18,10 @@ interface SopFormProps {
   userRole?: string;
   userDepartmentId?: string | null;
   userDepartmentIds?: string[];
+  userTargetDepartmentIds?: string[];
 }
 
-export function SopForm({ mode, contentId, initialData, userRole, userDepartmentId, userDepartmentIds }: SopFormProps) {
+export function SopForm({ mode, contentId, initialData, userRole, userDepartmentId, userDepartmentIds, userTargetDepartmentIds }: SopFormProps) {
   const router = useRouter();
   const effectiveRole = userRole || "OPERATOR";
 
@@ -120,8 +121,10 @@ export function SopForm({ mode, contentId, initialData, userRole, userDepartment
     : (effectiveRole === "CORPORATE" && userDepartmentIds?.length)
       ? allDepartments.filter(d => userDepartmentIds.includes(d.id))
       : allDepartments;
-  // Destinatari: tutti i reparti della property (la SOP può essere rivolta a chiunque)
-  const departments = allDepartments;
+  // Destinatari: CORPORATE con targetDepartmentIds → solo quei reparti. Altrimenti tutti.
+  const departments = (effectiveRole === "CORPORATE" && userTargetDepartmentIds?.length)
+    ? allDepartments.filter(d => userTargetDepartmentIds.includes(d.id))
+    : allDepartments;
 
   const totalTargets =
     (targetAudience.allDepartments ? 1 : 0) +
