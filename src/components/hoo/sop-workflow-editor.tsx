@@ -81,11 +81,12 @@ interface Props {
   currentUserId: string;
   currentUserRole: string;
   currentUserCanApprove?: boolean;
+  currentUserCanPublish?: boolean;
 }
 
 // ─── Main Component ──────────────────────────────────────────────────
 
-export function SopWorkflowEditor({ workflowId, currentUserId, currentUserRole, currentUserCanApprove }: Props) {
+export function SopWorkflowEditor({ workflowId, currentUserId, currentUserRole, currentUserCanApprove, currentUserCanPublish }: Props) {
   const router = useRouter();
   const [wf, setWf] = useState<SopWorkflowData | null>(null);
   const [loading, setLoading] = useState(true);
@@ -599,6 +600,7 @@ export function SopWorkflowEditor({ workflowId, currentUserId, currentUserRole, 
           isHoo={isHoo}
           isAdminOverride={isAdminOverride}
           canApproveFlag={!!currentUserCanApprove}
+          canPublishFlag={!!currentUserCanPublish}
           canDelete={isHoo || isHm}
           dirty={dirty}
           saving={saving}
@@ -893,12 +895,13 @@ function ReviewDueDateSection({ wf, isA, editing, dueDateMonths, onEdit, onCance
   );
 }
 
-function ActionBar({ wf, isR, isA, isHoo, isAdminOverride, canApproveFlag, canDelete, dirty, saving, actionLoading, onSave, onSubmit, onReturn, onApprove, onDelete }: {
+function ActionBar({ wf, isR, isA, isHoo, isAdminOverride, canApproveFlag, canPublishFlag, canDelete, dirty, saving, actionLoading, onSave, onSubmit, onReturn, onApprove, onDelete }: {
   wf: SopWorkflowData;
   isR: boolean;
   isA: boolean;
   isHoo: boolean;
   canApproveFlag: boolean;
+  canPublishFlag: boolean;
   canDelete: boolean;
   isAdminOverride: boolean;
   dirty: boolean;
@@ -910,6 +913,10 @@ function ActionBar({ wf, isR, isA, isHoo, isAdminOverride, canApproveFlag, canDe
   onApprove: () => void;
   onDelete: () => void;
 }) {
+  // canApprove = può approvare nel workflow (dare l'ok formale come A)
+  // canPublish = può pubblicare direttamente (rendere visibile agli operatori)
+  const canApproveOrPublish = isHoo || canApproveFlag || canPublishFlag;
+
   return (
     <div className="flex items-center gap-3 flex-wrap bg-white border border-ivory-dark px-5 py-4">
       {/* Save — visibile a chiunque possa modificare il testo (R, C, A, ADMIN override) */}
@@ -929,29 +936,34 @@ function ActionBar({ wf, isR, isA, isHoo, isAdminOverride, canApproveFlag, canDe
           )}
           {!wf.submittedToA && (
             <button onClick={() => onSubmit("A")} disabled={actionLoading} className="btn-outline">
-              Sottoponi a HOO
+              Sottoponi ad Accountable
             </button>
           )}
           {wf.consulted && !wf.submittedToC && !wf.submittedToA && (
             <button onClick={() => onSubmit("C_AND_A")} disabled={actionLoading} className="btn-outline">
-              Sottoponi a HM e HOO
+              Sottoponi a HM e Accountable
             </button>
           )}
         </>
       )}
 
-      {/* Utenti con canApprove — possono pubblicare direttamente */}
-      {(isHoo || canApproveFlag) && (
+      {/* Approva (canApprove) — come A, approva formalmente */}
+      {(isHoo || canApproveFlag) && wf.submittedToA && (
         <>
           <button onClick={onApprove} disabled={actionLoading} className="btn-primary !bg-sage hover:!bg-sage-dark">
-            {wf.submittedToA ? "Approva e pubblica" : "Pubblica direttamente"}
+            Approva e pubblica
           </button>
-          {wf.submittedToA && (
-            <button onClick={onReturn} disabled={actionLoading} className="btn-outline !border-alert-red !text-alert-red hover:!bg-alert-red hover:!text-white">
-              Restituisci
-            </button>
-          )}
+          <button onClick={onReturn} disabled={actionLoading} className="btn-outline !border-alert-red !text-alert-red hover:!bg-alert-red hover:!text-white">
+            Restituisci
+          </button>
         </>
+      )}
+
+      {/* Pubblica direttamente (canPublish) — senza passare dal workflow */}
+      {(isHoo || canPublishFlag) && !wf.submittedToA && (
+        <button onClick={onApprove} disabled={actionLoading} className="btn-primary !bg-sage hover:!bg-sage-dark">
+          Pubblica direttamente
+        </button>
       )}
 
       {/* Elimina bozza — solo HM / ADMIN / SUPER_ADMIN */}

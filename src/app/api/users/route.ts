@@ -93,7 +93,7 @@ export async function GET(request: NextRequest) {
       where,
       select: {
         id: true, email: true, name: true, role: true,
-        canView: true, canEdit: true, canApprove: true,
+        canView: true, canEdit: true, canApprove: true, canPublish: true,
         isActive: true, lastLoginAt: true, createdAt: true,
         propertyAssignments: {
           include: {
@@ -121,6 +121,7 @@ const createUserSchema = z.object({
   canView: z.boolean().default(true),
   canEdit: z.boolean().default(false),
   canApprove: z.boolean().default(false),
+  canPublish: z.boolean().default(false),
   propertyAssignments: z.array(z.object({
     propertyId: z.string(),
     departmentId: z.string().nullable().optional(),
@@ -139,7 +140,7 @@ export async function POST(request: NextRequest) {
   const parsed = createUserSchema.safeParse(body);
   if (!parsed.success) return NextResponse.json({ error: "Parametri non validi", details: parsed.error.issues }, { status: 400 });
 
-  const { email, name, password, role, canView, canEdit, canApprove, propertyAssignments, contentTypes } = parsed.data;
+  const { email, name, password, role, canView, canEdit, canApprove, canPublish, propertyAssignments, contentTypes } = parsed.data;
 
   // Validazioni coerenza ruolo-permessi
   if (role === "OPERATOR" && (canEdit || canApprove)) {
@@ -198,7 +199,7 @@ export async function POST(request: NextRequest) {
   const passwordHash = await bcrypt.hash(password, 12);
 
   const user = await prisma.user.create({
-    data: { email, name, passwordHash, role, canView, canEdit, canApprove },
+    data: { email, name, passwordHash, role, canView, canEdit, canApprove, canPublish },
   });
 
   // Property assignments

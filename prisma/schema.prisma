@@ -89,6 +89,7 @@ model User {
   canView      Boolean @default(true)
   canEdit      Boolean @default(false)
   canApprove   Boolean @default(false)
+  canPublish   Boolean @default(false)
   isActive     Boolean @default(true)
   lastLoginAt  DateTime?
   createdAt    DateTime @default(now())

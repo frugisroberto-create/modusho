@@ -12,6 +12,7 @@ declare module "next-auth" {
       canView: boolean;
       canEdit: boolean;
       canApprove: boolean;
+      canPublish: boolean;
     };
   }
 
@@ -23,6 +24,7 @@ declare module "next-auth" {
     canView: boolean;
     canEdit: boolean;
     canApprove: boolean;
+    canPublish: boolean;
   }
 }
 
@@ -35,5 +37,6 @@ declare module "next-auth/jwt" {
     canView: boolean;
     canEdit: boolean;
     canApprove: boolean;
+    canPublish: boolean;
   }
 }

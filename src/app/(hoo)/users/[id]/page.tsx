@@ -6,7 +6,7 @@ import { UserForm } from "@/components/hoo/user-form";
 
 interface UserDetail {
   id: string; email: string; name: string; role: string;
-  canView: boolean; canEdit: boolean; canApprove: boolean; isActive: boolean;
+  canView: boolean; canEdit: boolean; canApprove: boolean; canPublish: boolean; isActive: boolean;
   createdAt: string;
   propertyAssignments: {
     id: string;
@@ -95,10 +95,11 @@ export default function UserDetailPage() {
           initialData={{
             name: user.name,
             email: user.email,
-            role: user.role as "OPERATOR" | "HOD" | "HOTEL_MANAGER" | "ADMIN",
+            role: user.role as "OPERATOR" | "HOD" | "HOTEL_MANAGER" | "CORPORATE" | "ADMIN",
             canView: user.canView,
             canEdit: user.canEdit,
             canApprove: user.canApprove,
+            canPublish: user.canPublish,
             isActive: user.isActive,
             assignments,
             contentTypes,
@@ -152,6 +153,7 @@ export default function UserDetailPage() {
           <PermBadge active={user.canView} label="Può vedere" />
           <PermBadge active={user.canEdit} label="Può modificare" />
           <PermBadge active={user.canApprove} label="Può approvare" />
+          <PermBadge active={user.canPublish} label="Può pubblicare" />
         </div>
       </section>
 

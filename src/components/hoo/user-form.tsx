@@ -27,6 +27,7 @@ interface UserFormProps {
     canView: boolean;
     canEdit: boolean;
     canApprove: boolean;
+    canPublish: boolean;
     isActive: boolean;
     assignments: AssignmentEntry[];
     contentTypes: ContentTypeOption[];
@@ -41,12 +42,12 @@ const ROLE_LABELS: Record<RoleOption, string> = {
   ADMIN: "HOO",
 };
 
-const ROLE_PRESETS: Record<RoleOption, { canEdit: boolean; canApprove: boolean; contentTypes: ContentTypeOption[] }> = {
-  OPERATOR: { canEdit: false, canApprove: false, contentTypes: [] },
-  HOD: { canEdit: true, canApprove: false, contentTypes: ["SOP", "DOCUMENT", "MEMO"] },
-  HOTEL_MANAGER: { canEdit: true, canApprove: true, contentTypes: ["SOP", "DOCUMENT", "MEMO"] },
-  CORPORATE: { canEdit: true, canApprove: true, contentTypes: ["SOP", "DOCUMENT", "MEMO"] },
-  ADMIN: { canEdit: true, canApprove: true, contentTypes: ["SOP", "DOCUMENT", "MEMO"] },
+const ROLE_PRESETS: Record<RoleOption, { canEdit: boolean; canApprove: boolean; canPublish: boolean; contentTypes: ContentTypeOption[] }> = {
+  OPERATOR: { canEdit: false, canApprove: false, canPublish: false, contentTypes: [] },
+  HOD: { canEdit: true, canApprove: false, canPublish: false, contentTypes: ["SOP", "DOCUMENT", "MEMO"] },
+  HOTEL_MANAGER: { canEdit: true, canApprove: false, canPublish: true, contentTypes: ["SOP", "DOCUMENT", "MEMO"] },
+  CORPORATE: { canEdit: true, canApprove: true, canPublish: false, contentTypes: ["SOP", "DOCUMENT", "MEMO"] },
+  ADMIN: { canEdit: true, canApprove: true, canPublish: true, contentTypes: ["SOP", "DOCUMENT", "MEMO"] },
 };
 
 const CONTENT_TYPE_LABELS: Record<ContentTypeOption, string> = {
@@ -72,6 +73,7 @@ export function UserForm({ mode, userId, onSuccess, initialData }: UserFormProps
   // Sezione 3 — Permessi
   const [canEdit, setCanEdit] = useState(initialData?.canEdit ?? false);
   const [canApprove, setCanApprove] = useState(initialData?.canApprove ?? false);
+  const [canPublish, setCanPublish] = useState(initialData?.canPublish ?? false);
 
   // Sezione 4+5 — Strutture e reparti
   const [properties, setProperties] = useState<Property[]>([]);
@@ -104,6 +106,7 @@ export function UserForm({ mode, userId, onSuccess, initialData }: UserFormProps
     const preset = ROLE_PRESETS[newRole];
     setCanEdit(preset.canEdit);
     setCanApprove(preset.canApprove);
+    setCanPublish(preset.canPublish);
     setContentTypes(preset.contentTypes);
   }, []);
 
@@ -269,7 +272,7 @@ export function UserForm({ mode, userId, onSuccess, initialData }: UserFormProps
     try {
       const payload: Record<string, unknown> = {
         name, email, role,
-        canView: true, canEdit, canApprove,
+        canView: true, canEdit, canApprove, canPublish,
         propertyAssignments: realAssignments,
         contentTypes,
       };
@@ -495,10 +498,20 @@ export function UserForm({ mode, userId, onSuccess, initialData }: UserFormProps
           <label className="flex items-center justify-between py-2 cursor-pointer" onClick={() => setCanApprove(!canApprove)}>
             <div>
               <span className="text-sm font-ui font-medium text-charcoal">Può approvare</span>
-              <p className="text-xs font-ui text-sage-light">Revisione e approvazione nel workflow</p>
+              <p className="text-xs font-ui text-sage-light">Approvazione formale nel workflow (ruolo A)</p>
             </div>
             <div className={`w-10 h-6 rounded-full relative transition-colors ${canApprove ? "bg-sage" : "bg-ivory-dark"}`}>
               <div className={`absolute top-0.5 w-5 h-5 bg-white rounded-full transition-transform ${canApprove ? "right-0.5" : "left-0.5"}`} />
+            </div>
+          </label>
+
+          <label className="flex items-center justify-between py-2 cursor-pointer" onClick={() => setCanPublish(!canPublish)}>
+            <div>
+              <span className="text-sm font-ui font-medium text-charcoal">Può pubblicare</span>
+              <p className="text-xs font-ui text-sage-light">Pubblicazione diretta senza passare dal workflow</p>
+            </div>
+            <div className={`w-10 h-6 rounded-full relative transition-colors ${canPublish ? "bg-sage" : "bg-ivory-dark"}`}>
+              <div className={`absolute top-0.5 w-5 h-5 bg-white rounded-full transition-transform ${canPublish ? "right-0.5" : "left-0.5"}`} />
             </div>
           </label>
         </div>

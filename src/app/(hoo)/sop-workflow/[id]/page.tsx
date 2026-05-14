@@ -29,6 +29,7 @@ export default async function SopWorkflowPage({ params }: Props) {
         currentUserId={user.id}
         currentUserRole={user.role}
         currentUserCanApprove={user.canApprove}
+        currentUserCanPublish={user.canPublish}
       />
     </div>
   );

@@ -52,28 +52,34 @@ export function getSubmitTargetStatus(
 
 export function getAvailableSubmitActions(
   role: Role,
-  contentType?: ContentType
+  contentType?: ContentType,
+  canPublishFlag?: boolean
 ): {
   canSendToReview: boolean;
   canPublishDirectly: boolean;
   reviewLabel: string;
 } {
   const isNoWorkflow = isNoWorkflowType(contentType);
+  const hasPublishRight = canPublishFlag ?? false;
   switch (role) {
     case "HOD":
       return {
-        canSendToReview: !isNoWorkflow, // niente review per memo/document
-        canPublishDirectly: isNoWorkflow,
+        canSendToReview: !isNoWorkflow,
+        canPublishDirectly: isNoWorkflow || hasPublishRight,
         reviewLabel: "Invia a Hotel Manager",
       };
     case "HOTEL_MANAGER":
       return {
         canSendToReview: !isNoWorkflow,
-        canPublishDirectly: isNoWorkflow,
+        canPublishDirectly: isNoWorkflow || hasPublishRight,
         reviewLabel: "Invia per approvazione finale",
       };
     case "CORPORATE":
-      return { canSendToReview: true, canPublishDirectly: true, reviewLabel: "Invia a Hotel Manager" };
+      return {
+        canSendToReview: true,
+        canPublishDirectly: hasPublishRight,
+        reviewLabel: "Invia a Hotel Manager",
+      };
     case "ADMIN":
     case "SUPER_ADMIN":
       return { canSendToReview: true, canPublishDirectly: true, reviewLabel: "Invia a Hotel Manager" };

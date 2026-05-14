@@ -5,7 +5,7 @@ import Link from "next/link";
 
 interface UserItem {
   id: string; email: string; name: string; role: string; isActive: boolean;
-  canView: boolean; canEdit: boolean; canApprove: boolean;
+  canView: boolean; canEdit: boolean; canApprove: boolean; canPublish: boolean;
   lastLoginAt: string | null;
   propertyAssignments: { property: { name: string; code: string }; department: { name: string } | null }[];
   contentPermissions: { contentType: string }[];
@@ -186,6 +186,7 @@ export default function UsersPage() {
                         <PermIcon active={u.canView} label="Può vedere" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
                         <PermIcon active={u.canEdit} label="Può modificare" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
                         <PermIcon active={u.canApprove} label="Può approvare" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                        <PermIcon active={u.canPublish} label="Può pubblicare" d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8" />
                       </div>
                     </td>
                     <td className="px-4 py-3 text-xs text-charcoal">

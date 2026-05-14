@@ -21,7 +21,7 @@ export async function GET(
     where: { id },
     select: {
       id: true, email: true, name: true, role: true,
-      canView: true, canEdit: true, canApprove: true,
+      canView: true, canEdit: true, canApprove: true, canPublish: true,
       isActive: true, createdAt: true,
       propertyAssignments: {
         include: {
@@ -46,6 +46,7 @@ const updateUserSchema = z.object({
   canView: z.boolean().optional(),
   canEdit: z.boolean().optional(),
   canApprove: z.boolean().optional(),
+  canPublish: z.boolean().optional(),
   isActive: z.boolean().optional(),
   propertyAssignments: z.array(z.object({
     propertyId: z.string(),
@@ -80,7 +81,7 @@ export async function PUT(
     return NextResponse.json({ error: "Solo SUPER_ADMIN può modificare utenti ADMIN" }, { status: 403 });
   }
 
-  const { name, email, password, role, canView, canEdit, canApprove, isActive, propertyAssignments, contentTypes } = parsed.data;
+  const { name, email, password, role, canView, canEdit, canApprove, canPublish, isActive, propertyAssignments, contentTypes } = parsed.data;
 
   // Unicità email
   if (email) {
@@ -164,6 +165,7 @@ export async function PUT(
   if (canView !== undefined) updateData.canView = canView;
   if (canEdit !== undefined) updateData.canEdit = canEdit;
   if (canApprove !== undefined) updateData.canApprove = canApprove;
+  if (canPublish !== undefined) updateData.canPublish = canPublish;
   // Persist forced coherence: se l'utente sta cambiando ruolo a OPERATOR/HOD
   // e i permessi attuali nel DB sono incompatibili, allinea
   if (role !== undefined && finalCanApprove !== target.canApprove) {

@@ -73,6 +73,7 @@ export const authOptions: NextAuthOptions = {
           canView: user.canView,
           canEdit: user.canEdit,
           canApprove: user.canApprove,
+          canPublish: user.canPublish,
         };
       },
     }),
@@ -92,6 +93,7 @@ export const authOptions: NextAuthOptions = {
         token.canView = user.canView;
         token.canEdit = user.canEdit;
         token.canApprove = user.canApprove;
+        token.canPublish = user.canPublish;
         prisma.user.update({
           where: { id: user.id },
           data: { lastLoginAt: new Date() },
@@ -101,14 +103,14 @@ export const authOptions: NextAuthOptions = {
         try {
           const dbUser = await prisma.user.findUnique({
             where: { id: token.id as string },
-            select: { role: true, canView: true, canEdit: true, canApprove: true, isActive: true, name: true },
+            select: { role: true, canView: true, canEdit: true, canApprove: true, canPublish: true, isActive: true, name: true },
           });
           if (!dbUser || !dbUser.isActive) {
-            // Utente disattivato o eliminato: segna come invalido
             token.role = "OPERATOR";
             token.canView = false;
             token.canEdit = false;
             token.canApprove = false;
+            token.canPublish = false;
             return token;
           }
           token.role = dbUser.role;
@@ -116,6 +118,7 @@ export const authOptions: NextAuthOptions = {
           token.canView = dbUser.canView;
           token.canEdit = dbUser.canEdit;
           token.canApprove = dbUser.canApprove;
+          token.canPublish = dbUser.canPublish;
         } catch {
           // Errore DB: mantieni i dati esistenti nel token
         }
@@ -131,6 +134,7 @@ export const authOptions: NextAuthOptions = {
         canView: token.canView,
         canEdit: token.canEdit,
         canApprove: token.canApprove,
+        canPublish: token.canPublish,
       };
       return session;
     },
