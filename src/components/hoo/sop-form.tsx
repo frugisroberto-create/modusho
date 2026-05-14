@@ -114,12 +114,14 @@ export function SopForm({ mode, contentId, initialData, userRole, userDepartment
 
   const selectedProperty = properties.find(p => p.id === propertyId);
   const allDepartments = selectedProperty?.departments || [];
-  // HOD: solo il proprio reparto. CORPORATE: solo i reparti assegnati. HM/ADMIN: tutti.
-  const departments = (effectiveRole === "HOD" && userDepartmentId)
+  // Reparto della SOP: HOD/CORPORATE limitati ai propri reparti. HM/ADMIN: tutti.
+  const creatableDepartments = (effectiveRole === "HOD" && userDepartmentId)
     ? allDepartments.filter(d => d.id === userDepartmentId)
     : (effectiveRole === "CORPORATE" && userDepartmentIds?.length)
       ? allDepartments.filter(d => userDepartmentIds.includes(d.id))
       : allDepartments;
+  // Destinatari: tutti i reparti della property (la SOP può essere rivolta a chiunque)
+  const departments = allDepartments;
 
   const totalTargets =
     (targetAudience.allDepartments ? 1 : 0) +
@@ -246,7 +248,7 @@ export function SopForm({ mode, contentId, initialData, userRole, userDepartment
             <select value={departmentId} onChange={(e) => setDepartmentId(e.target.value)}
               disabled={mode === "edit"} className="w-full disabled:opacity-50">
               <option value="">Seleziona reparto proprietario</option>
-              {departments.map(d => <option key={d.id} value={d.id}>{d.name} ({d.code})</option>)}
+              {creatableDepartments.map(d => <option key={d.id} value={d.id}>{d.name} ({d.code})</option>)}
             </select>
           </div>
         )}
