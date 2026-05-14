@@ -57,6 +57,8 @@ interface Property { id: string; name: string; code: string; departments?: Depar
 export default function ApprovalsPage() {
   const { data: session } = useSession();
   const currentUserId = session?.user?.id || "";
+  const currentUserRole = session?.user?.role || "";
+  const isCorporate = currentUserRole === "CORPORATE";
   const [tab, setTab] = useState<Tab>("in_lavorazione");
   const [contentItems, setContentItems] = useState<ContentItem[]>([]);
   const [workflowItems, setWorkflowItems] = useState<WorkflowItem[]>([]);
@@ -69,8 +71,22 @@ export default function ApprovalsPage() {
   const [searchInput, setSearchInput] = useState("");
   const [search, setSearch] = useState("");
   const [importedOnly, setImportedOnly] = useState(false);
+  const [myDepartmentIds, setMyDepartmentIds] = useState<string[]>([]);
   const [statusFilter, setStatusFilter] = useState("");
   const pageSize = 20;
+
+  // CORPORATE: carica i propri department IDs per filtrare la coda
+  useEffect(() => {
+    if (!isCorporate || !propertyFilter) return;
+    async function fetchMyDepts() {
+      const res = await fetch(`/api/my-departments?propertyId=${propertyFilter}`);
+      if (res.ok) {
+        const json = await res.json();
+        setMyDepartmentIds((json.data || []).map((d: { id: string }) => d.id));
+      }
+    }
+    fetchMyDepts();
+  }, [isCorporate, propertyFilter]);
 
   useEffect(() => {
     async function fetchProps() {
@@ -102,9 +118,13 @@ export default function ApprovalsPage() {
           const json = await res.json();
           let items = json.data as WorkflowItem[];
           if (isImported) items = items.filter(w => w.isImported);
+          // CORPORATE: filtra solo SOP dei propri reparti
+          if (isCorporate && myDepartmentIds.length > 0) {
+            items = items.filter(w => w.department && myDepartmentIds.includes(w.department.id));
+          }
           setWorkflowItems(items);
           setContentItems([]);
-          setTotal(isImported ? items.length : json.meta.total);
+          setTotal(isCorporate && myDepartmentIds.length > 0 ? items.length : (isImported ? items.length : json.meta.total));
         }
       } else if (tab === "published_by_others") {
         const params = new URLSearchParams({
@@ -117,9 +137,13 @@ export default function ApprovalsPage() {
         const res = await fetch(`/api/content?${params}`);
         if (res.ok) {
           const json = await res.json();
-          setContentItems(json.data);
+          let items = json.data as ContentItem[];
+          if (isCorporate && myDepartmentIds.length > 0) {
+            items = items.filter(c => c.department && myDepartmentIds.includes(c.department.id));
+          }
+          setContentItems(items);
           setWorkflowItems([]);
-          setTotal(json.meta.total);
+          setTotal(isCorporate && myDepartmentIds.length > 0 ? items.length : json.meta.total);
         }
       } else {
         const status = tab === "pending" ? "REVIEW_ADMIN" : "RETURNED";
@@ -132,13 +156,17 @@ export default function ApprovalsPage() {
         const res = await fetch(`/api/content?${params}`);
         if (res.ok) {
           const json = await res.json();
-          setContentItems(json.data);
+          let items = json.data as ContentItem[];
+          if (isCorporate && myDepartmentIds.length > 0) {
+            items = items.filter(c => c.department && myDepartmentIds.includes(c.department.id));
+          }
+          setContentItems(items);
           setWorkflowItems([]);
-          setTotal(json.meta.total);
+          setTotal(isCorporate && myDepartmentIds.length > 0 ? items.length : json.meta.total);
         }
       }
     } finally { setLoading(false); }
-  }, [tab, page, propertyFilter, departmentFilter, search, importedOnly, statusFilter, currentUserId]);
+  }, [tab, page, propertyFilter, departmentFilter, search, importedOnly, statusFilter, currentUserId, isCorporate, myDepartmentIds]);
 
   useEffect(() => { fetchItems(); }, [fetchItems]);
   useEffect(() => { setPage(1); }, [tab, propertyFilter, departmentFilter, search, importedOnly, statusFilter]);
