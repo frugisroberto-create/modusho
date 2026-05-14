@@ -111,9 +111,9 @@ export default function UsersPage() {
           <form onSubmit={(e) => { e.preventDefault(); setSearch(searchInput); }} className="flex">
             <input type="text" value={searchInput} onChange={(e) => setSearchInput(e.target.value)}
               placeholder="Cerca per nome..."
-              className="flex-1 text-sm border border-ivory-dark px-3 py-[7px] bg-white font-ui border-r-0" />
+              className="flex-1 text-sm border border-ivory-dark px-3 py-[9px] bg-white font-ui border-r-0" />
             <button type="submit"
-              className="px-3 py-[7px] text-xs font-ui font-semibold uppercase tracking-wider bg-terracotta text-white hover:bg-terracotta-light transition-colors">
+              className="px-3 py-[9px] text-xs font-ui font-semibold uppercase tracking-wider bg-terracotta text-white hover:bg-terracotta-light transition-colors">
               Cerca
             </button>
           </form>
@@ -124,17 +124,17 @@ export default function UsersPage() {
             Annulla
           </button>
         )}
-        <select value={roleFilter} onChange={(e) => setRoleFilter(e.target.value)} className="text-sm font-ui">
+        <select value={roleFilter} onChange={(e) => setRoleFilter(e.target.value)} className="text-sm font-ui border border-ivory-dark px-3 py-[9px] bg-white">
           <option value="">Tutti i ruoli</option>
           {["OPERATOR", "HOD", "HOTEL_MANAGER", "ADMIN", "SUPER_ADMIN"].map(r => (
             <option key={r} value={r}>{ROLE_BADGE[r]?.label || r}</option>
           ))}
         </select>
-        <select value={propertyFilter} onChange={(e) => setPropertyFilter(e.target.value)} className="text-sm font-ui">
+        <select value={propertyFilter} onChange={(e) => setPropertyFilter(e.target.value)} className="text-sm font-ui border border-ivory-dark px-3 py-[9px] bg-white">
           <option value="">Tutte le strutture</option>
           {properties.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
         </select>
-        <select value={activeFilter} onChange={(e) => setActiveFilter(e.target.value)} className="text-sm font-ui">
+        <select value={activeFilter} onChange={(e) => setActiveFilter(e.target.value)} className="text-sm font-ui border border-ivory-dark px-3 py-[9px] bg-white">
           <option value="active">Attivi</option>
           <option value="inactive">Disattivati</option>
           <option value="all">Tutti</option>

@@ -168,13 +168,13 @@ export default function ApprovalsPage() {
       <div className="flex items-end gap-4 flex-wrap">
         {properties.length > 1 && (
           <select value={propertyFilter} onChange={(e) => { setPropertyFilter(e.target.value); setDepartmentFilter(""); }}
-            className="text-sm font-ui border border-ivory-dark px-3 py-2 bg-white">
+            className="text-sm font-ui border border-ivory-dark px-3 py-[9px] bg-white">
             <option value="">Tutte le strutture</option>
             {properties.map(p => <option key={p.id} value={p.id}>{p.code} — {p.name}</option>)}
           </select>
         )}
         <select value={departmentFilter} onChange={(e) => setDepartmentFilter(e.target.value)}
-          className={`text-sm font-ui border border-ivory-dark px-3 py-2 bg-white ${!propertyFilter ? "text-charcoal/35" : ""}`}
+          className={`text-sm font-ui border border-ivory-dark px-3 py-[9px] bg-white ${!propertyFilter ? "text-charcoal/35" : ""}`}
           disabled={!propertyFilter}>
           <option value="">Tutti i reparti</option>
           {propertyFilter && properties.find(p => p.id === propertyFilter)?.departments?.map(d =>
@@ -184,7 +184,7 @@ export default function ApprovalsPage() {
         {tab === "in_lavorazione" && (
           <>
             <select value={statusFilter} onChange={(e) => setStatusFilter(e.target.value)}
-              className="text-sm font-ui border border-ivory-dark px-3 py-2 bg-white">
+              className="text-sm font-ui border border-ivory-dark px-3 py-[9px] bg-white">
               <option value="">Tutti gli stati</option>
                 <option value="DRAFT">Bozza</option>
                 <option value="REVIEW_HM">In attesa di consultazione</option>
@@ -192,7 +192,7 @@ export default function ApprovalsPage() {
                 <option value="RETURNED">Restituita</option>
               </select>
             <div className="flex items-end">
-              <label className="flex items-center gap-2 px-3 py-[7px] border border-ivory-dark bg-white cursor-pointer">
+              <label className="flex items-center gap-2 px-3 py-[9px] border border-ivory-dark bg-white cursor-pointer">
                 <input type="checkbox" checked={importedOnly} onChange={(e) => setImportedOnly(e.target.checked)}
                   className="w-3.5 h-3.5 rounded border-ivory-dark text-terracotta focus:ring-terracotta" />
                 <span className="text-sm font-ui text-charcoal">Solo importate</span>
@@ -206,7 +206,7 @@ export default function ApprovalsPage() {
               placeholder="Cerca nel titolo e contenuto..."
               className="flex-1 text-sm border border-ivory-dark px-3 py-2 bg-white font-ui border-r-0" />
             <button type="submit"
-              className="px-4 py-2 text-xs font-ui font-semibold uppercase tracking-wider bg-terracotta text-white hover:bg-terracotta-light transition-colors">
+              className="px-4 py-[9px] text-xs font-ui font-semibold uppercase tracking-wider bg-terracotta text-white hover:bg-terracotta-light transition-colors">
               Cerca
             </button>
           </form>
