@@ -78,9 +78,8 @@ export function resolveRaciRoles(params: {
         // CORPORATE with HOD → HOD=R, HM=C, CORPORATE=A
         return { responsibleId: hodUserId, consultedId: hmUserId, accountableId: initiatorId };
       }
-      // CORPORATE without HOD → CORPORATE=R, HM=C, CORPORATE=A
-      // (R e A sono lo stesso utente — il Corporate gestisce tutto nel suo perimetro)
-      return { responsibleId: initiatorId, consultedId: hmUserId, accountableId: initiatorId };
+      // CORPORATE without HOD → HM=R, CORPORATE=A
+      return { responsibleId: hmUserId, consultedId: null, accountableId: initiatorId };
 
     case "ADMIN":
     case "SUPER_ADMIN":
