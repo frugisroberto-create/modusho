@@ -201,7 +201,7 @@ export default function ApprovalsPage() {
               </select>
             </div>
             <div className="flex items-end">
-              <label className="flex items-center gap-2 px-3 py-2 border border-ivory-dark bg-white cursor-pointer">
+              <label className="flex items-center gap-2 px-3 py-[7px] border border-ivory-dark bg-white cursor-pointer">
                 <input type="checkbox" checked={importedOnly} onChange={(e) => setImportedOnly(e.target.checked)}
                   className="w-3.5 h-3.5 rounded border-ivory-dark text-terracotta focus:ring-terracotta" />
                 <span className="text-sm font-ui text-charcoal">Solo importate</span>
