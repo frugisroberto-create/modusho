@@ -148,7 +148,7 @@ export async function POST(request: NextRequest) {
   if (role === "HOD" && canApprove) {
     return NextResponse.json({ error: "Un HOD non può avere permessi di approvazione" }, { status: 400 });
   }
-  if (canApprove && role !== "HOTEL_MANAGER" && role !== "ADMIN") {
+  if (canApprove && role !== "HOTEL_MANAGER" && role !== "CORPORATE" && role !== "ADMIN") {
     return NextResponse.json({ error: "Il permesso di approvazione richiede almeno il ruolo Hotel Manager" }, { status: 400 });
   }
   if (!canEdit && contentTypes.length > 0) {

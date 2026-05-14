@@ -127,7 +127,7 @@ export function UserForm({ mode, userId, onSuccess, initialData }: UserFormProps
     if (role === "HOD" && canApprove) {
       w.push("Un HOD non dovrebbe avere permessi di approvazione");
     }
-    if (canApprove && role !== "HOTEL_MANAGER" && role !== "ADMIN") {
+    if (canApprove && role !== "HOTEL_MANAGER" && role !== "CORPORATE" && role !== "ADMIN") {
       w.push("Il permesso di approvazione richiede almeno il ruolo Hotel Manager");
     }
     if (canApprove) {
