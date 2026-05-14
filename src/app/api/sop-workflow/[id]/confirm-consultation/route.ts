@@ -38,9 +38,11 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
     where: { id },
     select: {
       id: true,
+      contentId: true,
       sopStatus: true,
       consultedId: true,
       submittedToC: true,
+      submittedToA: true,
       textVersionCount: true,
       consultedConfirmedVersion: true,
       content: { select: { status: true } },
@@ -74,6 +76,9 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
 
   const now = new Date();
 
+  // Se C conferma e la SOP è già sottoposta ad A, avanza lo stato a REVIEW_ADMIN
+  const shouldAdvance = wf.submittedToA && wf.content.status === "REVIEW_HM";
+
   await prisma.$transaction([
     prisma.sopWorkflow.update({
       where: { id: wf.id },
@@ -84,6 +89,21 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
         consultedConfirmedNote: parsed.data.note || null,
       },
     }),
+    ...(shouldAdvance ? [
+      prisma.content.update({
+        where: { id: wf.contentId },
+        data: { status: "REVIEW_ADMIN" },
+      }),
+      prisma.contentStatusHistory.create({
+        data: {
+          contentId: wf.contentId,
+          fromStatus: "REVIEW_HM",
+          toStatus: "REVIEW_ADMIN",
+          changedById: userId,
+          note: "Consultazione HM confermata, avanzata a revisione HOO",
+        },
+      }),
+    ] : []),
     prisma.sopWorkflowEvent.create({
       data: {
         sopWorkflowId: wf.id,
@@ -92,6 +112,7 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
         metadata: {
           version: wf.textVersionCount,
           ...(parsed.data.note ? { note: parsed.data.note } : {}),
+          ...(shouldAdvance ? { statusAdvanced: "REVIEW_ADMIN" } : {}),
         },
       },
     }),
