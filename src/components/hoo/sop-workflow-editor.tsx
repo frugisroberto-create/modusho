@@ -713,7 +713,7 @@ function SopHeader({ wf }: { wf: SopWorkflowData }) {
   const STATUS_LABEL: Record<string, string> = {
     DRAFT: "Bozza",
     REVIEW_HM: "In attesa di consultazione",
-    REVIEW_ADMIN: "In approvazione HOO",
+    REVIEW_ADMIN: "In approvazione Accountable",
     RETURNED: "Restituita",
     PUBLISHED: "Pubblicata",
     ARCHIVED: "Archiviata",

@@ -33,7 +33,7 @@ const DRAFT_STATUSES = ["DRAFT", "REVIEW_HM", "REVIEW_ADMIN", "RETURNED"];
 const STATUS_LABELS: Record<string, string> = {
   DRAFT: "Bozza",
   REVIEW_HM: "In attesa di consultazione",
-  REVIEW_ADMIN: "In approvazione HOO",
+  REVIEW_ADMIN: "In approvazione Accountable",
   RETURNED: "Restituita",
   PUBLISHED: "Pubblicata",
   ARCHIVED: "Archiviata",

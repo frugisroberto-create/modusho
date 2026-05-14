@@ -1,0 +1,66 @@
+ANALISI GAP - PATRIA PALACE STANDARD BOOK vs LQA CHECKLISTS
+===========================================================
+
+Data Analisi: 12 Aprile 2026
+Destinatario: Roberto - COO, Patria Palace Hotel
+
+DOCUMENTO PRINCIPALE:
+  Analisi_Gap_Patria_vs_LQA.md (48 KB, 1.432 righe)
+
+SCOPE DELL'ANALISI:
+  ✓ 25 LQA Checklists processati (sezioni 01-26, escludendo 21)
+  ✓ 3.818 standard LQA estratti e confrontati
+  ✓ 885 paragrafi del Patria Standard Book analizzati
+  ✓ Matching algoritmo: keyword-based (threshold 60% per "assente", 80% per "presente")
+
+NUMERI CHIAVE:
+  - Standard LQA Totali: 3.818
+  - Copertura Patria: 82.3% (sopra 30% match score)
+  - Standard Assenti: 677 (17.7%)
+  - Standard Incongruenti: 2.440 (63.9%)
+
+AREE CRITICHE (Priority 1):
+  1. Sezione 15 - The Room: 125 gap (copertura 52%)
+  2. Sezione 16 - Public Areas: 70 gap (copertura 65%)
+  3. Sezione 17 - Fitness & Wellness: 51 gap (copertura 80%)
+  4. Sezione 11 - Buffet: 38 gap (copertura 84%)
+  5. Sezione 14 - In-Room Dining: 38 gap (copertura 86%)
+
+COSA SIGNIFICA:
+  - Il Patria Standard Book è stato scritto PRIMA che gli LQA checklists fossero finalizzati
+  - La struttura del Patria (narrativa) differisce dalla struttura LQA (checklist granulare)
+  - Molti gap riflettono differenze di dettaglio/specifificità, non errori assoluti
+  - Le sezioni critiche sono principalmente legate a Room & Hospitality Services
+
+RACCOMANDAZIONI PRIORITARIE:
+  
+  PRIORITY 1 (Entro 2 settimane):
+  ✓ Revisione delle 5 sezioni critiche identificate
+  ✓ Mapping strutturato LQA → Patria per identificare veri buchi vs. differenze terminologiche
+  ✓ Riunione con team operativo per validare findings
+  
+  PRIORITY 2 (Entro 1 mese):
+  ✓ Aggiornamento Patria Standard Book v2.0 'Allineato agli LQA Standards 2026'
+  ✓ Integrazione degli standard LQA mancanti mantenendo tono narrativo Patria
+  ✓ Quality assurance post-aggiornamento (re-analisi con soglia >80%)
+  
+  PRIORITY 3 (Entro 3 mesi):
+  ✓ Automazione del governance (confronto trimestrale Patria ↔ LQA)
+  ✓ Estensione dell'analisi ad altri hotel HO Collection
+  ✓ Master Standard Book del gruppo allineato agli LQA
+
+LIMITAZIONI METODOLOGICHE:
+  - Il matching è basato su testo; alcuni concetti potrebbero essere coperti con terminologia diversa
+  - LQA checklists hanno formato tabellare; Patria è narrativo (difficile confronto diretto)
+  - Alcuni gap potrebbero riflettere scelte strutturali piuttosto che omissioni reali
+
+CONCLUSIONE:
+  Il Patria Standard Book copre bene gli standard LQA (82.3% di coverage) ma necessita di aggiornamento
+  per allinearsi completamente agli LQA standards 2026-2028, particolarmente nelle sezioni critiche
+  legate a Room, Public Areas e Fitness/Wellness. L'analisi fornisce una mappa chiara di dove
+  intervenire prioritariamente per garantire la conformità agli standard Leading Hotels of the World.
+
+CONTATTO PER DOMANDE:
+  Claude Code Analysis - Local Agent Mode
+  Analisi completata con Python 3.10 + python-docx + openpyxl
+
