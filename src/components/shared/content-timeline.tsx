@@ -10,7 +10,7 @@ const ROLE_LABELS: Record<string, string> = {
 };
 
 const STATUS_LABELS: Record<string, string> = {
-  DRAFT: "Bozza", REVIEW_HM: "In attesa di consultazione", REVIEW_ADMIN: "Da approvare",
+  DRAFT: "Bozza", REVIEW_HM: "In attesa di consultazione", REVIEW_ADMIN: "In approvazione HOO",
   PUBLISHED: "Pubblicato", RETURNED: "Restituito", ARCHIVED: "Archiviato",
 };
 

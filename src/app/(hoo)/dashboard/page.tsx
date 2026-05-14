@@ -36,7 +36,7 @@ interface DashboardData {
 
 type PeriodPreset = "week" | "month" | "quarter";
 
-const STATUS_LABELS: Record<string, string> = { DRAFT: "Bozza", REVIEW_HM: "In attesa di consultazione", REVIEW_ADMIN: "Da approvare" };
+const STATUS_LABELS: Record<string, string> = { DRAFT: "Bozza", REVIEW_HM: "In attesa di consultazione", REVIEW_ADMIN: "In approvazione HOO" };
 
 export default function GovernanceDashboardPage() {
   const [data, setData] = useState<DashboardData | null>(null);
@@ -154,10 +154,10 @@ export default function GovernanceDashboardPage() {
           LIVELLO 1 — Priorità immediate
           ══════════════════════════════════════════════════════════════════ */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-        {/* Card 1 — Da approvare */}
+        {/* Card 1 — In approvazione HOO */}
         <Link href="/approvals"
           className={`block bg-white border border-ivory-dark p-8 transition-colors hover:bg-ivory/50 ${pendingCount > 0 ? "border-l-4 border-l-terracotta" : ""}`}>
-          <p className="text-[12px] font-ui uppercase tracking-wider text-charcoal/50 mb-3">Da approvare</p>
+          <p className="text-[12px] font-ui uppercase tracking-wider text-charcoal/50 mb-3">In approvazione HOO</p>
           <p className={`text-[42px] font-heading font-semibold leading-tight ${pendingCount > 0 ? "text-terracotta" : "text-sage"}`}>
             {pendingCount}
           </p>
@@ -319,7 +319,7 @@ export default function GovernanceDashboardPage() {
             { label: "SOP totali", value: data.kpi.sopTotal },
             { label: "Pubblicate", value: data.kpi.sopPublished },
             { label: "In attesa di consultazione", value: data.kpi.sopReviewHm },
-            { label: "Da approvare", value: data.kpi.sopReviewAdmin },
+            { label: "In approvazione HOO", value: data.kpi.sopReviewAdmin },
             { label: "Restituite", value: data.kpi.sopReturned },
             { label: "Approvate nel periodo", value: data.kpi.sopApprovedInPeriod },
             { label: "Tempo medio workflow", value: data.kpi.avgWorkflowDays != null ? `${data.kpi.avgWorkflowDays}g` : "n/d" },

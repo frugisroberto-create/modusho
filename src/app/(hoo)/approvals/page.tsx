@@ -38,7 +38,7 @@ const WF_BADGE = "text-[9px] font-ui font-bold uppercase tracking-wider px-1.5 p
 const STATUS_LABELS: Record<string, string> = {
   DRAFT: "Bozza",
   REVIEW_HM: "In attesa di consultazione",
-  REVIEW_ADMIN: "Da approvare",
+  REVIEW_ADMIN: "In approvazione HOO",
   RETURNED: "Restituita",
   PUBLISHED: "Pubblicata",
   ARCHIVED: "Archiviata",
@@ -144,7 +144,7 @@ export default function ApprovalsPage() {
 
   const tabs: [Tab, string][] = [
     ["in_lavorazione", "In lavorazione"],
-    ["pending", "Da approvare"],
+    ["pending", "In approvazione HOO"],
     ["returned", "Restituite"],
     ["published_by_others", "Pubblicate da altri"],
   ];
@@ -290,7 +290,7 @@ export default function ApprovalsPage() {
           </div>
         )
       ) : (
-        /* ── Tab: Da approvare / Restituite (Content) ── */
+        /* ── Tab: In approvazione HOO / Restituite (Content) ── */
         contentItems.length === 0 ? (
           <p className="text-charcoal/40 text-sm font-ui py-8 text-center">
             {tab === "pending" ? "Nessuna SOP in attesa di approvazione" : "Nessuna SOP restituita"}
@@ -304,7 +304,7 @@ export default function ApprovalsPage() {
                   <div>
                     <div className="flex items-center gap-2 mb-1">
                       <span className={`text-[10px] font-ui font-bold uppercase tracking-wider px-2 py-0.5 ${tab === "pending" ? "bg-[#FFF3E0] text-[#E65100]" : "bg-[#FECACA] text-[#991B1B]"}`}>
-                        {tab === "pending" ? "Da approvare" : "Restituita"}
+                        {tab === "pending" ? "In approvazione HOO" : "Restituita"}
                       </span>
                       <span className="text-[11px] font-ui text-charcoal/45">{item.property.code}</span>
                       {item.department && <span className="text-[11px] font-ui text-charcoal/45">{item.department.name}</span>}

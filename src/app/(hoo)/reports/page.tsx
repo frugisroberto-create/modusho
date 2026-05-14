@@ -98,7 +98,7 @@ export default function ReportsPage() {
               { label: "Pubblicate", value: data.kpi.sopPublished, color: "text-sage" },
               { label: "In bozza", value: data.kpi.sopDraft },
               { label: "In attesa di consultazione", value: data.kpi.sopReviewHm, color: "text-[#D4A017]" },
-              { label: "Da approvare", value: data.kpi.sopReviewAdmin, color: "text-terracotta" },
+              { label: "In approvazione HOO", value: data.kpi.sopReviewAdmin, color: "text-terracotta" },
               { label: "Restituite", value: data.kpi.sopReturned, color: "text-alert-red" },
               { label: "Approvate nel periodo", value: data.kpi.sopApprovedInPeriod, color: "text-sage" },
               { label: "Restituite nel periodo", value: data.kpi.sopReturnedInPeriod, color: "text-alert-red" },
