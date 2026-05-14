@@ -30,7 +30,7 @@ export function ContentActions({ contentId, contentType, contentStatus, userRole
   const [archiveNote, setArchiveNote] = useState("");
   const [loading, setLoading] = useState(false);
 
-  const canAct = userRole === "HOTEL_MANAGER" || userRole === "ADMIN" || userRole === "SUPER_ADMIN";
+  const canAct = userRole === "HOTEL_MANAGER" || userRole === "CORPORATE" || userRole === "ADMIN" || userRole === "SUPER_ADMIN";
   if (!canAct) return null;
 
   const handleArchive = async () => {

@@ -5,7 +5,7 @@ import Link from "next/link";
 import { useOperatorContext } from "./operator-shell";
 
 const ROLE_LEVEL: Record<string, number> = {
-  OPERATOR: 0, HOD: 1, HOTEL_MANAGER: 2, ADMIN: 3, SUPER_ADMIN: 4,
+  OPERATOR: 0, HOD: 1, HOTEL_MANAGER: 2, CORPORATE: 2, ADMIN: 3, SUPER_ADMIN: 4,
 };
 
 interface Stats {

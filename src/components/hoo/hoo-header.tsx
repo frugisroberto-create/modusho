@@ -30,12 +30,13 @@ const HOO_NAV_ITEMS: { href: string; label: string; minRole?: string; adminOnly?
 ];
 
 const ROLE_LEVEL: Record<string, number> = {
-  OPERATOR: 0, HOD: 1, HOTEL_MANAGER: 2, ADMIN: 3, SUPER_ADMIN: 4,
+  OPERATOR: 0, HOD: 1, HOTEL_MANAGER: 2, CORPORATE: 2, ADMIN: 3, SUPER_ADMIN: 4,
 };
 
 const ROLE_LABEL: Record<string, string> = {
   SUPER_ADMIN: "HOO",
   ADMIN: "HOO",
+  CORPORATE: "Corporate",
   HOTEL_MANAGER: "Hotel Manager",
   HOD: "HOD",
   OPERATOR: "Operatore",

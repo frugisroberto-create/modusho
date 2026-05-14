@@ -19,6 +19,11 @@ export function getSubmitTargetStatus(
     if (role === "ADMIN" || role === "SUPER_ADMIN") {
       return "PUBLISHED";
     }
+    // CORPORATE con canApprove può pubblicare direttamente (come ADMIN nel suo perimetro)
+    // La verifica canApprove è fatta a livello API, qui accettiamo il ruolo
+    if (role === "CORPORATE") {
+      return "PUBLISHED";
+    }
     // HOTEL_MANAGER può pubblicare direttamente DOCUMENT/MEMO (non SOP)
     if (role === "HOTEL_MANAGER" && isNoWorkflowType(contentType)) {
       return "PUBLISHED";
@@ -35,6 +40,8 @@ export function getSubmitTargetStatus(
       return "REVIEW_HM";
     case "HOTEL_MANAGER":
       return "REVIEW_ADMIN";
+    case "CORPORATE":
+      return "REVIEW_HM"; // Corporate invia a HM per consultazione
     case "ADMIN":
     case "SUPER_ADMIN":
       return "REVIEW_HM";
@@ -65,6 +72,8 @@ export function getAvailableSubmitActions(
         canPublishDirectly: isNoWorkflow,
         reviewLabel: "Invia per approvazione finale",
       };
+    case "CORPORATE":
+      return { canSendToReview: true, canPublishDirectly: true, reviewLabel: "Invia a Hotel Manager" };
     case "ADMIN":
     case "SUPER_ADMIN":
       return { canSendToReview: true, canPublishDirectly: true, reviewLabel: "Invia a Hotel Manager" };

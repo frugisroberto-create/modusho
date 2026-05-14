@@ -14,7 +14,7 @@ export default async function HooLayout({
   const dbUser = await prisma.user.findUnique({ where: { id: user.id }, select: { id: true } });
   if (!dbUser) redirect("/api/auth/signout");
 
-  if (user.role !== "HOD" && user.role !== "HOTEL_MANAGER" && user.role !== "ADMIN" && user.role !== "SUPER_ADMIN") {
+  if (user.role !== "HOD" && user.role !== "HOTEL_MANAGER" && user.role !== "CORPORATE" && user.role !== "ADMIN" && user.role !== "SUPER_ADMIN") {
     redirect("/");
   }
 

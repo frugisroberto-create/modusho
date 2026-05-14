@@ -6,6 +6,7 @@ const ROLE_HIERARCHY: Record<Role, number> = {
   OPERATOR: 0,
   HOD: 1,
   HOTEL_MANAGER: 2,
+  CORPORATE: 2,
   ADMIN: 3,
   SUPER_ADMIN: 4,
 };

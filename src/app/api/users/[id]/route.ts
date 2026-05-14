@@ -42,7 +42,7 @@ const updateUserSchema = z.object({
   name: z.string().min(1).max(200).optional(),
   email: z.email().optional(),
   password: z.string().min(10).regex(/[A-Z]/, "Almeno una lettera maiuscola").regex(/[0-9]/, "Almeno un numero").optional(),
-  role: z.enum(["OPERATOR", "HOD", "HOTEL_MANAGER", "ADMIN"]).optional(),
+  role: z.enum(["OPERATOR", "HOD", "HOTEL_MANAGER", "CORPORATE", "ADMIN"]).optional(),
   canView: z.boolean().optional(),
   canEdit: z.boolean().optional(),
   canApprove: z.boolean().optional(),
@@ -122,12 +122,13 @@ export async function PUT(
     return NextResponse.json({ error: "Solo SUPER_ADMIN può assegnare ruolo ADMIN" }, { status: 403 });
   }
 
-  // Validazione coerenza ruolo-reparti: OPERATOR e HOD non possono avere departmentId = null
-  if (propertyAssignments !== undefined && (finalRole === "OPERATOR" || finalRole === "HOD")) {
+  // Validazione coerenza ruolo-reparti: OPERATOR, HOD e CORPORATE devono avere departmentId specifici
+  if (propertyAssignments !== undefined && (finalRole === "OPERATOR" || finalRole === "HOD" || finalRole === "CORPORATE")) {
     const hasNullDept = propertyAssignments.some(a => !a.departmentId);
     if (hasNullDept) {
+      const roleLabel = finalRole === "OPERATOR" ? "Operatore" : finalRole === "HOD" ? "HOD" : "Corporate";
       return NextResponse.json({
-        error: `Un ${finalRole === "OPERATOR" ? "Operatore" : "HOD"} deve avere reparti specifici assegnati, non accesso a tutti i reparti`,
+        error: `Un ${roleLabel} deve avere reparti specifici assegnati, non accesso a tutti i reparti`,
       }, { status: 400 });
     }
   }

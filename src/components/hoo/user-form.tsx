@@ -3,7 +3,7 @@
 import { useState, useEffect, useCallback } from "react";
 import { useRouter } from "next/navigation";
 
-type RoleOption = "OPERATOR" | "HOD" | "HOTEL_MANAGER" | "ADMIN";
+type RoleOption = "OPERATOR" | "HOD" | "HOTEL_MANAGER" | "CORPORATE" | "ADMIN";
 type ContentTypeOption = "SOP" | "DOCUMENT" | "MEMO";
 
 interface Property {
@@ -37,6 +37,7 @@ const ROLE_LABELS: Record<RoleOption, string> = {
   OPERATOR: "Operatore",
   HOD: "Head of Department",
   HOTEL_MANAGER: "Hotel Manager",
+  CORPORATE: "Corporate",
   ADMIN: "HOO",
 };
 
@@ -44,6 +45,7 @@ const ROLE_PRESETS: Record<RoleOption, { canEdit: boolean; canApprove: boolean; 
   OPERATOR: { canEdit: false, canApprove: false, contentTypes: [] },
   HOD: { canEdit: true, canApprove: false, contentTypes: ["SOP", "DOCUMENT", "MEMO"] },
   HOTEL_MANAGER: { canEdit: true, canApprove: true, contentTypes: ["SOP", "DOCUMENT", "MEMO"] },
+  CORPORATE: { canEdit: true, canApprove: true, contentTypes: ["SOP", "DOCUMENT", "MEMO"] },
   ADMIN: { canEdit: true, canApprove: true, contentTypes: ["SOP", "DOCUMENT", "MEMO"] },
 };
 
@@ -109,7 +111,7 @@ export function UserForm({ mode, userId, onSuccess, initialData }: UserFormProps
     setRole(newRole);
     applyRolePreset(newRole);
     // If switching to a role that requires specific depts, convert any null departmentIds to pending
-    if (newRole === "OPERATOR" || newRole === "HOD") {
+    if (newRole === "OPERATOR" || newRole === "HOD" || newRole === "CORPORATE") {
       setAssignments(prev => prev.map(a =>
         a.departmentId === null ? { ...a, departmentId: "__pending__" as string } : a
       ));
@@ -142,7 +144,7 @@ export function UserForm({ mode, userId, onSuccess, initialData }: UserFormProps
   // Selected property IDs
   const selectedPropertyIds = [...new Set(assignments.map(a => a.propertyId))];
 
-  const roleRequiresSpecificDepts = role === "OPERATOR" || role === "HOD";
+  const roleRequiresSpecificDepts = role === "OPERATOR" || role === "HOD" || role === "CORPORATE";
 
   const toggleProperty = (propId: string) => {
     if (selectedPropertyIds.includes(propId)) {
@@ -452,8 +454,8 @@ export function UserForm({ mode, userId, onSuccess, initialData }: UserFormProps
       {/* SEZIONE 2 — Ruolo */}
       <section className="bg-ivory-medium border border-ivory-dark  p-6 space-y-4">
         <h2 className="text-base font-heading font-semibold text-charcoal-dark">Ruolo</h2>
-        <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
-          {(["OPERATOR", "HOD", "HOTEL_MANAGER", "ADMIN"] as RoleOption[]).map((r) => (
+        <div className="grid grid-cols-2 sm:grid-cols-5 gap-2">
+          {(["OPERATOR", "HOD", "HOTEL_MANAGER", "CORPORATE", "ADMIN"] as RoleOption[]).map((r) => (
             <button key={r} type="button" onClick={() => handleRoleChange(r)}
               className={`px-3 py-2.5 text-sm font-ui font-medium  border transition-colors ${
                 role === r

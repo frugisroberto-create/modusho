@@ -6,7 +6,7 @@ import bcrypt from "bcryptjs";
 import { z } from "zod/v4";
 
 const querySchema = z.object({
-  role: z.enum(["OPERATOR", "HOD", "HOTEL_MANAGER", "ADMIN", "SUPER_ADMIN"]).optional(),
+  role: z.enum(["OPERATOR", "HOD", "HOTEL_MANAGER", "CORPORATE", "ADMIN", "SUPER_ADMIN"]).optional(),
   propertyId: z.string().optional(),
   search: z.string().optional(),
   page: z.coerce.number().int().min(1).default(1),
@@ -117,7 +117,7 @@ const createUserSchema = z.object({
   email: z.email(),
   name: z.string().min(1).max(200),
   password: z.string().min(10).regex(/[A-Z]/, "Almeno una lettera maiuscola").regex(/[0-9]/, "Almeno un numero"),
-  role: z.enum(["OPERATOR", "HOD", "HOTEL_MANAGER", "ADMIN"]),
+  role: z.enum(["OPERATOR", "HOD", "HOTEL_MANAGER", "CORPORATE", "ADMIN"]),
   canView: z.boolean().default(true),
   canEdit: z.boolean().default(false),
   canApprove: z.boolean().default(false),
@@ -155,12 +155,13 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: "Tipi contenuto non assegnabili senza permesso di modifica" }, { status: 400 });
   }
 
-  // Validazione coerenza ruolo-reparti: OPERATOR e HOD non possono avere departmentId = null
-  if (role === "OPERATOR" || role === "HOD") {
+  // Validazione coerenza ruolo-reparti: OPERATOR, HOD e CORPORATE devono avere departmentId specifici
+  if (role === "OPERATOR" || role === "HOD" || role === "CORPORATE") {
     const hasNullDept = propertyAssignments.some(a => !a.departmentId);
     if (hasNullDept) {
+      const roleLabel = role === "OPERATOR" ? "Operatore" : role === "HOD" ? "HOD" : "Corporate";
       return NextResponse.json({
-        error: `Un ${role === "OPERATOR" ? "Operatore" : "HOD"} deve avere reparti specifici assegnati, non accesso a tutti i reparti`,
+        error: `Un ${roleLabel} deve avere reparti specifici assegnati, non accesso a tutti i reparti`,
       }, { status: 400 });
     }
   }

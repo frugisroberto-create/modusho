@@ -5,6 +5,7 @@ const ROLE_HIERARCHY: Record<Role, number> = {
   OPERATOR: 0,
   HOD: 1,
   HOTEL_MANAGER: 2,
+  CORPORATE: 2,
   ADMIN: 3,
   SUPER_ADMIN: 4,
 };
@@ -238,6 +239,19 @@ export async function canUserAccessContent(
 
   // HM e ADMIN hanno accesso coarse basato sulla property
   if (userRole === "HOTEL_MANAGER" || userRole === "ADMIN") return true;
+
+  // CORPORATE: accesso basato sui reparti assegnati (come HOD ma con permessi configurabili)
+  if (userRole === "CORPORATE") {
+    const accessibleDepts = await getAccessibleDepartmentIds(userId, content.propertyId);
+    // Se il contenuto non ha reparto (trasversale), CORPORATE lo vede se ha almeno un reparto nella property
+    if (!content.targetAudience || content.targetAudience.length === 0) return accessibleDepts.length > 0;
+    return content.targetAudience.some((t) => {
+      if (t.targetType === "ROLE") return true; // target per ruolo → visibile
+      if (t.targetType === "USER" && t.targetUserId === userId) return true;
+      if (t.targetType === "DEPARTMENT" && t.targetDepartmentId && accessibleDepts.includes(t.targetDepartmentId)) return true;
+      return false;
+    });
+  }
 
   // OPERATOR/HOD: devono essere autori (solo HOD) o in targetAudience
   if (userRole === "HOD" && content.createdById === userId) return true;

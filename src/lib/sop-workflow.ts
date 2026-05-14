@@ -41,10 +41,12 @@ function isDraft(status: ContentStatus): boolean {
 /**
  * Resolve RACI roles based on who initiates and whether HOD is involved.
  *
- * Rules (from mini-spec):
- *   HOD opens             → R=HOD,  C=HM,   A=HOO
- *   HM opens w/o HOD      → R=HM,           A=HOO
- *   HM opens w/ HOD       → R=HOD,  C=HM,   A=HOO
+ * Rules:
+ *   HOD opens             → R=HOD,  C=HM,   A=HOO (or CORPORATE if available)
+ *   HM opens w/o HOD      → R=HM,           A=HOO (or CORPORATE if available)
+ *   HM opens w/ HOD       → R=HOD,  C=HM,   A=HOO (or CORPORATE if available)
+ *   CORPORATE opens w/o HOD → R=CORPORATE,  C=HM, A=CORPORATE
+ *   CORPORATE opens w/ HOD  → R=HOD,  C=HM,  A=CORPORATE
  *   HOO opens w/o HOD     → R=HM,           A=HOO
  *   HOO opens w/ HOD      → R=HOD,  C=HM,   A=HOO
  */
@@ -60,16 +62,25 @@ export function resolveRaciRoles(params: {
 
   switch (initiatorRole) {
     case "HOD":
-      // HOD opens → HOD=R, HM=C, HOO=A
+      // HOD opens → HOD=R, HM=C, A=hooUserId (could be CORPORATE or ADMIN)
       return { responsibleId: initiatorId, consultedId: hmUserId, accountableId: hooUserId };
 
     case "HOTEL_MANAGER":
       if (involveHod && hodUserId) {
-        // HM with HOD → HOD=R, HM=C, HOO=A
+        // HM with HOD → HOD=R, HM=C, A=hooUserId
         return { responsibleId: hodUserId, consultedId: initiatorId, accountableId: hooUserId };
       }
-      // HM without HOD → HM=R, HOO=A
+      // HM without HOD → HM=R, A=hooUserId
       return { responsibleId: initiatorId, consultedId: null, accountableId: hooUserId };
+
+    case "CORPORATE":
+      if (involveHod && hodUserId) {
+        // CORPORATE with HOD → HOD=R, HM=C, CORPORATE=A
+        return { responsibleId: hodUserId, consultedId: hmUserId, accountableId: initiatorId };
+      }
+      // CORPORATE without HOD → CORPORATE=R, HM=C, CORPORATE=A
+      // (R e A sono lo stesso utente — il Corporate gestisce tutto nel suo perimetro)
+      return { responsibleId: initiatorId, consultedId: hmUserId, accountableId: initiatorId };
 
     case "ADMIN":
     case "SUPER_ADMIN":

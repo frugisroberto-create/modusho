@@ -277,18 +277,38 @@ export async function POST(request: NextRequest) {
   }
 
   if (!hooUserId) {
-    // HOO = primo ADMIN assegnato alla property, oppure se chi crea e' ADMIN/SUPER_ADMIN, e' lui
-    if (role === "ADMIN" || role === "SUPER_ADMIN") {
+    // A = chi approva. Priorità:
+    // 1. Se chi crea è CORPORATE con canApprove → lui stesso
+    // 2. Se chi crea è ADMIN/SUPER_ADMIN → lui stesso
+    // 3. Cerca CORPORATE con canApprove assegnato al reparto specifico
+    // 4. Fallback: primo ADMIN assegnato alla property
+    if (role === "CORPORATE" && session.user.canApprove) {
+      hooUserId = userId;
+    } else if (role === "ADMIN" || role === "SUPER_ADMIN") {
       hooUserId = userId;
     } else {
-      const hoo = await prisma.propertyAssignment.findFirst({
-        where: { propertyId: data.propertyId, user: { role: { in: ["ADMIN", "SUPER_ADMIN"] }, isActive: true } },
+      // Cerca un CORPORATE con canApprove per il reparto specifico
+      const corporate = await prisma.propertyAssignment.findFirst({
+        where: {
+          propertyId: data.propertyId,
+          departmentId: data.departmentId,
+          user: { role: "CORPORATE", canApprove: true, isActive: true },
+        },
         select: { userId: true },
       });
-      if (!hoo) {
-        return NextResponse.json({ error: "Nessun ADMIN/HOO trovato per questa struttura" }, { status: 400 });
+      if (corporate) {
+        hooUserId = corporate.userId;
+      } else {
+        // Fallback: primo ADMIN assegnato alla property
+        const hoo = await prisma.propertyAssignment.findFirst({
+          where: { propertyId: data.propertyId, user: { role: { in: ["ADMIN", "SUPER_ADMIN"] }, isActive: true } },
+          select: { userId: true },
+        });
+        if (!hoo) {
+          return NextResponse.json({ error: "Nessun Accountable trovato per questa struttura/reparto" }, { status: 400 });
+        }
+        hooUserId = hoo.userId;
       }
-      hooUserId = hoo.userId;
     }
   }
 
