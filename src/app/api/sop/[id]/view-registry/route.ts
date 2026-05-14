@@ -202,18 +202,22 @@ async function resolveTargetUsers(content: {
       .filter((t) => t.targetType === "ROLE" && t.targetRole)
       .map((t) => t.targetRole!);
 
-    if (deptTargets.length > 0) {
+    if (deptTargets.length > 0 && roleTargets.length === 0) {
+      // Target solo per reparto: include OPERATOR e HOD del reparto
+      where.role = { in: ["OPERATOR", "HOD"] };
       where.propertyAssignments = {
         some: {
           propertyId: content.propertyId,
-          OR: [
-            { departmentId: { in: deptTargets } },
-            { departmentId: null },
-          ],
+          departmentId: { in: deptTargets },
         },
       };
-    }
-    if (roleTargets.length > 0) {
+    } else if (deptTargets.length > 0 && roleTargets.length > 0) {
+      // Target misto: reparto + ruolo
+      where.OR = [
+        { role: { in: ["OPERATOR", "HOD"] }, propertyAssignments: { some: { propertyId: content.propertyId, departmentId: { in: deptTargets } } } },
+        { role: { in: roleTargets }, propertyAssignments: { some: { propertyId: content.propertyId } } },
+      ];
+    } else if (roleTargets.length > 0) {
       where.role = { in: roleTargets };
     }
   }
