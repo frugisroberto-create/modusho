@@ -158,7 +158,7 @@ export default function ApprovalsPage() {
       <div className="flex gap-1 bg-ivory p-0.5 w-fit border border-ivory-dark">
         {tabs.map(([key, label]) => (
           <button key={key} onClick={() => setTab(key)}
-            className={`px-4 py-1.5 text-sm font-ui transition-colors ${tab === key ? "bg-white shadow-sm font-medium text-charcoal-dark" : "text-charcoal/50 hover:text-charcoal/70"}`}>
+            className={`px-4 py-[9px] text-sm font-ui transition-colors ${tab === key ? "bg-white shadow-sm font-medium text-charcoal-dark" : "text-charcoal/50 hover:text-charcoal/70"}`}>
             {label}
           </button>
         ))}
