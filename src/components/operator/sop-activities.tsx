@@ -68,7 +68,7 @@ export function SopActivities() {
     if (isOperator || isMobile) { setLoading(false); return; }
     setLoading(true);
     try {
-      const res = await fetch(`/api/sop-workflow?contentStatus=DRAFT&pageSize=10`);
+      const res = await fetch(`/api/sop-workflow?contentStatus=DRAFT&pageSize=10&propertyId=${currentPropertyId}`);
       if (res.ok) {
         const json = await res.json();
         const mapped: SopActivity[] = (json.data || []).map((w: ApiItem) => ({
@@ -85,7 +85,7 @@ export function SopActivities() {
         setItems(mapped.filter(i => getActivityInfo(i) !== null).slice(0, 5));
       }
     } finally { setLoading(false); }
-  }, [isOperator]);
+  }, [isOperator, currentPropertyId]);
 
   useEffect(() => { fetchActivities(); }, [fetchActivities]);
 
