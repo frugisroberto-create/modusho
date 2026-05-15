@@ -81,11 +81,12 @@ export function SopForm({ mode, contentId, initialData, userRole, userDepartment
           let users = json.data || [];
           // CORPORATE: filtra solo HOD dei reparti nel perimetro operativo
           if (effectiveRole === "CORPORATE" && userDepartmentIds?.length) {
-            users = users.filter((u: { propertyAssignments: { department: { id: string } | null }[] }) =>
-              u.propertyAssignments?.some((a: { department: { id: string } | null }) =>
+            users = users.filter((u: { id: string; name: string; propertyAssignments?: { department?: { id: string } | null }[] }) => {
+              if (!u.propertyAssignments) return false;
+              return u.propertyAssignments.some((a) =>
                 a.department && userDepartmentIds!.includes(a.department.id)
-              )
-            );
+              );
+            });
           }
           setHodUsers(users.map((u: { id: string; name: string }) => ({ id: u.id, name: u.name })));
         }
@@ -94,7 +95,8 @@ export function SopForm({ mode, contentId, initialData, userRole, userDepartment
       }
     }
     fetchHods();
-  }, [canInvolveHod, propertyId]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [canInvolveHod, propertyId, effectiveRole, userDepartmentIds]);
 
   // In edit mode, load existing targets (tutti i tipi: ROLE, DEPARTMENT, USER)
   useEffect(() => {
