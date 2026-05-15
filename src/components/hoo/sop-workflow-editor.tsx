@@ -1239,7 +1239,11 @@ function PublishedActions({ contentId, workflowId, onRefresh }: { contentId: str
       <div className="flex items-center gap-3 bg-white border border-ivory-dark px-5 py-4">
         <button onClick={() => setShowReopenModal(true)}
           className="btn-primary">
-          Modifica
+          Modifica testo
+        </button>
+        <button onClick={() => router.push(`/hoo-sop/${contentId}/edit`)}
+          className="btn-outline">
+          Modifica reparto e destinatari
         </button>
         <button onClick={() => setShowArchiveModal(true)}
           className="btn-outline">

@@ -2,47 +2,47 @@ import { notFound, redirect } from "next/navigation";
 import { getSessionUser } from "@/lib/session";
 import { prisma } from "@/lib/prisma";
 import { SopForm } from "@/components/hoo/sop-form";
-import { ContentActions } from "@/components/hoo/content-actions";
 
-interface Props {
-  params: Promise<{ id: string }>;
-}
+interface Props { params: Promise<{ id: string }> }
 
 export default async function EditSopPage({ params }: Props) {
   const user = await getSessionUser();
   if (!user) redirect("/login");
-
-  const canEdit = ["HOTEL_MANAGER", "ADMIN", "SUPER_ADMIN"].includes(user.role);
-  if (!canEdit) redirect("/");
+  if (!["HOTEL_MANAGER", "CORPORATE", "ADMIN", "SUPER_ADMIN"].includes(user.role)) redirect("/");
 
   const { id } = await params;
 
   const content = await prisma.content.findUnique({
-    where: { id, isDeleted: false },
-    select: { id: true, type: true, title: true, body: true, status: true, propertyId: true, departmentId: true },
+    where: { id, isDeleted: false, type: "SOP" },
+    select: {
+      id: true, title: true, body: true, propertyId: true, departmentId: true, status: true,
+    },
   });
 
   if (!content) notFound();
-  if (content.status === "ARCHIVED") notFound();
 
-  const isPublished = content.status === "PUBLISHED";
+  let userDepartmentIds: string[] | undefined;
+  let userTargetDepartmentIds: string[] | undefined;
+  if (user.role === "HOD" || user.role === "CORPORATE") {
+    const assignments = await prisma.propertyAssignment.findMany({
+      where: { userId: user.id, departmentId: { not: null } },
+      select: { departmentId: true },
+    });
+    userDepartmentIds = assignments.map(a => a.departmentId!);
+  }
+  if (user.role === "CORPORATE") {
+    const dbUser = await prisma.user.findUnique({
+      where: { id: user.id },
+      select: { targetDepartmentIds: true },
+    });
+    if (dbUser?.targetDepartmentIds?.length) {
+      userTargetDepartmentIds = dbUser.targetDepartmentIds;
+    }
+  }
 
   return (
     <div>
-      <div className="flex items-center justify-between mb-6">
-        <h1 className="text-xl font-heading font-medium text-charcoal-dark">
-          {isPublished ? "Modifica SOP pubblicata" : "Modifica SOP"}
-        </h1>
-        {isPublished && (
-          <ContentActions
-            contentId={content.id}
-            contentType={content.type}
-            contentStatus={content.status}
-            userRole={user.role}
-          />
-        )}
-      </div>
-
+      <h1 className="text-xl font-heading font-medium text-charcoal-dark mb-6">Modifica SOP — Reparto e destinatari</h1>
       <SopForm
         mode="edit"
         contentId={content.id}
@@ -53,6 +53,8 @@ export default async function EditSopPage({ params }: Props) {
           departmentId: content.departmentId,
         }}
         userRole={user.role}
+        userDepartmentIds={userDepartmentIds}
+        userTargetDepartmentIds={userTargetDepartmentIds}
       />
     </div>
   );
