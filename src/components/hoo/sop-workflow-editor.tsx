@@ -99,12 +99,13 @@ export function SopWorkflowEditor({ workflowId, currentUserId, currentUserRole, 
   const [dirty, setDirty] = useState(false);
 
   // Avviso modifiche non salvate
-  // 1. beforeunload: chiusura/ricarica pagina
-  // 2. Intercettazione history.pushState: navigazione interna Next.js
   const dirtyRef = useRef(false);
+  const currentUrlRef = useRef("");
   useEffect(() => { dirtyRef.current = dirty; }, [dirty]);
+  useEffect(() => { currentUrlRef.current = window.location.href; }, []);
 
   useEffect(() => {
+    // 1. beforeunload: chiusura/ricarica pagina
     const handleBeforeUnload = (e: BeforeUnloadEvent) => {
       if (dirtyRef.current) {
         e.preventDefault();
@@ -112,35 +113,31 @@ export function SopWorkflowEditor({ workflowId, currentUserId, currentUserRole, 
     };
     window.addEventListener("beforeunload", handleBeforeUnload);
 
-    // Intercetta navigazione interna Next.js (usa history.pushState)
+    // 2. Intercetta navigazione interna Next.js
     const originalPushState = history.pushState.bind(history);
-    const originalReplaceState = history.replaceState.bind(history);
 
     history.pushState = function (...args) {
       if (dirtyRef.current) {
-        if (!confirm("Hai modifiche non salvate. Vuoi uscire senza salvare?")) {
+        const confirmed = confirm("Hai modifiche non salvate. Vuoi uscire senza salvare?");
+        if (!confirmed) {
+          // Blocca: non chiamare pushState e ripristina URL
+          window.history.replaceState(null, "", currentUrlRef.current);
           return;
         }
+        // Utente ha confermato l'uscita: resetta dirty per evitare loop
+        dirtyRef.current = false;
       }
       return originalPushState(...args);
     };
 
-    history.replaceState = function (...args) {
-      if (dirtyRef.current) {
-        if (!confirm("Hai modifiche non salvate. Vuoi uscire senza salvare?")) {
-          return;
-        }
-      }
-      return originalReplaceState(...args);
-    };
-
-    // Intercetta anche back/forward del browser
+    // 3. back/forward del browser
     const handlePopState = () => {
       if (dirtyRef.current) {
         if (!confirm("Hai modifiche non salvate. Vuoi uscire senza salvare?")) {
-          // Ripristina la posizione precedente
-          history.pushState(null, "", window.location.href);
+          history.pushState(null, "", currentUrlRef.current);
+          return;
         }
+        dirtyRef.current = false;
       }
     };
     window.addEventListener("popstate", handlePopState);
@@ -149,7 +146,6 @@ export function SopWorkflowEditor({ workflowId, currentUserId, currentUserRole, 
       window.removeEventListener("beforeunload", handleBeforeUnload);
       window.removeEventListener("popstate", handlePopState);
       history.pushState = originalPushState;
-      history.replaceState = originalReplaceState;
     };
   }, []);
 
