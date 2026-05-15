@@ -125,31 +125,15 @@ export default function ReportsPage() {
             </div>
           </div>
 
-          {/* ── SEZIONE 1: Stato attuale ── */}
-          <div>
-            <h3 className="text-sm font-ui font-semibold text-charcoal mb-3 uppercase tracking-wide">
-              Stato attuale — {data.currentState.totalPublished} SOP pubblicate
-            </h3>
-            <table className="w-full text-sm font-ui">
-              <thead>
-                <tr className="border-b border-ivory-dark text-left text-xs text-charcoal/45 uppercase">
-                  <th className="py-2">Reparto</th>
-                  <th className="py-2 text-center">SOP pubblicate</th>
-                </tr>
-              </thead>
-              <tbody>
-                {data.currentState.byDepartment.filter(d => d.publishedCount > 0).map((dept) => (
-                  <tr key={dept.id} className="border-b border-ivory-dark/50">
-                    <td className="py-2 text-charcoal">{dept.name} <span className="text-charcoal/40">({dept.code})</span></td>
-                    <td className="py-2 text-center font-medium text-sage">{dept.publishedCount}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-
+          {/* ── SEZIONE 1: Pubblicate nel periodo ── */}
+          <div className="text-center py-4 bg-ivory border border-ivory-dark">
+            <p className="text-[42px] font-heading font-semibold text-terracotta">{data.approvedInPeriod.total}</p>
+            <p className="text-sm font-ui text-charcoal/60">
+              {data.approvedInPeriod.total === 1 ? "nuova procedura pubblicata" : "nuove procedure pubblicate"} nel periodo
+            </p>
           </div>
 
-          {/* ── SEZIONE 2: Approvate nel periodo ── */}
+          {/* ── SEZIONE 2: Dettaglio approvate ── */}
           <div>
             <h3 className="text-sm font-ui font-semibold text-charcoal mb-3 uppercase tracking-wide">
               Approvate nel periodo — {data.approvedInPeriod.total} SOP
@@ -187,6 +171,29 @@ export default function ReportsPage() {
                 ))}
               </div>
             )}
+          </div>
+
+          {/* ── SEZIONE 3: Stato attuale ── */}
+          <div>
+            <h3 className="text-sm font-ui font-semibold text-charcoal mb-3 uppercase tracking-wide">
+              Stato attuale — {data.currentState.totalPublished} SOP pubblicate
+            </h3>
+            <table className="w-full text-sm font-ui">
+              <thead>
+                <tr className="border-b border-ivory-dark text-left text-xs text-charcoal/45 uppercase">
+                  <th className="py-2">Reparto</th>
+                  <th className="py-2 text-center">SOP pubblicate</th>
+                </tr>
+              </thead>
+              <tbody>
+                {data.currentState.byDepartment.filter(d => d.publishedCount > 0).map((dept) => (
+                  <tr key={dept.id} className="border-b border-ivory-dark/50">
+                    <td className="py-2 text-charcoal">{dept.name} <span className="text-charcoal/40">({dept.code})</span></td>
+                    <td className="py-2 text-center font-medium text-sage">{dept.publishedCount}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
           </div>
         </div>
       )}
