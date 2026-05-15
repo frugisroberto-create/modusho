@@ -16,13 +16,13 @@ interface HooSubNavProps {
   onPropertyChange: (id: string) => void;
 }
 
-const SUB_NAV_ITEMS: { href: string; label: string; minRole?: string }[] = [
-  { href: "/dashboard", label: "Overview", minRole: "HOTEL_MANAGER" },
+const SUB_NAV_ITEMS: { href: string; label: string; minRole?: string; excludeRoles?: string[] }[] = [
+  { href: "/dashboard", label: "Overview", minRole: "HOTEL_MANAGER", excludeRoles: ["CORPORATE"] },
   { href: "/approvals", label: "Approvazioni", minRole: "HOD" },
   { href: "/compliance", label: "Presa visione", minRole: "HOD" },
   { href: "/users", label: "Gestione utenti", minRole: "ADMIN" },
   { href: "/properties", label: "Strutture", minRole: "ADMIN" },
-  { href: "/reports", label: "Report", minRole: "HOTEL_MANAGER" },
+  { href: "/reports", label: "Report", minRole: "HOTEL_MANAGER", excludeRoles: ["CORPORATE"] },
 ];
 
 const ROLE_LEVEL: Record<string, number> = {
@@ -33,6 +33,7 @@ export function HooSubNav({ userRole, properties, currentPropertyId, onPropertyC
   const pathname = usePathname();
 
   const visibleItems = SUB_NAV_ITEMS.filter((item) => {
+    if (item.excludeRoles?.includes(userRole)) return false;
     if (!item.minRole) return true;
     return (ROLE_LEVEL[userRole] ?? 0) >= (ROLE_LEVEL[item.minRole] ?? 0);
   });
