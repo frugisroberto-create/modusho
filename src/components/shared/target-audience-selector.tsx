@@ -74,7 +74,16 @@ export function TargetAudienceSelector({
         }
         if (usersRes.ok) {
           const j = await usersRes.json();
-          setUsers(j.data || []);
+          let userList = j.data || [];
+          // CORPORATE: filtra utenti solo dei reparti nel perimetro
+          if (allowedDepartmentIds?.length) {
+            userList = userList.filter((u: { propertyAssignments?: { department?: { id: string } | null }[] }) =>
+              u.propertyAssignments?.some((a: { department?: { id: string } | null }) =>
+                a.department && allowedDepartmentIds.includes(a.department.id)
+              )
+            );
+          }
+          setUsers(userList);
         }
         if (myDeptsRes.ok) {
           const j = await myDeptsRes.json();
@@ -221,16 +230,18 @@ export function TargetAudienceSelector({
         </div>
       )}
 
-      {/* SEZIONE 1 — Tutti gli operatori */}
-      <div>
-        <label className="flex items-center gap-3 py-2.5 px-3 border border-ivory-dark cursor-pointer hover:bg-ivory-medium/30 transition-colors">
-          <input type="checkbox" checked={value.allDepartments} onChange={toggleAllDepartments} className="w-4 h-4 accent-terracotta" />
-          <div>
-            <span className="text-sm font-ui font-medium text-charcoal">Tutti gli operatori</span>
-            <p className="text-xs text-charcoal/45">Visibile a ogni operatore della struttura</p>
-          </div>
-        </label>
-      </div>
+      {/* SEZIONE 1 — Tutti gli operatori (nascosta per CORPORATE) */}
+      {userRole !== "CORPORATE" && (
+        <div>
+          <label className="flex items-center gap-3 py-2.5 px-3 border border-ivory-dark cursor-pointer hover:bg-ivory-medium/30 transition-colors">
+            <input type="checkbox" checked={value.allDepartments} onChange={toggleAllDepartments} className="w-4 h-4 accent-terracotta" />
+            <div>
+              <span className="text-sm font-ui font-medium text-charcoal">Tutti gli operatori</span>
+              <p className="text-xs text-charcoal/45">Visibile a ogni operatore della struttura</p>
+            </div>
+          </label>
+        </div>
+      )}
 
       {/* SEZIONE 2 — Reparti specifici */}
       <div>
@@ -259,21 +270,23 @@ export function TargetAudienceSelector({
         </div>
       </div>
 
-      {/* SEZIONE 3 — Ruoli trasversali */}
-      <div>
-        <p className="text-xs font-ui font-semibold uppercase tracking-wider text-charcoal/70 mb-1.5">Ruoli trasversali</p>
-        <div className="border border-ivory-dark divide-y divide-ivory-dark/50">
-          {(["HOD", "HOTEL_MANAGER"] as TargetRole[]).map((role) => (
-            <label key={role} className="flex items-center gap-3 py-2 px-3 cursor-pointer hover:bg-ivory-medium/30 transition-colors">
-              <input type="checkbox"
-                checked={value.roles.includes(role)}
-                onChange={() => toggleRole(role)}
-                className="w-4 h-4 accent-terracotta" />
-              <span className="text-sm font-ui text-charcoal">{ROLE_LABELS[role]}</span>
-            </label>
-          ))}
+      {/* SEZIONE 3 — Ruoli trasversali (nascosta per CORPORATE) */}
+      {userRole !== "CORPORATE" && (
+        <div>
+          <p className="text-xs font-ui font-semibold uppercase tracking-wider text-charcoal/70 mb-1.5">Ruoli trasversali</p>
+          <div className="border border-ivory-dark divide-y divide-ivory-dark/50">
+            {(["HOD", "HOTEL_MANAGER"] as TargetRole[]).map((role) => (
+              <label key={role} className="flex items-center gap-3 py-2 px-3 cursor-pointer hover:bg-ivory-medium/30 transition-colors">
+                <input type="checkbox"
+                  checked={value.roles.includes(role)}
+                  onChange={() => toggleRole(role)}
+                  className="w-4 h-4 accent-terracotta" />
+                <span className="text-sm font-ui text-charcoal">{ROLE_LABELS[role]}</span>
+              </label>
+            ))}
+          </div>
         </div>
-      </div>
+      )}
 
       {/* SEZIONE 4 — Utenti specifici */}
       <div>
