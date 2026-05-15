@@ -147,14 +147,6 @@ export default function ReportsPage() {
               </tbody>
             </table>
 
-            {data.currentState.deptsWithoutSop.length > 0 && (
-              <div className="mt-3 px-4 py-3 bg-[#FFF3E0] border-l-4 border-[#E65100] text-sm font-ui">
-                <span className="font-medium text-[#E65100]">Reparti senza procedure pubblicate: </span>
-                <span className="text-charcoal/70">
-                  {data.currentState.deptsWithoutSop.map(d => d.name).join(", ")}
-                </span>
-              </div>
-            )}
           </div>
 
           {/* ── SEZIONE 2: Approvate nel periodo ── */}
@@ -174,7 +166,6 @@ export default function ReportsPage() {
                       <thead>
                         <tr className="border-b border-ivory-dark text-left text-xs text-charcoal/45 uppercase">
                           <th className="py-1.5">Procedura</th>
-                          <th className="py-1.5">Autore (R)</th>
                           <th className="py-1.5 text-center">Approvata il</th>
                         </tr>
                       </thead>
@@ -185,7 +176,6 @@ export default function ReportsPage() {
                                 {sop.code && <span className="text-terracotta font-medium mr-1.5">{sop.code}</span>}
                                 <span className="text-charcoal">{sop.title}</span>
                               </td>
-                              <td className="py-2 text-charcoal/70">{sop.author}</td>
                               <td className="py-2 text-center text-charcoal/70">
                                 {new Date(sop.approvedAt).toLocaleDateString("it-IT", { day: "2-digit", month: "2-digit" })}
                               </td>
