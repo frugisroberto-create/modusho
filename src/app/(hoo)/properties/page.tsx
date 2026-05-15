@@ -61,26 +61,7 @@ export default function PropertiesPage() {
               </div>
 
               {/* Città */}
-              <p className="text-sm font-ui text-sage-light mb-4">{p.city}</p>
-
-              {/* KPI */}
-              <div className="mt-auto pt-4 border-t border-ivory-dark space-y-2">
-                <div className="flex items-center justify-between text-sm font-ui">
-                  <span className="text-sage-light">SOP</span>
-                  <span className="text-charcoal-dark font-medium">{p.sopPublished}/{p.sopTotal}</span>
-                </div>
-                {p.ackRate !== null && (
-                  <div className="space-y-1">
-                    <div className="flex items-center justify-between text-xs font-ui">
-                      <span className="text-sage-light">Presa visione</span>
-                      <span className="text-charcoal font-medium">{p.ackRate}%</span>
-                    </div>
-                    <div className="w-full h-1.5 bg-ivory-dark rounded-full overflow-hidden">
-                      <div className="h-full rounded-full bg-sage transition-all" style={{ width: `${p.ackRate}%` }} />
-                    </div>
-                  </div>
-                )}
-              </div>
+              <p className="text-sm font-ui text-sage-light">{p.city}</p>
             </Link>
           ))}
         </div>
