@@ -86,8 +86,8 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
   // assegnato come A nel RACI può approvare quando submittedToA è true.
   // Nota: il check di property scope sopra (checkAccess HOTEL_MANAGER) garantisce
   // che HM non possa pubblicare SOP di property a cui non è assegnato.
-  const userCanApprove = session.user.canApprove && (
-    userRole === "HOTEL_MANAGER" || userRole === "ADMIN" || userRole === "SUPER_ADMIN"
+  const userCanApprove = (session.user.canApprove || session.user.canPublish) && (
+    userRole === "HOTEL_MANAGER" || userRole === "CORPORATE" || userRole === "ADMIN" || userRole === "SUPER_ADMIN"
   );
   if (!userCanApprove && !canApprove(userId, wfInfo)) {
     return NextResponse.json({
