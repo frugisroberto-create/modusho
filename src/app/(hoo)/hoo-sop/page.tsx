@@ -60,9 +60,20 @@ export default function HooSopListPage() {
   const [loading, setLoading] = useState(true);
   const [statusFilter, setStatusFilter] = useState("");
   const [validityFilter, setValidityFilter] = useState<"" | "expiring" | "expired">("");
+  const [propertyFilter, setPropertyFilter] = useState("");
+  const [departmentFilter, setDepartmentFilter] = useState("");
+  const [properties, setProperties] = useState<{ id: string; name: string; code: string; departments: { id: string; name: string; code: string }[] }[]>([]);
   const [search, setSearch] = useState("");
   const [searchInput, setSearchInput] = useState("");
   const pageSize = 20;
+
+  useEffect(() => {
+    async function fetchProps() {
+      const res = await fetch("/api/properties");
+      if (res.ok) { const json = await res.json(); setProperties(json.data); }
+    }
+    fetchProps();
+  }, []);
 
   const fetchSops = useCallback(async () => {
     setLoading(true);
@@ -70,6 +81,8 @@ export default function HooSopListPage() {
     if (statusFilter) {
       params.set("contentStatus", statusFilter);
     }
+    if (propertyFilter) params.set("propertyId", propertyFilter);
+    if (departmentFilter) params.set("departmentId", departmentFilter);
     if (search) {
       params.set("search", search);
     }
@@ -83,10 +96,10 @@ export default function HooSopListPage() {
         console.error("SOP fetch failed:", res.status, await res.text().catch(() => ""));
       }
     } finally { setLoading(false); }
-  }, [page, statusFilter, search]);
+  }, [page, statusFilter, propertyFilter, departmentFilter, search]);
 
   useEffect(() => { fetchSops(); }, [fetchSops]);
-  useEffect(() => { setPage(1); }, [statusFilter, search]);
+  useEffect(() => { setPage(1); }, [statusFilter, propertyFilter, departmentFilter, search]);
 
   // Filtro client-side per validità
   const filteredItems = useMemo(() => {
@@ -151,25 +164,34 @@ export default function HooSopListPage() {
 
       {/* Filtri */}
       <div className="flex items-end gap-4 flex-wrap">
-        <div>
-          <label className="block text-[11px] font-ui uppercase tracking-wider text-charcoal/45 mb-1">Stato</label>
-          <select value={statusFilter} onChange={(e) => setStatusFilter(e.target.value)}
-            className="text-sm border border-ivory-dark px-3 py-2 bg-white font-ui">
-            <option value="">Tutti gli stati</option>
-            <option value="DRAFT">In lavorazione</option>
-            <option value="PUBLISHED">Pubblicata</option>
-            <option value="ARCHIVED">Archiviata</option>
+        {properties.length > 1 && (
+          <select value={propertyFilter} onChange={(e) => { setPropertyFilter(e.target.value); setDepartmentFilter(""); }}
+            className="text-sm font-ui border border-ivory-dark px-3 py-[9px] bg-white">
+            <option value="">Tutte le strutture</option>
+            {properties.map(p => <option key={p.id} value={p.id}>{p.code} — {p.name}</option>)}
           </select>
-        </div>
-        <div>
-          <label className="block text-[11px] font-ui uppercase tracking-wider text-charcoal/45 mb-1">Validità</label>
-          <select value={validityFilter} onChange={(e) => setValidityFilter(e.target.value as "" | "expiring" | "expired")}
-            className="text-sm border border-ivory-dark px-3 py-2 bg-white font-ui">
-            <option value="">Tutte</option>
-            <option value="expiring">In scadenza</option>
-            <option value="expired">Scadute</option>
-          </select>
-        </div>
+        )}
+        <select value={departmentFilter} onChange={(e) => setDepartmentFilter(e.target.value)}
+          className={`text-sm font-ui border border-ivory-dark px-3 py-[9px] bg-white ${!propertyFilter ? "text-charcoal/35" : ""}`}
+          disabled={!propertyFilter}>
+          <option value="">Tutti i reparti</option>
+          {propertyFilter && properties.find(p => p.id === propertyFilter)?.departments?.map(d =>
+            <option key={d.id} value={d.id}>{d.name}</option>
+          )}
+        </select>
+        <select value={statusFilter} onChange={(e) => setStatusFilter(e.target.value)}
+          className="text-sm font-ui border border-ivory-dark px-3 py-[9px] bg-white">
+          <option value="">Tutti gli stati</option>
+          <option value="DRAFT">In lavorazione</option>
+          <option value="PUBLISHED">Pubblicata</option>
+          <option value="ARCHIVED">Archiviata</option>
+        </select>
+        <select value={validityFilter} onChange={(e) => setValidityFilter(e.target.value as "" | "expiring" | "expired")}
+          className="text-sm font-ui border border-ivory-dark px-3 py-[9px] bg-white">
+          <option value="">Tutte le validità</option>
+          <option value="expiring">In scadenza</option>
+          <option value="expired">Scadute</option>
+        </select>
       </div>
 
       {/* Lista (con filtro validità client-side) */}
