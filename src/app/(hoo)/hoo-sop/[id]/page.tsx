@@ -18,7 +18,7 @@ interface Props {
 export default async function HooSopDetailPage({ params }: Props) {
   const user = await getSessionUser();
   if (!user) redirect("/login");
-  if (!["HOTEL_MANAGER", "ADMIN", "SUPER_ADMIN"].includes(user.role)) redirect("/");
+  if (!["HOTEL_MANAGER", "CORPORATE", "ADMIN", "SUPER_ADMIN"].includes(user.role)) redirect("/");
 
   const { id } = await params;
 

@@ -284,8 +284,9 @@ export async function POST(request: NextRequest) {
   // DOCUMENT/MEMO: HM/ADMIN/SUPER_ADMIN/HOD (HOD limitato al proprio perimetro — vedi sotto)
   // BRAND_BOOK/STANDARD_BOOK: solo ADMIN/SUPER_ADMIN
   if (publishDirectly) {
-    if (type === "SOP" && role !== "ADMIN" && role !== "SUPER_ADMIN") {
-      return NextResponse.json({ error: "Solo ADMIN e SUPER_ADMIN possono pubblicare SOP direttamente" }, { status: 403 });
+    const canPublishSop = role === "ADMIN" || role === "SUPER_ADMIN" || (session.user.canPublish && (role === "CORPORATE" || role === "HOTEL_MANAGER"));
+    if (type === "SOP" && !canPublishSop) {
+      return NextResponse.json({ error: "Non hai permessi per pubblicare SOP direttamente" }, { status: 403 });
     }
     if ((type === "BRAND_BOOK" || type === "STANDARD_BOOK") && role !== "ADMIN" && role !== "SUPER_ADMIN") {
       return NextResponse.json({ error: "Solo ADMIN e SUPER_ADMIN possono pubblicare Brand/Standard Book direttamente" }, { status: 403 });

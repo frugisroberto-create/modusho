@@ -286,8 +286,9 @@ export async function PUT(
   if ((sendToReview || publishDirectly) && (content.status === "DRAFT" || content.status === "RETURNED")) {
     // Validazione server-side: pubblicazione diretta
     if (publishDirectly) {
-      if (content.type === "SOP" && role !== "ADMIN" && role !== "SUPER_ADMIN") {
-        return NextResponse.json({ error: "Solo ADMIN e SUPER_ADMIN possono pubblicare SOP direttamente" }, { status: 403 });
+      const canPublishSop = role === "ADMIN" || role === "SUPER_ADMIN" || (session.user.canPublish && (role === "CORPORATE" || role === "HOTEL_MANAGER"));
+      if (content.type === "SOP" && !canPublishSop) {
+        return NextResponse.json({ error: "Non hai permessi per pubblicare SOP direttamente" }, { status: 403 });
       }
       if ((content.type === "BRAND_BOOK" || content.type === "STANDARD_BOOK") && role !== "ADMIN" && role !== "SUPER_ADMIN") {
         return NextResponse.json({ error: "Solo ADMIN e SUPER_ADMIN possono pubblicare Brand/Standard Book direttamente" }, { status: 403 });
