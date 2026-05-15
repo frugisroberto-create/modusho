@@ -20,8 +20,9 @@ export async function GET(request: NextRequest) {
   const userRole = session.user.role;
   const isAdmin = userRole === "ADMIN" || userRole === "SUPER_ADMIN";
   const isHM = userRole === "HOTEL_MANAGER";
+  const isCorporate = userRole === "CORPORATE";
 
-  if (!isAdmin && !isHM) {
+  if (!isAdmin && !isHM && !isCorporate) {
     return NextResponse.json({ error: "Accesso negato" }, { status: 403 });
   }
 
@@ -43,8 +44,8 @@ export async function GET(request: NextRequest) {
     ];
   }
 
-  // HOTEL_MANAGER: accesso in sola lettura, limitato alle property assegnate
-  if (isHM) {
+  // HOTEL_MANAGER / CORPORATE: accesso in sola lettura, limitato alle property assegnate
+  if (isHM || isCorporate) {
     if (propertyId) {
       // Se specifica una propertyId, verifica che HM sia assegnato
       const hmAssignment = await prisma.propertyAssignment.findFirst({
