@@ -271,7 +271,31 @@ export function SopWorkflowEditor({ workflowId, currentUserId, currentUserRole, 
     }
   };
 
-  const handleApproveClick = () => {
+  const handleApproveClick = async () => {
+    // Se ci sono modifiche non salvate, salva prima di pubblicare
+    if (dirty && wf) {
+      setSaving(true);
+      try {
+        const saveRes = await fetch(`/api/sop-workflow/${workflowId}`, {
+          method: "PUT",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ title: editTitle, body: editBody, expectedVersionCount: wf.textVersionCount }),
+        });
+        if (!saveRes.ok) {
+          const data = await saveRes.json();
+          setActionMessage({ type: "error", text: data.error || "Errore nel salvataggio automatico" });
+          setSaving(false);
+          return;
+        }
+        await fetchWorkflow();
+      } catch {
+        setActionMessage({ type: "error", text: "Errore nel salvataggio automatico" });
+        setSaving(false);
+        return;
+      }
+      setSaving(false);
+    }
+
     // Se la SOP era già pubblicata in passato → mostra domanda sulla nuova conferma
     if (wf?.publishedAt) {
       setShowRepubModal(true);
