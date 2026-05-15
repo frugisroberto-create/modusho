@@ -247,7 +247,7 @@ export function SopForm({ mode, contentId, initialData, userRole, userDepartment
                 setDepartmentId("");
               }
             }}
-            disabled={mode === "edit"} className="w-full disabled:opacity-50">
+            className="w-full">
             <option value="">Seleziona struttura</option>
             {properties.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
           </select>
@@ -262,7 +262,7 @@ export function SopForm({ mode, contentId, initialData, userRole, userDepartment
               <strong className="text-charcoal/60"> non determina la visibilità</strong>, che è governata dai destinatari sotto.
             </p>
             <select value={departmentId} onChange={(e) => setDepartmentId(e.target.value)}
-              disabled={mode === "edit"} className="w-full disabled:opacity-50">
+              className="w-full">
               <option value="">Seleziona reparto proprietario</option>
               {creatableDepartments.map(d => <option key={d.id} value={d.id}>{d.name} ({d.code})</option>)}
             </select>
