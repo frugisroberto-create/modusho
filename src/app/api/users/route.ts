@@ -124,6 +124,7 @@ const createUserSchema = z.object({
   canApprove: z.boolean().default(false),
   canPublish: z.boolean().default(false),
   targetDepartmentIds: z.array(z.string()).default([]),
+  viewDepartmentIds: z.array(z.string()).default([]),
   propertyAssignments: z.array(z.object({
     propertyId: z.string(),
     departmentId: z.string().nullable().optional(),
@@ -142,7 +143,7 @@ export async function POST(request: NextRequest) {
   const parsed = createUserSchema.safeParse(body);
   if (!parsed.success) return NextResponse.json({ error: "Parametri non validi", details: parsed.error.issues }, { status: 400 });
 
-  const { email, name, password, role, canView, canEdit, canApprove, canPublish, targetDepartmentIds, propertyAssignments, contentTypes } = parsed.data;
+  const { email, name, password, role, canView, canEdit, canApprove, canPublish, targetDepartmentIds, viewDepartmentIds, propertyAssignments, contentTypes } = parsed.data;
 
   // Validazioni coerenza ruolo-permessi
   if (role === "OPERATOR" && (canEdit || canApprove)) {
@@ -201,7 +202,7 @@ export async function POST(request: NextRequest) {
   const passwordHash = await bcrypt.hash(password, 12);
 
   const user = await prisma.user.create({
-    data: { email, name, passwordHash, role, canView, canEdit, canApprove, canPublish, targetDepartmentIds },
+    data: { email, name, passwordHash, role, canView, canEdit, canApprove, canPublish, targetDepartmentIds, viewDepartmentIds },
   });
 
   // Property assignments

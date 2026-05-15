@@ -158,7 +158,7 @@ export async function getAccessibleDepartmentIds(
 ): Promise<string[]> {
   const user = await prisma.user.findUnique({
     where: { id: userId },
-    select: { role: true },
+    select: { role: true, viewDepartmentIds: true },
   });
 
   if (!user) return [];
@@ -186,9 +186,22 @@ export async function getAccessibleDepartmentIds(
     return allDepts.map((d) => d.id);
   }
 
-  return assignments
+  // Reparti operativi + reparti visibili aggiuntivi
+  const operativeIds = assignments
     .filter((a) => a.departmentId !== null)
     .map((a) => a.departmentId!);
+
+  if (user.viewDepartmentIds?.length) {
+    // Filtra viewDepartmentIds per la property corrente
+    const propertyDepts = await prisma.department.findMany({
+      where: { propertyId, id: { in: user.viewDepartmentIds } },
+      select: { id: true },
+    });
+    const viewIds = propertyDepts.map((d) => d.id);
+    return [...new Set([...operativeIds, ...viewIds])];
+  }
+
+  return operativeIds;
 }
 
 /**

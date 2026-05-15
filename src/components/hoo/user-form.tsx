@@ -29,6 +29,7 @@ interface UserFormProps {
     canApprove: boolean;
     canPublish: boolean;
     targetDepartmentIds: string[];
+    viewDepartmentIds: string[];
     isActive: boolean;
     assignments: AssignmentEntry[];
     contentTypes: ContentTypeOption[];
@@ -76,6 +77,7 @@ export function UserForm({ mode, userId, onSuccess, initialData }: UserFormProps
   const [canApprove, setCanApprove] = useState(initialData?.canApprove ?? false);
   const [canPublish, setCanPublish] = useState(initialData?.canPublish ?? false);
   const [targetDepartmentIds, setTargetDepartmentIds] = useState<string[]>(initialData?.targetDepartmentIds ?? []);
+  const [viewDepartmentIds, setViewDepartmentIds] = useState<string[]>(initialData?.viewDepartmentIds ?? []);
 
   // Sezione 4+5 — Strutture e reparti
   const [properties, setProperties] = useState<Property[]>([]);
@@ -276,6 +278,7 @@ export function UserForm({ mode, userId, onSuccess, initialData }: UserFormProps
         name, email, role,
         canView: true, canEdit, canApprove, canPublish,
         targetDepartmentIds: role === "CORPORATE" ? targetDepartmentIds : [],
+        viewDepartmentIds,
         propertyAssignments: realAssignments,
         contentTypes,
       };
@@ -611,6 +614,48 @@ export function UserForm({ mode, userId, onSuccess, initialData }: UserFormProps
                           <input type="checkbox" checked={isSelected}
                             onChange={() => {
                               setTargetDepartmentIds(prev =>
+                                isSelected ? prev.filter(id => id !== dept.id) : [...prev, dept.id]
+                              );
+                            }}
+                            className="w-3.5 h-3.5 rounded border-ivory-dark text-terracotta focus:ring-terracotta" />
+                          <span className="text-xs font-ui text-charcoal">{dept.name}</span>
+                        </label>
+                      );
+                    })}
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </section>
+      )}
+
+      {/* SEZIONE 5c — Reparti visibili (HOD e CORPORATE) */}
+      {(role === "HOD" || role === "CORPORATE") && selectedPropertyIds.length > 0 && (
+        <section className="bg-ivory-medium border border-ivory-dark p-6 space-y-4">
+          <h2 className="text-base font-heading font-semibold text-charcoal-dark">Reparti visibili</h2>
+          <p className="text-xs font-ui text-sage-light">
+            Seleziona i reparti aggiuntivi di cui questo utente può consultare le procedure (in sola lettura). I reparti operativi sono sempre visibili.
+          </p>
+          <div className="space-y-3">
+            {selectedPropertyIds.map((propId) => {
+              const prop = properties.find(p => p.id === propId);
+              if (!prop) return null;
+              // Escludi i reparti già assegnati come operativi
+              const operativeDeptIds = assignments.filter(a => a.propertyId === propId && a.departmentId && a.departmentId !== "__pending__").map(a => a.departmentId!);
+              const availableDepts = prop.departments.filter(d => !operativeDeptIds.includes(d.id));
+              if (availableDepts.length === 0) return null;
+              return (
+                <div key={propId} className="border border-ivory-dark p-4 bg-ivory">
+                  <p className="text-sm font-ui font-medium text-charcoal-dark mb-2">{prop.name}</p>
+                  <div className="grid grid-cols-2 sm:grid-cols-3 gap-1">
+                    {availableDepts.map((dept) => {
+                      const isSelected = viewDepartmentIds.includes(dept.id);
+                      return (
+                        <label key={dept.id} className="flex items-center gap-2 py-1 cursor-pointer">
+                          <input type="checkbox" checked={isSelected}
+                            onChange={() => {
+                              setViewDepartmentIds(prev =>
                                 isSelected ? prev.filter(id => id !== dept.id) : [...prev, dept.id]
                               );
                             }}
