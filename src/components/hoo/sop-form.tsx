@@ -75,30 +75,19 @@ export function SopForm({ mode, contentId, initialData, userRole, userDepartment
     setHodLoading(true);
     async function fetchHods() {
       try {
-        const url = `/api/users?role=HOD&propertyId=${propertyId}&pageSize=50`;
-        console.log("[SopForm] fetchHods URL:", url);
-        console.log("[SopForm] effectiveRole:", effectiveRole, "userDepartmentIds:", userDepartmentIds);
-        const res = await fetch(url);
-        console.log("[SopForm] fetchHods status:", res.status);
+        const res = await fetch(`/api/users?role=HOD&propertyId=${propertyId}&pageSize=50`);
         if (res.ok) {
           const json = await res.json();
           let users = json.data || [];
-          console.log("[SopForm] HOD trovati dalla API:", users.length, users.map((u: { name: string }) => u.name));
           // CORPORATE: filtra solo HOD dei reparti nel perimetro operativo
           if (effectiveRole === "CORPORATE" && userDepartmentIds?.length) {
-            console.log("[SopForm] Applico filtro CORPORATE");
             users = users.filter((u: { id: string; name: string; propertyAssignments?: { department?: { id: string } | null }[] }) => {
-              const match = u.propertyAssignments?.some((a) =>
+              return u.propertyAssignments?.some((a) =>
                 a.department && userDepartmentIds!.includes(a.department.id)
               );
-              console.log("[SopForm]", u.name, "assignments:", JSON.stringify(u.propertyAssignments?.map(a => a.department?.id)), "match:", match);
-              return match;
             });
           }
-          console.log("[SopForm] HOD dopo filtro:", users.length);
           setHodUsers(users.map((u: { id: string; name: string }) => ({ id: u.id, name: u.name })));
-        } else {
-          console.log("[SopForm] fetchHods FAILED:", res.status);
         }
       } finally {
         setHodLoading(false);
