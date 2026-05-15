@@ -51,14 +51,22 @@ export default withAuth(
       }
     }
 
-    // 4a. Dashboard: HM+ (overview operativa)
+    // 4a. Dashboard: HM+ ma non CORPORATE (redirect a approvazioni)
     if (pathname.startsWith("/dashboard")) {
+      if (userRole === "CORPORATE") {
+        return NextResponse.redirect(new URL("/approvals", req.url));
+      }
       if (ROLE_HIERARCHY[userRole] < ROLE_HIERARCHY.HOTEL_MANAGER) {
         return NextResponse.redirect(new URL("/hoo-sop", req.url));
       }
     }
 
-    // 4a2. Approvazioni, presa visione e report: accessibili da HOD+
+    // 4a2. Report: CORPORATE redirect a approvazioni
+    if (pathname.startsWith("/reports") && userRole === "CORPORATE") {
+      return NextResponse.redirect(new URL("/approvals", req.url));
+    }
+
+    // 4a3. Approvazioni, presa visione e report: accessibili da HOD+
     if (pathname.startsWith("/approvals") || pathname.startsWith("/compliance") || pathname.startsWith("/reports")) {
       if (ROLE_HIERARCHY[userRole] < ROLE_HIERARCHY.HOD) {
         return NextResponse.redirect(new URL("/unauthorized", req.url));
