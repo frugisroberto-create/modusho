@@ -88,45 +88,22 @@ export async function GET(request: NextRequest) {
     orderBy: { changedAt: "desc" },
   });
 
-  // Per ogni SOP approvata, calcola presa visione
-  const approvedSops = await Promise.all(
-    approvedHistory.map(async (h) => {
-      const contentId = h.content.id;
-      // Conta acknowledgments
-      const ackCount = await prisma.contentAcknowledgment.count({ where: { contentId } });
-      // Conta target users (approssimazione: operatori del reparto o della property)
-      let targetCount = 0;
-      if (h.content.department) {
-        targetCount = await prisma.user.count({
-          where: {
-            isActive: true,
-            role: { in: ["OPERATOR", "HOD"] },
-            propertyAssignments: { some: { departmentId: h.content.department.id } },
-          },
-        });
-      } else {
-        targetCount = await prisma.user.count({
-          where: {
-            isActive: true,
-            role: "OPERATOR",
-            propertyAssignments: { some: { propertyId } },
-          },
-        });
-      }
+  // Deduplica per contentId (prendi solo l'ultima approvazione per ogni SOP)
+  const seenIds = new Set<string>();
+  const uniqueHistory = approvedHistory.filter((h) => {
+    if (seenIds.has(h.content.id)) return false;
+    seenIds.add(h.content.id);
+    return true;
+  });
 
-      return {
-        id: contentId,
-        code: h.content.code,
-        title: h.content.title,
-        department: h.content.department,
-        author: h.content.sopWorkflow?.responsible?.name || "—",
-        authorRole: h.content.sopWorkflow?.responsible?.role || "—",
-        approvedAt: h.changedAt.toISOString(),
-        ackCount,
-        targetCount,
-      };
-    })
-  );
+  const approvedSops = uniqueHistory.map((h) => ({
+    id: h.content.id,
+    code: h.content.code,
+    title: h.content.title,
+    department: h.content.department,
+    author: h.content.sopWorkflow?.responsible?.name || "—",
+    approvedAt: h.changedAt.toISOString(),
+  }));
 
   // Raggruppa per reparto
   const approvedByDept: Record<string, typeof approvedSops> = {};

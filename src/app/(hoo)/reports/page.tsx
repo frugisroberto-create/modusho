@@ -10,8 +10,8 @@ interface DeptStat {
 interface ApprovedSop {
   id: string; code: string | null; title: string;
   department: { name: string; code: string } | null;
-  author: string; authorRole: string;
-  approvedAt: string; ackCount: number; targetCount: number;
+  author: string;
+  approvedAt: string;
 }
 
 interface ReportData {
@@ -176,13 +176,10 @@ export default function ReportsPage() {
                           <th className="py-1.5">Procedura</th>
                           <th className="py-1.5">Autore (R)</th>
                           <th className="py-1.5 text-center">Approvata il</th>
-                          <th className="py-1.5 text-center">Presa visione</th>
                         </tr>
                       </thead>
                       <tbody>
-                        {sops.map((sop) => {
-                          const pct = sop.targetCount > 0 ? Math.round((sop.ackCount / sop.targetCount) * 100) : 0;
-                          return (
+                        {sops.map((sop) => (
                             <tr key={sop.id} className="border-b border-ivory-dark/30">
                               <td className="py-2">
                                 {sop.code && <span className="text-terracotta font-medium mr-1.5">{sop.code}</span>}
@@ -192,15 +189,8 @@ export default function ReportsPage() {
                               <td className="py-2 text-center text-charcoal/70">
                                 {new Date(sop.approvedAt).toLocaleDateString("it-IT", { day: "2-digit", month: "2-digit" })}
                               </td>
-                              <td className="py-2 text-center">
-                                <span className={`font-medium ${pct >= 80 ? "text-sage" : pct >= 50 ? "text-[#D4A017]" : "text-alert-red"}`}>
-                                  {sop.ackCount}/{sop.targetCount}
-                                </span>
-                                <span className="text-charcoal/40 ml-1">({pct}%)</span>
-                              </td>
                             </tr>
-                          );
-                        })}
+                        ))}
                       </tbody>
                     </table>
                   </div>
