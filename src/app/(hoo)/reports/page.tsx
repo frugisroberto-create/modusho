@@ -32,6 +32,46 @@ interface ReportData {
 
 type PeriodPreset = "month" | "quarter" | "semester";
 
+// Macro-categorie reparti
+const DEPT_CATEGORIES: Record<string, string> = {
+  FB: "Food & Beverage", SAL: "Food & Beverage", CUC: "Food & Beverage", BAR: "Food & Beverage",
+  HOU: "Room Division", FO: "Room Division", VAL: "Room Division", ROO: "Room Division",
+  HM: "Management", HOO: "Management",
+};
+const CATEGORY_ORDER = ["Food & Beverage", "Room Division", "Management", "Altro"];
+
+function getCategoryForDept(code: string): string {
+  return DEPT_CATEGORIES[code] || "Altro";
+}
+
+function groupByCategory<T extends { department?: { code: string } | null }>(items: T[]): Record<string, T[]> {
+  const groups: Record<string, T[]> = {};
+  for (const item of items) {
+    const cat = item.department ? getCategoryForDept(item.department.code) : "Altro";
+    if (!groups[cat]) groups[cat] = [];
+    groups[cat].push(item);
+  }
+  return groups;
+}
+
+function groupDeptStatsByCategory(depts: DeptStat[]): Record<string, DeptStat[]> {
+  const groups: Record<string, DeptStat[]> = {};
+  for (const dept of depts) {
+    const cat = getCategoryForDept(dept.code);
+    if (!groups[cat]) groups[cat] = [];
+    groups[cat].push(dept);
+  }
+  return groups;
+}
+
+function sortedCategories(categories: string[]): string[] {
+  return categories.sort((a, b) => {
+    const ia = CATEGORY_ORDER.indexOf(a);
+    const ib = CATEGORY_ORDER.indexOf(b);
+    return (ia === -1 ? 99 : ia) - (ib === -1 ? 99 : ib);
+  });
+}
+
 interface Property { id: string; name: string; code: string }
 
 export default function ReportsPage() {
@@ -133,67 +173,94 @@ export default function ReportsPage() {
             </p>
           </div>
 
-          {/* ── SEZIONE 2: Dettaglio approvate ── */}
+          {/* ── SEZIONE 2: Dettaglio approvate per macro-categoria ── */}
           <div>
             <h3 className="text-sm font-ui font-semibold text-charcoal mb-3 uppercase tracking-wide">
-              Approvate nel periodo — {data.approvedInPeriod.total} SOP
+              Dettaglio procedure pubblicate nel periodo
             </h3>
 
             {data.approvedInPeriod.total === 0 ? (
               <p className="text-charcoal/40 text-sm font-ui py-4 text-center italic">Nessuna SOP approvata nel periodo selezionato</p>
             ) : (
-              <div className="space-y-4">
-                {Object.entries(data.approvedInPeriod.byDepartment).map(([deptName, sops]) => (
-                  <div key={deptName}>
-                    <p className="text-xs font-ui font-semibold uppercase tracking-wider text-terracotta mb-1.5">{deptName}</p>
-                    <table className="w-full text-sm font-ui">
-                      <thead>
-                        <tr className="border-b border-ivory-dark text-left text-xs text-charcoal/45 uppercase">
-                          <th className="py-1.5">Procedura</th>
-                          <th className="py-1.5 text-center">Approvata il</th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {sops.map((sop) => (
-                            <tr key={sop.id} className="border-b border-ivory-dark/30">
-                              <td className="py-2">
-                                {sop.code && <span className="text-terracotta font-medium mr-1.5">{sop.code}</span>}
-                                <span className="text-charcoal">{sop.title}</span>
-                              </td>
-                              <td className="py-2 text-center text-charcoal/70">
-                                {new Date(sop.approvedAt).toLocaleDateString("it-IT", { day: "2-digit", month: "2-digit" })}
-                              </td>
-                            </tr>
-                        ))}
-                      </tbody>
-                    </table>
-                  </div>
-                ))}
+              <div className="space-y-6">
+                {(() => {
+                  const byCat = groupByCategory(data.approvedInPeriod.list);
+                  return sortedCategories(Object.keys(byCat)).map((catName) => {
+                    const sops = byCat[catName];
+                    // Raggruppa per sotto-reparto dentro la macro-categoria
+                    const byDept: Record<string, ApprovedSop[]> = {};
+                    for (const sop of sops) {
+                      const deptName = sop.department?.name || "Trasversale";
+                      if (!byDept[deptName]) byDept[deptName] = [];
+                      byDept[deptName].push(sop);
+                    }
+                    return (
+                      <div key={catName}>
+                        <p className="text-sm font-heading font-semibold text-terracotta mb-2 border-b border-terracotta/30 pb-1">{catName}</p>
+                        <div className="space-y-3 pl-3">
+                          {Object.entries(byDept).map(([deptName, deptSops]) => (
+                            <div key={deptName}>
+                              <p className="text-xs font-ui font-semibold uppercase tracking-wider text-charcoal/60 mb-1">{deptName}</p>
+                              <table className="w-full text-sm font-ui">
+                                <tbody>
+                                  {deptSops.map((sop) => (
+                                    <tr key={sop.id} className="border-b border-ivory-dark/30">
+                                      <td className="py-1.5">
+                                        {sop.code && <span className="text-terracotta font-medium mr-1.5">{sop.code}</span>}
+                                        <span className="text-charcoal">{sop.title}</span>
+                                      </td>
+                                      <td className="py-1.5 text-right text-charcoal/50 text-xs w-20">
+                                        {new Date(sop.approvedAt).toLocaleDateString("it-IT", { day: "2-digit", month: "2-digit" })}
+                                      </td>
+                                    </tr>
+                                  ))}
+                                </tbody>
+                              </table>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    );
+                  });
+                })()}
               </div>
             )}
           </div>
 
-          {/* ── SEZIONE 3: Stato attuale ── */}
+          {/* ── SEZIONE 3: Stato attuale per macro-categoria ── */}
           <div>
             <h3 className="text-sm font-ui font-semibold text-charcoal mb-3 uppercase tracking-wide">
               Stato attuale — {data.currentState.totalPublished} SOP pubblicate
             </h3>
-            <table className="w-full text-sm font-ui">
-              <thead>
-                <tr className="border-b border-ivory-dark text-left text-xs text-charcoal/45 uppercase">
-                  <th className="py-2">Reparto</th>
-                  <th className="py-2 text-center">SOP pubblicate</th>
-                </tr>
-              </thead>
-              <tbody>
-                {data.currentState.byDepartment.filter(d => d.publishedCount > 0).map((dept) => (
-                  <tr key={dept.id} className="border-b border-ivory-dark/50">
-                    <td className="py-2 text-charcoal">{dept.name} <span className="text-charcoal/40">({dept.code})</span></td>
-                    <td className="py-2 text-center font-medium text-sage">{dept.publishedCount}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
+            {(() => {
+              const byCat = groupDeptStatsByCategory(data.currentState.byDepartment.filter(d => d.publishedCount > 0));
+              return (
+                <div className="space-y-4">
+                  {sortedCategories(Object.keys(byCat)).map((catName) => {
+                    const depts = byCat[catName];
+                    const catTotal = depts.reduce((sum, d) => sum + d.publishedCount, 0);
+                    return (
+                      <div key={catName}>
+                        <div className="flex items-center justify-between mb-1">
+                          <p className="text-sm font-heading font-semibold text-terracotta">{catName}</p>
+                          <p className="text-sm font-ui font-semibold text-sage">{catTotal}</p>
+                        </div>
+                        <table className="w-full text-sm font-ui">
+                          <tbody>
+                            {depts.map((dept) => (
+                              <tr key={dept.id} className="border-b border-ivory-dark/30">
+                                <td className="py-1.5 pl-3 text-charcoal">{dept.name}</td>
+                                <td className="py-1.5 text-right text-charcoal/60 w-16">{dept.publishedCount}</td>
+                              </tr>
+                            ))}
+                          </tbody>
+                        </table>
+                      </div>
+                    );
+                  })}
+                </div>
+              );
+            })()}
           </div>
         </div>
       )}
