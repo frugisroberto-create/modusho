@@ -8,134 +8,148 @@ import { z } from "zod/v4";
 const querySchema = z.object({
   from: z.string().optional(),
   to: z.string().optional(),
+  propertyId: z.string(),
 });
 
 export async function GET(request: NextRequest) {
   const session = await getServerSession(authOptions);
   if (!session?.user) return NextResponse.json({ error: "Non autenticato" }, { status: 401 });
-  if (session.user.role !== "HOTEL_MANAGER" && session.user.role !== "ADMIN" && session.user.role !== "SUPER_ADMIN") {
+  const role = session.user.role;
+  if (role !== "HOTEL_MANAGER" && role !== "ADMIN" && role !== "SUPER_ADMIN") {
     return NextResponse.json({ error: "Accesso negato" }, { status: 403 });
   }
 
   const params = Object.fromEntries(request.nextUrl.searchParams);
   const parsed = querySchema.safeParse(params);
-  if (!parsed.success) return NextResponse.json({ error: "Parametri non validi" }, { status: 400 });
+  if (!parsed.success) return NextResponse.json({ error: "Parametri non validi (propertyId obbligatorio)" }, { status: 400 });
 
+  const { propertyId } = parsed.data;
   const periodFrom = parsed.data.from ? new Date(parsed.data.from) : new Date(Date.now() - 30 * 86400000);
   const periodTo = parsed.data.to ? new Date(parsed.data.to) : new Date();
-  const propertyIds = await getAccessiblePropertyIds(session.user.id);
-  const pFilter = { propertyId: { in: propertyIds } };
 
-  // KPI globali
-  const [sopTotal, sopPublished, sopDraft, sopReviewHm, sopReviewAdmin, sopReturned, sopArchived] = await Promise.all([
-    prisma.content.count({ where: { ...pFilter, isDeleted: false, type: "SOP" } }),
-    prisma.content.count({ where: { ...pFilter, isDeleted: false, type: "SOP", status: "PUBLISHED" } }),
-    prisma.content.count({ where: { ...pFilter, isDeleted: false, type: "SOP", status: "DRAFT" } }),
-    prisma.content.count({ where: { ...pFilter, isDeleted: false, type: "SOP", status: "REVIEW_HM" } }),
-    prisma.content.count({ where: { ...pFilter, isDeleted: false, type: "SOP", status: "REVIEW_ADMIN" } }),
-    prisma.content.count({ where: { ...pFilter, isDeleted: false, type: "SOP", status: "RETURNED" } }),
-    prisma.content.count({ where: { ...pFilter, isDeleted: false, type: "SOP", status: "ARCHIVED" } }),
-  ]);
+  // RBAC
+  const accessibleIds = await getAccessiblePropertyIds(session.user.id);
+  if (!accessibleIds.includes(propertyId)) {
+    return NextResponse.json({ error: "Accesso negato a questa struttura" }, { status: 403 });
+  }
 
-  const sopApprovedInPeriod = await prisma.contentStatusHistory.count({
-    where: { toStatus: "PUBLISHED", changedAt: { gte: periodFrom, lte: periodTo }, content: { ...pFilter, isDeleted: false, type: "SOP" } },
+  const property = await prisma.property.findUnique({
+    where: { id: propertyId },
+    select: { id: true, name: true, code: true },
   });
+  if (!!property === false) {
+    return NextResponse.json({ error: "Struttura non trovata" }, { status: 404 });
+  }
 
-  const sopReturnedInPeriod = await prisma.contentStatusHistory.count({
-    where: { toStatus: "RETURNED", changedAt: { gte: periodFrom, lte: periodTo }, content: { ...pFilter, isDeleted: false, type: "SOP" } },
-  });
+  const pFilter = { propertyId, isDeleted: false, type: "SOP" as const };
 
-  // Tempo medio workflow
-  const avgWorkflow = await prisma.$queryRaw<{ avg_days: number | null }[]>`
-    SELECT AVG(EXTRACT(EPOCH FROM (pub."changedAt" - draft."changedAt")) / 86400)::numeric(10,1) as avg_days
-    FROM "ContentStatusHistory" pub
-    JOIN "ContentStatusHistory" draft ON draft."contentId" = pub."contentId" AND draft."toStatus" = 'DRAFT' AND draft."fromStatus" IS NULL
-    JOIN "Content" c ON c.id = pub."contentId"
-    WHERE pub."toStatus" = 'PUBLISHED' AND c."propertyId" = ANY(${propertyIds}) AND c.type = 'SOP'
-  `;
+  // ── SEZIONE 1: Stato attuale per reparto ──
 
-  // Presa visione — calcolo preciso per contenuto/reparto
-  const publishedContent = await prisma.content.count({ where: { ...pFilter, isDeleted: false, status: "PUBLISHED", type: { in: ["SOP", "DOCUMENT"] } } });
-  const totalAcks = await prisma.contentAcknowledgment.count({ where: { content: { propertyId: { in: propertyIds } } } });
-  const ackStats = await prisma.$queryRaw<{ total_expected: number; total_acked: number }[]>`
-    SELECT
-      COALESCE(SUM(total_ops.cnt), 0)::int as total_expected,
-      COALESCE(SUM(ack.cnt), 0)::int as total_acked
-    FROM "Content" c
-    LEFT JOIN LATERAL (
-      SELECT COUNT(*)::int as cnt FROM "ContentAcknowledgment" ca WHERE ca."contentId" = c.id
-    ) ack ON true
-    LEFT JOIN LATERAL (
-      SELECT COUNT(DISTINCT pa."userId")::int as cnt
-      FROM "PropertyAssignment" pa
-      JOIN "User" u ON u.id = pa."userId"
-      WHERE pa."propertyId" = c."propertyId"
-        AND u."role" = 'OPERATOR' AND u."isActive" = true
-        AND (c."departmentId" IS NULL OR pa."departmentId" IS NULL OR pa."departmentId" = c."departmentId")
-    ) total_ops ON true
-    WHERE c.status = 'PUBLISHED' AND c."isDeleted" = false
-      AND c.type IN ('SOP', 'DOCUMENT')
-      AND c."propertyId" = ANY(${propertyIds})
-      AND total_ops.cnt > 0
-  `;
-  const totalExpected = ackStats[0]?.total_expected || 0;
-  const ackRate = totalExpected > 0 ? Math.round((ackStats[0]?.total_acked / totalExpected) * 100) : null;
-
-  // Per hotel
-  const properties = await prisma.property.findMany({
-    where: { id: { in: propertyIds }, isActive: true },
+  const departments = await prisma.department.findMany({
+    where: { propertyId },
     select: { id: true, name: true, code: true },
     orderBy: { name: "asc" },
   });
 
-  const hotelStats = await Promise.all(
-    properties.map(async (p) => {
-      const hFilter = { propertyId: p.id, type: "SOP" as const };
-      const [total, published, inReview, returned, draft] = await Promise.all([
-        prisma.content.count({ where: { ...hFilter, isDeleted: false } }),
-        prisma.content.count({ where: { ...hFilter, isDeleted: false, status: "PUBLISHED" } }),
-        prisma.content.count({ where: { ...hFilter, isDeleted: false, status: { in: ["REVIEW_HM", "REVIEW_ADMIN"] } } }),
-        prisma.contentStatusHistory.count({ where: { toStatus: "RETURNED", changedAt: { gte: periodFrom, lte: periodTo }, content: hFilter } }),
-        prisma.content.count({ where: { ...hFilter, isDeleted: false, status: "DRAFT" } }),
-      ]);
-      const approved = await prisma.contentStatusHistory.count({
-        where: { toStatus: "PUBLISHED", changedAt: { gte: periodFrom, lte: periodTo }, content: hFilter },
+  const deptStats = await Promise.all(
+    departments.map(async (dept) => {
+      const published = await prisma.content.count({
+        where: { ...pFilter, status: "PUBLISHED", departmentId: dept.id },
       });
+      return { id: dept.id, name: dept.name, code: dept.code, publishedCount: published };
+    })
+  );
+
+  const totalPublished = deptStats.reduce((sum, d) => sum + d.publishedCount, 0);
+  const deptsWithoutSop = deptStats.filter(d => d.publishedCount === 0);
+
+  // ── SEZIONE 2: SOP approvate nel periodo ──
+
+  const approvedHistory = await prisma.contentStatusHistory.findMany({
+    where: {
+      toStatus: "PUBLISHED",
+      changedAt: { gte: periodFrom, lte: periodTo },
+      content: { ...pFilter },
+    },
+    select: {
+      changedAt: true,
+      content: {
+        select: {
+          id: true, code: true, title: true,
+          department: { select: { id: true, name: true, code: true } },
+          sopWorkflow: {
+            select: {
+              responsible: { select: { name: true, role: true } },
+            },
+          },
+        },
+      },
+    },
+    orderBy: { changedAt: "desc" },
+  });
+
+  // Per ogni SOP approvata, calcola presa visione
+  const approvedSops = await Promise.all(
+    approvedHistory.map(async (h) => {
+      const contentId = h.content.id;
+      // Conta acknowledgments
+      const ackCount = await prisma.contentAcknowledgment.count({ where: { contentId } });
+      // Conta target users (approssimazione: operatori del reparto o della property)
+      let targetCount = 0;
+      if (h.content.department) {
+        targetCount = await prisma.user.count({
+          where: {
+            isActive: true,
+            role: { in: ["OPERATOR", "HOD"] },
+            propertyAssignments: { some: { departmentId: h.content.department.id } },
+          },
+        });
+      } else {
+        targetCount = await prisma.user.count({
+          where: {
+            isActive: true,
+            role: "OPERATOR",
+            propertyAssignments: { some: { propertyId } },
+          },
+        });
+      }
+
       return {
-        name: p.name, code: p.code,
-        sopTotal: total, sopPublished: published, sopDraft: draft,
-        sopInReview: inReview, sopReturned: returned, sopApproved: approved,
-        pct: total > 0 ? Math.round((published / total) * 100) : 0,
+        id: contentId,
+        code: h.content.code,
+        title: h.content.title,
+        department: h.content.department,
+        author: h.content.sopWorkflow?.responsible?.name || "—",
+        authorRole: h.content.sopWorkflow?.responsible?.role || "—",
+        approvedAt: h.changedAt.toISOString(),
+        ackCount,
+        targetCount,
       };
     })
   );
 
-  // Trend settimanale (ultime 4 settimane)
-  const weeks: { label: string; approved: number; returned: number }[] = [];
-  for (let i = 3; i >= 0; i--) {
-    const wFrom = new Date(Date.now() - (i + 1) * 7 * 86400000);
-    const wTo = new Date(Date.now() - i * 7 * 86400000);
-    const [approved, returned] = await Promise.all([
-      prisma.contentStatusHistory.count({ where: { toStatus: "PUBLISHED", changedAt: { gte: wFrom, lt: wTo }, content: { ...pFilter, isDeleted: false, type: "SOP" } } }),
-      prisma.contentStatusHistory.count({ where: { toStatus: "RETURNED", changedAt: { gte: wFrom, lt: wTo }, content: { ...pFilter, isDeleted: false, type: "SOP" } } }),
-    ]);
-    weeks.push({
-      label: `${wFrom.toLocaleDateString("it-IT", { day: "2-digit", month: "2-digit" })} - ${wTo.toLocaleDateString("it-IT", { day: "2-digit", month: "2-digit" })}`,
-      approved, returned,
-    });
+  // Raggruppa per reparto
+  const approvedByDept: Record<string, typeof approvedSops> = {};
+  for (const sop of approvedSops) {
+    const deptName = sop.department?.name || "Trasversale";
+    if (!approvedByDept[deptName]) approvedByDept[deptName] = [];
+    approvedByDept[deptName].push(sop);
   }
 
   return NextResponse.json({
     data: {
-      period: { from: periodFrom, to: periodTo },
-      kpi: {
-        sopTotal, sopPublished, sopDraft, sopReviewHm, sopReviewAdmin, sopReturned, sopArchived,
-        sopApprovedInPeriod, sopReturnedInPeriod,
-        avgWorkflowDays: avgWorkflow[0]?.avg_days != null ? Number(avgWorkflow[0].avg_days) : null,
-        ackRate, totalExpected, publishedContent, totalAcks,
+      property: property!,
+      period: { from: periodFrom.toISOString(), to: periodTo.toISOString() },
+      currentState: {
+        totalPublished,
+        byDepartment: deptStats,
+        deptsWithoutSop,
       },
-      hotelStats,
-      trend: weeks,
+      approvedInPeriod: {
+        total: approvedSops.length,
+        byDepartment: approvedByDept,
+        list: approvedSops,
+      },
       generatedAt: new Date().toISOString(),
     },
   });
