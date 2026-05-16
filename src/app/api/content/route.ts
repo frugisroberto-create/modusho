@@ -127,6 +127,13 @@ export async function GET(request: NextRequest) {
     where.acknowledgments = { some: { userId } };
   } else if (acknowledged === "false") {
     where.acknowledgments = { none: { userId } };
+    // Escludi memo scaduti dalla lista "da prendere visione"
+    where.NOT = {
+      AND: [
+        { type: "MEMO" },
+        { memo: { expiresAt: { lt: new Date() } } },
+      ],
+    };
   }
 
   if (excludeUpdatedBy) {
