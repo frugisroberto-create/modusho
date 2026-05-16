@@ -222,7 +222,7 @@ export default function HooSopListPage() {
                   )}
                   {item.isImported && (
                     <span className="text-[9px] font-ui font-bold uppercase tracking-wider px-1.5 py-0.5 bg-[#E3F2FD] text-[#1565C0]">
-                      Importata
+                      I
                     </span>
                   )}
                   {item.contentStatus === "PUBLISHED" && item.reviewDueDate && (
