@@ -69,7 +69,7 @@ export async function GET(request: NextRequest) {
   if (type) {
     where.type = type;
   } else {
-    where.type = { in: ["SOP", "DOCUMENT", "MEMO"] };
+    where.type = { in: ["SOP", "MEMO"] };
   }
   if (departmentId) where.departmentId = departmentId;
 

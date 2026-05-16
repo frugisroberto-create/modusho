@@ -42,7 +42,7 @@ export function PendingReads() {
       );
       if (res.ok) {
         const json = await res.json();
-        setItems(json.data.filter((c: PendingContent) => c.type !== "BRAND_BOOK" && c.type !== "STANDARD_BOOK"));
+        setItems(json.data.filter((c: PendingContent) => c.type !== "BRAND_BOOK" && c.type !== "STANDARD_BOOK" && c.type !== "DOCUMENT"));
       }
     } finally { setLoading(false); }
   }, [currentPropertyId]);

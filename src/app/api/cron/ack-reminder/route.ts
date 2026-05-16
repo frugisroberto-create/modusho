@@ -46,7 +46,7 @@ export async function GET(request: Request) {
       where: {
         isDeleted: false,
         status: "PUBLISHED",
-        type: { in: ["SOP", "DOCUMENT", "MEMO"] },
+        type: { in: ["SOP", "MEMO"] },
         publishedAt: { lt: threshold },
         targetAudience: { some: {} },
       },
