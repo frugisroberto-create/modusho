@@ -127,7 +127,14 @@ export default function MemoListPage() {
                       <span className="text-[10px] font-ui uppercase tracking-wider px-2 py-0.5 bg-[#E8F5E9] text-[#2E7D32]">Letto</span>
                     )}
                   </div>
-                  <button onClick={() => setExpandedMemo(expandedMemo === memo.id ? null : memo.id)}
+                  <button onClick={() => {
+                    const newExpanded = expandedMemo === memo.id ? null : memo.id;
+                    setExpandedMemo(newExpanded);
+                    // Auto-acknowledge on expand
+                    if (newExpanded && !memo.acknowledged) {
+                      fetch(`/api/content/${memo.contentId}/acknowledge`, { method: "POST" }).catch(() => {});
+                    }
+                  }}
                     className="font-ui font-medium text-charcoal-dark text-sm hover:text-terracotta transition-colors text-left">
                     {memo.title}
                   </button>
