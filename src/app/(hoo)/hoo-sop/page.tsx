@@ -42,7 +42,7 @@ const STATUS_LABELS: Record<string, string> = {
 const STATUS_COLORS: Record<string, string> = {
   DRAFT: "bg-[#FFF3E0] text-[#E65100]",
   REVIEW_HM: "bg-mauve/15 text-mauve",
-  REVIEW_ADMIN: "bg-terracotta/10 text-terracotta",
+  REVIEW_ADMIN: "bg-[#E3F2FD] text-[#1565C0]",
   RETURNED: "bg-[#FECACA] text-[#991B1B]",
   PUBLISHED: "bg-[#E8F5E9] text-[#2E7D32]",
   ARCHIVED: "bg-ivory-dark text-charcoal/50",
@@ -221,7 +221,7 @@ export default function HooSopListPage() {
                     <span className={WF_BADGE}>Sottoposta a HOO</span>
                   )}
                   {item.isImported && (
-                    <span className="text-[9px] font-ui font-bold uppercase tracking-wider px-1.5 py-0.5 bg-[#E3F2FD] text-[#1565C0]">
+                    <span className="text-[9px] font-ui font-bold uppercase tracking-wider px-1.5 py-0.5 bg-terracotta/10 text-terracotta">
                       I
                     </span>
                   )}
