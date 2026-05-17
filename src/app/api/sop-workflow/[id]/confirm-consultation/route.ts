@@ -76,8 +76,9 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
 
   const now = new Date();
 
-  // Se C conferma e la SOP è già sottoposta ad A, avanza lo stato a REVIEW_ADMIN
-  const shouldAdvance = wf.submittedToA && wf.content.status === "REVIEW_HM";
+  // Quando C conferma e la SOP è in REVIEW_HM, avanza sempre a REVIEW_ADMIN
+  // (la consultazione è completata → si passa all'approvazione Accountable)
+  const shouldAdvance = wf.content.status === "REVIEW_HM";
 
   await prisma.$transaction([
     prisma.sopWorkflow.update({
@@ -87,6 +88,8 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
         consultedConfirmedById: userId,
         consultedConfirmedVersion: wf.textVersionCount,
         consultedConfirmedNote: parsed.data.note || null,
+        // Se non era già sottoposta ad A, segna come sottoposta implicitamente
+        ...(!wf.submittedToA && shouldAdvance ? { submittedToA: true, submittedToAAt: now, submittedToAById: userId } : {}),
       },
     }),
     ...(shouldAdvance ? [
