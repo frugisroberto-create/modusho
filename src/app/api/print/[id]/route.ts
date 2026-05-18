@@ -53,139 +53,58 @@ export async function GET(
     : "";
   const exportDate = new Date().toLocaleDateString("it-IT", { day: "2-digit", month: "long", year: "numeric" });
 
-  const parts: string[] = [];
+  // Build HTML — everything inline, no external resources, Safari-safe
+  const p: string[] = [];
 
-  parts.push('<!DOCTYPE html><html lang="it"><head><meta charset="utf-8">');
-  parts.push('<meta name="viewport" content="width=device-width, initial-scale=1">');
-  parts.push('<title>' + esc(content.title) + ' — ' + esc(content.property.name) + '</title>');
-  // System fonts only — no external fonts, guaranteed to work in Safari print
-  parts.push('<style>');
-  parts.push(`
-    @page { margin: 10mm; }
-    * { margin: 0; padding: 0; box-sizing: border-box; }
-    body {
-      font-family: Georgia, 'Times New Roman', serif;
-      font-size: 14px; line-height: 1.7; color: #333;
-      background: white; margin: 0; padding: 0;
-      -webkit-print-color-adjust: exact; print-color-adjust: exact;
-    }
-    .page {
-      max-width: 680px; margin: 0 auto; padding: 40px 32px;
-    }
-    /* ── Header ── */
-    .hdr { padding-bottom: 14px; border-bottom: 2px solid #964733; margin-bottom: 28px; }
-    .hdr-row { display: table; width: 100%; }
-    .hdr-left { display: table-cell; vertical-align: middle; }
-    .hdr-right { display: table-cell; vertical-align: middle; text-align: right; }
-    .badge {
-      font-family: -apple-system, Helvetica, Arial, sans-serif;
-      font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: 1.5px;
-      color: white; background: #964733; padding: 3px 10px; display: inline-block;
-    }
-    .code {
-      font-family: -apple-system, Helvetica, Arial, sans-serif;
-      font-size: 12px; font-weight: 600; color: #964733; margin-left: 10px;
-    }
-    .brand { font-size: 13px; color: #964733; letter-spacing: 3px; text-transform: uppercase; }
-    /* ── Title & Meta ── */
-    .title { font-size: 26px; font-weight: 600; color: #141413; margin-bottom: 10px; line-height: 1.3; }
-    .meta {
-      font-family: -apple-system, Helvetica, Arial, sans-serif;
-      font-size: 11px; color: #888; margin-bottom: 28px; padding-bottom: 14px;
-      border-bottom: 1px solid #ddd;
-    }
-    /* ── Body ── */
-    .body h1,.body h2,.body h3,.body h4 { color: #141413; margin-top: 22px; margin-bottom: 8px; }
-    .body h1 { font-size: 20px; } .body h2 { font-size: 18px; } .body h3 { font-size: 16px; }
-    .body p { margin-bottom: 10px; }
-    .body ul,.body ol { margin-bottom: 10px; padding-left: 22px; }
-    .body li { margin-bottom: 3px; }
-    .body table { width: 100%; border-collapse: collapse; margin: 14px 0; }
-    .body th,.body td { border: 1px solid #ddd; padding: 6px 10px; text-align: left; font-size: 12px; }
-    .body th {
-      background: #f5f5f0;
-      font-family: -apple-system, Helvetica, Arial, sans-serif;
-      font-weight: 600;
-    }
-    .body blockquote { margin: 10px 0; padding: 8px 14px; border-left: 3px solid #964733; background: #faf9f5; }
-    .body hr { border: none; border-top: 1px solid #ddd; margin: 18px 0; }
-    /* ── Footer ── */
-    .att {
-      font-family: -apple-system, Helvetica, Arial, sans-serif;
-      font-size: 11px; color: #999; margin-top: 28px; padding-top: 10px; border-top: 1px solid #ddd;
-    }
-    .ftr {
-      font-family: -apple-system, Helvetica, Arial, sans-serif;
-      font-size: 9px; color: #aaa; margin-top: 40px; padding-top: 10px; border-top: 1px solid #ddd;
-    }
-    .ftr-row { display: table; width: 100%; }
-    .ftr-left { display: table-cell; }
-    .ftr-right { display: table-cell; text-align: right; }
-    /* ── Print button ── */
-    .no-print {
-      max-width: 680px; margin: 12px auto; padding: 0 32px; text-align: right;
-    }
-    .no-print button {
-      font-family: -apple-system, Helvetica, Arial, sans-serif;
-      font-size: 12px; font-weight: 600; text-transform: uppercase; letter-spacing: 1px;
-      color: #964733; border: 1px solid rgba(150,71,51,0.3); background: white;
-      padding: 8px 20px; cursor: pointer;
-    }
-    .no-print button:hover { background: #964733; color: white; }
-    @media print {
-      .no-print { display: none; }
-      .page { max-width: none; padding: 0; margin: 0; }
-      h1,h2,h3,h4 { page-break-after: avoid; }
-      table,img { page-break-inside: avoid; }
-      p { orphans: 3; widows: 3; }
-    }
-  `);
-  parts.push('</style></head><body>');
+  p.push('<!DOCTYPE html>');
+  p.push('<html lang="it">');
+  p.push('<head>');
+  p.push('<meta charset="utf-8">');
+  p.push('<title>' + esc(content.title) + '</title>');
+  p.push('</head>');
+  p.push('<body style="font-family:Georgia,serif;color:#333;margin:0;padding:20px 30px;font-size:14px;line-height:1.7;">');
 
-  // Print button (hidden when printing)
-  parts.push('<div class="no-print"><button onclick="window.print()">Stampa / Salva PDF</button></div>');
-
-  // Page content
-  parts.push('<div class="page">');
-
-  // Header — use display:table instead of flexbox (Safari print safe)
-  parts.push('<div class="hdr"><div class="hdr-row">');
-  parts.push('<div class="hdr-left">');
-  parts.push('<span class="badge">' + esc(typeLabel) + '</span>');
-  if (content.code) parts.push('<span class="code">' + esc(content.code) + '</span>');
-  parts.push('</div>');
-  parts.push('<div class="hdr-right"><span class="brand">' + esc(content.property.name) + '</span></div>');
-  parts.push('</div></div>');
+  // Header line
+  p.push('<table width="100%" cellpadding="0" cellspacing="0" style="border-bottom:2px solid #964733;padding-bottom:12px;margin-bottom:24px;">');
+  p.push('<tr>');
+  p.push('<td>');
+  p.push('<span style="font-family:Helvetica,Arial,sans-serif;font-size:10px;font-weight:bold;text-transform:uppercase;letter-spacing:1px;color:white;background:#964733;padding:3px 10px;">' + esc(typeLabel) + '</span>');
+  if (content.code) {
+    p.push(' <span style="font-family:Helvetica,Arial,sans-serif;font-size:12px;font-weight:bold;color:#964733;">' + esc(content.code) + '</span>');
+  }
+  p.push('</td>');
+  p.push('<td style="text-align:right;font-size:13px;color:#964733;letter-spacing:2px;text-transform:uppercase;">' + esc(content.property.name) + '</td>');
+  p.push('</tr></table>');
 
   // Title
-  parts.push('<div class="title">' + esc(content.title) + '</div>');
+  p.push('<h1 style="font-family:Georgia,serif;font-size:24px;font-weight:bold;color:#141413;margin:0 0 12px 0;line-height:1.3;">' + esc(content.title) + '</h1>');
 
   // Meta
   const metaParts = [esc(content.property.name)];
   if (content.department) metaParts.push(esc(content.department.name));
   if (publishDate) metaParts.push(esc(publishDate));
-  parts.push('<div class="meta">' + metaParts.join(' &middot; ') + '</div>');
+  p.push('<p style="font-family:Helvetica,Arial,sans-serif;font-size:11px;color:#888;margin:0 0 24px 0;padding-bottom:12px;border-bottom:1px solid #ddd;">' + metaParts.join(' &middot; ') + '</p>');
 
-  // Body
-  parts.push('<div class="body">');
-  parts.push(content.body);
-  parts.push('</div>');
+  // Body — raw HTML content
+  p.push('<div style="font-size:14px;line-height:1.7;">');
+  p.push(content.body);
+  p.push('</div>');
 
   // Attachments
   if (content._count.attachments > 0) {
-    parts.push('<div class="att">Allegati presenti: ' + content._count.attachments + '</div>');
+    p.push('<p style="font-family:Helvetica,Arial,sans-serif;font-size:11px;color:#999;margin-top:28px;padding-top:10px;border-top:1px solid #ddd;">Allegati presenti: ' + content._count.attachments + '</p>');
   }
 
-  // Footer — display:table instead of flexbox
-  parts.push('<div class="ftr"><div class="ftr-row">');
-  parts.push('<div class="ftr-left">' + esc(content.property.name) + '</div>');
-  parts.push('<div class="ftr-right">Esportato il ' + esc(exportDate) + '</div>');
-  parts.push('</div></div>');
+  // Footer
+  p.push('<table width="100%" cellpadding="0" cellspacing="0" style="margin-top:36px;padding-top:10px;border-top:1px solid #ddd;">');
+  p.push('<tr>');
+  p.push('<td style="font-family:Helvetica,Arial,sans-serif;font-size:9px;color:#aaa;">' + esc(content.property.name) + '</td>');
+  p.push('<td style="font-family:Helvetica,Arial,sans-serif;font-size:9px;color:#aaa;text-align:right;">Esportato il ' + esc(exportDate) + '</td>');
+  p.push('</tr></table>');
 
-  parts.push('</div>'); // .page
-  parts.push('</body></html>');
+  p.push('</body></html>');
 
-  return new NextResponse(parts.join("\n"), {
+  return new NextResponse(p.join("\n"), {
     headers: { "Content-Type": "text/html; charset=utf-8" },
   });
 }
