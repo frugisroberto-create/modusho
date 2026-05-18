@@ -323,6 +323,10 @@ export function SopWorkflowEditor({ workflowId, currentUserId, currentUserRole, 
         throw new Error(data.error || "Errore");
       }
       setActionMessage({ type: "success", text: "SOP approvata e pubblicata" });
+      // Apre la pagina di stampa per salvare come PDF
+      if (wf?.contentId) {
+        window.open("/api/print/" + wf.contentId, "_blank");
+      }
       await fetchWorkflow();
     } catch (e) {
       setActionMessage({ type: "error", text: e instanceof Error ? e.message : "Errore" });
