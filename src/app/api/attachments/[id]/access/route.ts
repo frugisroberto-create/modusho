@@ -16,7 +16,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
-import { checkAccess } from "@/lib/rbac";
+import { canUserAccessContent } from "@/lib/rbac";
 import { getPresignedDownloadUrl } from "@/lib/attachments/storage";
 
 const PRESIGNED_TTL = 120; // seconds
@@ -50,6 +50,9 @@ export async function GET(
           departmentId: true,
           createdById: true,
           isDeleted: true,
+          targetAudience: {
+            select: { targetType: true, targetRole: true, targetDepartmentId: true, targetUserId: true },
+          },
         },
       },
     },
@@ -78,13 +81,12 @@ export async function GET(
     // HOD can access attachments of any content in their property/department (checked below)
   }
 
-  // Property/department access
-  const hasAccess = await checkAccess(
-    userId,
-    "OPERATOR",
-    content.propertyId,
-    content.departmentId ?? undefined
-  );
+  // RBAC: same logic as content detail page (property + targetAudience)
+  const hasAccess = await canUserAccessContent(userId, userRole, {
+    propertyId: content.propertyId,
+    createdById: content.createdById,
+    targetAudience: content.targetAudience,
+  });
 
   if (!hasAccess) {
     return NextResponse.json({ error: "Allegato non trovato" }, { status: 404 });
