@@ -135,9 +135,8 @@ export function canViewAttachments(userId: string, wf: SopWorkflowInfo): boolean
   return isInvolved(userId, wf);
 }
 
-/** Only involved actors (R/C/A) can add notes while IN_LAVORAZIONE */
+/** R/C/A can add notes in any state (including PUBLISHED) to propose updates */
 export function canAddNote(userId: string, wf: SopWorkflowInfo): boolean {
-  if (!isDraft(wf.contentStatus)) return false;
   return isInvolved(userId, wf);
 }
 
