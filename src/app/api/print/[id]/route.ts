@@ -60,9 +60,10 @@ export async function GET(
   parts.push('<title>' + esc(content.title) + ' — ' + esc(content.property.name) + '</title>');
   parts.push('<link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@400;500;600;700&family=Inter:wght@300;400;500;600;700&family=Cardo:ital,wght@0,400;0,700;1,400&display=swap" rel="stylesheet">');
   parts.push(`<style>
-    @page { size: A4; margin: 15mm 15mm 20mm 15mm; }
+    @page { margin: 12mm 12mm 16mm 12mm; }
     * { margin: 0; padding: 0; box-sizing: border-box; }
-    body { font-family: 'Cardo', Georgia, serif; color: #333; background: #f0efea; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+    html { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+    body { font-family: 'Cardo', Georgia, serif; color: #333; background: #f0efea; }
     .doc { max-width: 700px; margin: 32px auto; padding: 48px 40px; background: white; box-shadow: 0 0 20px rgba(0,0,0,0.08); }
     .hdr { display: flex; justify-content: space-between; align-items: center; padding-bottom: 16px; border-bottom: 2px solid #964733; margin-bottom: 32px; }
     .hdr-left { display: flex; align-items: center; gap: 12px; }
@@ -89,15 +90,15 @@ export async function GET(
     .btn-bar button { font-family: 'Inter', sans-serif; font-size: 12px; font-weight: 600; text-transform: uppercase; letter-spacing: 1px; color: #964733; border: 1px solid rgba(150,71,51,0.3); background: transparent; padding: 8px 20px; cursor: pointer; }
     .btn-bar button:hover { background: #964733; color: white; }
     @media print {
-      html, body { width: 100%; height: auto; background: white !important; }
-      .doc { box-shadow: none; margin: 0; padding: 0; max-width: 100%; width: 100%; }
+      html, body { background: white !important; margin: 0; padding: 0; }
+      .doc { box-shadow: none; margin: 0; padding: 0; max-width: none; width: auto; float: none; overflow: visible; }
       .btn-bar { display: none !important; }
-      h1, h2, h3, h4 { break-after: avoid; page-break-after: avoid; }
-      table, figure, img { break-inside: avoid; page-break-inside: avoid; }
-      tr { break-inside: avoid; page-break-inside: avoid; }
+      h1, h2, h3, h4 { page-break-after: avoid; }
+      table, figure, img { page-break-inside: avoid; }
+      tr { page-break-inside: avoid; }
       p { orphans: 3; widows: 3; }
-      .hdr { break-after: avoid; page-break-after: avoid; }
-      .ftr { break-before: avoid; page-break-before: avoid; }
+      .hdr { page-break-after: avoid; }
+      .ftr { page-break-before: avoid; }
     }
   </style>`);
   parts.push('</head><body>');
