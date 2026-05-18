@@ -81,10 +81,21 @@ export async function GET(
     .btn-bar { max-width: 700px; margin: 0 auto; padding: 16px 0; text-align: right; }
     .btn-bar button { font-family: 'Inter', sans-serif; font-size: 12px; font-weight: 600; text-transform: uppercase; letter-spacing: 1px; color: #964733; border: 1px solid rgba(150,71,51,0.3); background: transparent; padding: 8px 20px; cursor: pointer; }
     .btn-bar button:hover { background: #964733; color: white; }
+    @page {
+      size: A4;
+      margin: 20mm 18mm 25mm 18mm;
+    }
     @media print {
       body { background: white; }
-      .doc { box-shadow: none; margin: 0; padding: 20px 0; max-width: none; }
+      .doc { box-shadow: none; margin: 0; padding: 0; max-width: none; }
       .btn-bar { display: none; }
+      h1, h2, h3, h4 { page-break-after: avoid; }
+      table, figure, img { page-break-inside: avoid; }
+      ul, ol { page-break-inside: avoid; }
+      tr { page-break-inside: avoid; }
+      p { orphans: 3; widows: 3; }
+      .hdr { page-break-after: avoid; }
+      .ftr { page-break-before: avoid; }
     }
   </style>
 </head>
