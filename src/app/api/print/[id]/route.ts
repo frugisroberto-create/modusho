@@ -53,96 +53,136 @@ export async function GET(
     : "";
   const exportDate = new Date().toLocaleDateString("it-IT", { day: "2-digit", month: "long", year: "numeric" });
 
-  // Build HTML via concatenation to avoid template literal breaking on backticks in content.body
   const parts: string[] = [];
 
   parts.push('<!DOCTYPE html><html lang="it"><head><meta charset="utf-8">');
+  parts.push('<meta name="viewport" content="width=device-width, initial-scale=1">');
   parts.push('<title>' + esc(content.title) + ' — ' + esc(content.property.name) + '</title>');
-  parts.push('<link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@400;500;600;700&family=Inter:wght@300;400;500;600;700&family=Cardo:ital,wght@0,400;0,700;1,400&display=swap" rel="stylesheet">');
-  parts.push(`<style>
-    @page { margin: 12mm 12mm 16mm 12mm; }
+  // System fonts only — no external fonts, guaranteed to work in Safari print
+  parts.push('<style>');
+  parts.push(`
+    @page { margin: 10mm; }
     * { margin: 0; padding: 0; box-sizing: border-box; }
-    html { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
-    body { font-family: 'Cardo', Georgia, serif; color: #333; background: #f0efea; }
-    .doc { max-width: 700px; margin: 32px auto; padding: 48px 40px; background: white; box-shadow: 0 0 20px rgba(0,0,0,0.08); }
-    .hdr { display: flex; justify-content: space-between; align-items: center; padding-bottom: 16px; border-bottom: 2px solid #964733; margin-bottom: 32px; }
-    .hdr-left { display: flex; align-items: center; gap: 12px; }
-    .badge { font-family: 'Inter', sans-serif; font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: 1.5px; color: white; background: #964733; padding: 3px 10px; }
-    .code { font-family: 'Inter', sans-serif; font-size: 13px; font-weight: 600; color: #964733; }
-    .brand { font-family: 'Playfair Display', Georgia, serif; font-size: 14px; color: #964733; letter-spacing: 3px; text-transform: uppercase; }
-    h1 { font-family: 'Playfair Display', Georgia, serif; font-size: 28px; font-weight: 600; color: #141413; margin-bottom: 12px; line-height: 1.3; }
-    .meta { display: flex; flex-wrap: wrap; gap: 16px; font-family: 'Inter', sans-serif; font-size: 12px; color: #666; margin-bottom: 32px; padding-bottom: 16px; border-bottom: 1px solid #E8E5DC; }
-    .meta span + span::before { content: '\\00B7'; margin-right: 16px; color: #ccc; }
-    .body { font-size: 15px; line-height: 1.8; }
-    .body h1,.body h2,.body h3,.body h4 { font-family: 'Playfair Display', serif; color: #141413; margin-top: 24px; margin-bottom: 8px; }
-    .body h1 { font-size: 22px; } .body h2 { font-size: 19px; } .body h3 { font-size: 16px; }
-    .body p { margin-bottom: 12px; }
-    .body ul,.body ol { margin-bottom: 12px; padding-left: 24px; }
-    .body li { margin-bottom: 4px; }
-    .body table { width: 100%; border-collapse: collapse; margin: 16px 0; }
-    .body th,.body td { border: 1px solid #E8E5DC; padding: 8px 12px; text-align: left; font-size: 13px; }
-    .body th { background: #FAF9F5; font-family: 'Inter', sans-serif; font-weight: 600; }
-    .body blockquote { margin: 12px 0; padding: 8px 16px; border-left: 3px solid #964733; background: #FAF9F5; }
-    .body hr { border: none; border-top: 1px solid #E8E5DC; margin: 20px 0; }
-    .att { font-family: 'Inter', sans-serif; font-size: 12px; color: #999; margin-top: 32px; padding-top: 12px; border-top: 1px solid #E8E5DC; }
-    .ftr { display: flex; justify-content: space-between; font-family: 'Inter', sans-serif; font-size: 10px; color: #999; margin-top: 48px; padding-top: 12px; border-top: 1px solid #E8E5DC; }
-    .btn-bar { max-width: 700px; margin: 0 auto; padding: 16px 0; text-align: right; }
-    .btn-bar button { font-family: 'Inter', sans-serif; font-size: 12px; font-weight: 600; text-transform: uppercase; letter-spacing: 1px; color: #964733; border: 1px solid rgba(150,71,51,0.3); background: transparent; padding: 8px 20px; cursor: pointer; }
-    .btn-bar button:hover { background: #964733; color: white; }
-    @media print {
-      * { font-family: Georgia, 'Times New Roman', serif !important; }
-      .badge, .code, .meta, .meta span, .att, .ftr, .ftr span,
-      .body th, button { font-family: -apple-system, Helvetica, Arial, sans-serif !important; }
-      html, body { background: white !important; margin: 0; padding: 0; }
-      .doc { box-shadow: none; margin: 0; padding: 0; max-width: none; width: auto; }
-      .btn-bar { display: none !important; }
-      h1, h2, h3, h4 { page-break-after: avoid; }
-      table, figure, img { page-break-inside: avoid; }
-      tr { page-break-inside: avoid; }
-      p { orphans: 3; widows: 3; }
-      .hdr { page-break-after: avoid; }
-      .ftr { page-break-before: avoid; }
+    body {
+      font-family: Georgia, 'Times New Roman', serif;
+      font-size: 14px; line-height: 1.7; color: #333;
+      background: white; margin: 0; padding: 0;
+      -webkit-print-color-adjust: exact; print-color-adjust: exact;
     }
-  </style>`);
-  parts.push('</head><body>');
-  parts.push('<div class="btn-bar"><button onclick="doPrint()">Stampa / Salva PDF</button></div>');
-  parts.push('<div class="doc">');
+    .page {
+      max-width: 680px; margin: 0 auto; padding: 40px 32px;
+    }
+    /* ── Header ── */
+    .hdr { padding-bottom: 14px; border-bottom: 2px solid #964733; margin-bottom: 28px; }
+    .hdr-row { display: table; width: 100%; }
+    .hdr-left { display: table-cell; vertical-align: middle; }
+    .hdr-right { display: table-cell; vertical-align: middle; text-align: right; }
+    .badge {
+      font-family: -apple-system, Helvetica, Arial, sans-serif;
+      font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: 1.5px;
+      color: white; background: #964733; padding: 3px 10px; display: inline-block;
+    }
+    .code {
+      font-family: -apple-system, Helvetica, Arial, sans-serif;
+      font-size: 12px; font-weight: 600; color: #964733; margin-left: 10px;
+    }
+    .brand { font-size: 13px; color: #964733; letter-spacing: 3px; text-transform: uppercase; }
+    /* ── Title & Meta ── */
+    .title { font-size: 26px; font-weight: 600; color: #141413; margin-bottom: 10px; line-height: 1.3; }
+    .meta {
+      font-family: -apple-system, Helvetica, Arial, sans-serif;
+      font-size: 11px; color: #888; margin-bottom: 28px; padding-bottom: 14px;
+      border-bottom: 1px solid #ddd;
+    }
+    /* ── Body ── */
+    .body h1,.body h2,.body h3,.body h4 { color: #141413; margin-top: 22px; margin-bottom: 8px; }
+    .body h1 { font-size: 20px; } .body h2 { font-size: 18px; } .body h3 { font-size: 16px; }
+    .body p { margin-bottom: 10px; }
+    .body ul,.body ol { margin-bottom: 10px; padding-left: 22px; }
+    .body li { margin-bottom: 3px; }
+    .body table { width: 100%; border-collapse: collapse; margin: 14px 0; }
+    .body th,.body td { border: 1px solid #ddd; padding: 6px 10px; text-align: left; font-size: 12px; }
+    .body th {
+      background: #f5f5f0;
+      font-family: -apple-system, Helvetica, Arial, sans-serif;
+      font-weight: 600;
+    }
+    .body blockquote { margin: 10px 0; padding: 8px 14px; border-left: 3px solid #964733; background: #faf9f5; }
+    .body hr { border: none; border-top: 1px solid #ddd; margin: 18px 0; }
+    /* ── Footer ── */
+    .att {
+      font-family: -apple-system, Helvetica, Arial, sans-serif;
+      font-size: 11px; color: #999; margin-top: 28px; padding-top: 10px; border-top: 1px solid #ddd;
+    }
+    .ftr {
+      font-family: -apple-system, Helvetica, Arial, sans-serif;
+      font-size: 9px; color: #aaa; margin-top: 40px; padding-top: 10px; border-top: 1px solid #ddd;
+    }
+    .ftr-row { display: table; width: 100%; }
+    .ftr-left { display: table-cell; }
+    .ftr-right { display: table-cell; text-align: right; }
+    /* ── Print button ── */
+    .no-print {
+      max-width: 680px; margin: 12px auto; padding: 0 32px; text-align: right;
+    }
+    .no-print button {
+      font-family: -apple-system, Helvetica, Arial, sans-serif;
+      font-size: 12px; font-weight: 600; text-transform: uppercase; letter-spacing: 1px;
+      color: #964733; border: 1px solid rgba(150,71,51,0.3); background: white;
+      padding: 8px 20px; cursor: pointer;
+    }
+    .no-print button:hover { background: #964733; color: white; }
+    @media print {
+      .no-print { display: none; }
+      .page { max-width: none; padding: 0; margin: 0; }
+      h1,h2,h3,h4 { page-break-after: avoid; }
+      table,img { page-break-inside: avoid; }
+      p { orphans: 3; widows: 3; }
+    }
+  `);
+  parts.push('</style></head><body>');
 
-  // Header
-  parts.push('<div class="hdr"><div class="hdr-left">');
+  // Print button (hidden when printing)
+  parts.push('<div class="no-print"><button onclick="window.print()">Stampa / Salva PDF</button></div>');
+
+  // Page content
+  parts.push('<div class="page">');
+
+  // Header — use display:table instead of flexbox (Safari print safe)
+  parts.push('<div class="hdr"><div class="hdr-row">');
+  parts.push('<div class="hdr-left">');
   parts.push('<span class="badge">' + esc(typeLabel) + '</span>');
   if (content.code) parts.push('<span class="code">' + esc(content.code) + '</span>');
   parts.push('</div>');
-  parts.push('<span class="brand">' + esc(content.property.name) + '</span>');
-  parts.push('</div>');
+  parts.push('<div class="hdr-right"><span class="brand">' + esc(content.property.name) + '</span></div>');
+  parts.push('</div></div>');
 
   // Title
-  parts.push('<h1>' + esc(content.title) + '</h1>');
+  parts.push('<div class="title">' + esc(content.title) + '</div>');
 
   // Meta
-  parts.push('<div class="meta">');
-  parts.push('<span>' + esc(content.property.name) + '</span>');
-  if (content.department) parts.push('<span>' + esc(content.department.name) + '</span>');
-  parts.push('<span>' + esc(publishDate) + '</span>');
-  parts.push('</div>');
+  const metaParts = [esc(content.property.name)];
+  if (content.department) metaParts.push(esc(content.department.name));
+  if (publishDate) metaParts.push(esc(publishDate));
+  parts.push('<div class="meta">' + metaParts.join(' &middot; ') + '</div>');
 
-  // Body — inserted as raw HTML (already sanitized in the editor)
+  // Body
   parts.push('<div class="body">');
   parts.push(content.body);
   parts.push('</div>');
 
-  // Attachments count
+  // Attachments
   if (content._count.attachments > 0) {
-    parts.push('<p class="att">Allegati presenti: ' + content._count.attachments + '</p>');
+    parts.push('<div class="att">Allegati presenti: ' + content._count.attachments + '</div>');
   }
 
-  // Footer
-  parts.push('<div class="ftr"><span>' + esc(content.property.name) + '</span><span>Esportato il ' + esc(exportDate) + '</span></div>');
-  parts.push('</div>');
-  // Script: wait for fonts to load, then enable print
-  parts.push('<script>');
-  parts.push('function doPrint(){document.fonts.ready.then(function(){window.print()})}');
-  parts.push('</script>');
+  // Footer — display:table instead of flexbox
+  parts.push('<div class="ftr"><div class="ftr-row">');
+  parts.push('<div class="ftr-left">' + esc(content.property.name) + '</div>');
+  parts.push('<div class="ftr-right">Esportato il ' + esc(exportDate) + '</div>');
+  parts.push('</div></div>');
+
+  parts.push('</div>'); // .page
   parts.push('</body></html>');
 
   return new NextResponse(parts.join("\n"), {
