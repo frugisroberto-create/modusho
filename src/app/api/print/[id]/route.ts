@@ -90,8 +90,11 @@ export async function GET(
     .btn-bar button { font-family: 'Inter', sans-serif; font-size: 12px; font-weight: 600; text-transform: uppercase; letter-spacing: 1px; color: #964733; border: 1px solid rgba(150,71,51,0.3); background: transparent; padding: 8px 20px; cursor: pointer; }
     .btn-bar button:hover { background: #964733; color: white; }
     @media print {
+      * { font-family: Georgia, 'Times New Roman', serif !important; }
+      .badge, .code, .meta, .meta span, .att, .ftr, .ftr span,
+      .body th, button { font-family: -apple-system, Helvetica, Arial, sans-serif !important; }
       html, body { background: white !important; margin: 0; padding: 0; }
-      .doc { box-shadow: none; margin: 0; padding: 0; max-width: none; width: auto; float: none; overflow: visible; }
+      .doc { box-shadow: none; margin: 0; padding: 0; max-width: none; width: auto; }
       .btn-bar { display: none !important; }
       h1, h2, h3, h4 { page-break-after: avoid; }
       table, figure, img { page-break-inside: avoid; }
@@ -102,7 +105,7 @@ export async function GET(
     }
   </style>`);
   parts.push('</head><body>');
-  parts.push('<div class="btn-bar"><button onclick="window.print()">Stampa / Salva PDF</button></div>');
+  parts.push('<div class="btn-bar"><button onclick="doPrint()">Stampa / Salva PDF</button></div>');
   parts.push('<div class="doc">');
 
   // Header
@@ -135,7 +138,12 @@ export async function GET(
 
   // Footer
   parts.push('<div class="ftr"><span>' + esc(content.property.name) + '</span><span>Esportato il ' + esc(exportDate) + '</span></div>');
-  parts.push('</div></body></html>');
+  parts.push('</div>');
+  // Script: wait for fonts to load, then enable print
+  parts.push('<script>');
+  parts.push('function doPrint(){document.fonts.ready.then(function(){window.print()})}');
+  parts.push('</script>');
+  parts.push('</body></html>');
 
   return new NextResponse(parts.join("\n"), {
     headers: { "Content-Type": "text/html; charset=utf-8" },
