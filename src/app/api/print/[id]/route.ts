@@ -3,11 +3,18 @@ import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { canUserAccessContent } from "@/lib/rbac";
+import { getPresignedDownloadUrl } from "@/lib/attachments/storage";
 
 const TYPE_LABELS: Record<string, string> = { SOP: "SOP", DOCUMENT: "Documento", MEMO: "Memo" };
 
 function esc(s: string): string {
   return s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
+}
+
+function formatSize(bytes: number): string {
+  if (bytes < 1024) return bytes + " B";
+  if (bytes < 1024 * 1024) return (bytes / 1024).toFixed(0) + " KB";
+  return (bytes / (1024 * 1024)).toFixed(1) + " MB";
 }
 
 export async function GET(
@@ -27,7 +34,10 @@ export async function GET(
       property: { select: { name: true, code: true } },
       department: { select: { name: true } },
       createdBy: { select: { id: true, name: true } },
-      _count: { select: { attachments: true } },
+      attachments: {
+        select: { id: true, storageKey: true, originalFileName: true, mimeType: true, fileSize: true, kind: true },
+        orderBy: { sortOrder: "asc" },
+      },
       targetAudience: {
         select: { targetType: true, targetRole: true, targetDepartmentId: true, targetUserId: true },
       },
@@ -53,6 +63,20 @@ export async function GET(
     : "";
   const exportDate = new Date().toLocaleDateString("it-IT", { day: "2-digit", month: "long", year: "numeric" });
 
+  // Separate images from document attachments, generate presigned URLs for images
+  const images = content.attachments.filter(a => a.kind === "IMAGE");
+  const documents = content.attachments.filter(a => a.kind === "DOCUMENT");
+
+  const imageUrls: { fileName: string; url: string }[] = [];
+  for (const img of images) {
+    try {
+      const url = await getPresignedDownloadUrl(img.storageKey, 300, "inline");
+      imageUrls.push({ fileName: img.originalFileName, url });
+    } catch {
+      // skip if presigned URL fails
+    }
+  }
+
   // Build HTML — everything inline, no external resources, Safari-safe
   const p: string[] = [];
 
@@ -61,6 +85,9 @@ export async function GET(
   p.push('<head>');
   p.push('<meta charset="utf-8">');
   p.push('<title>' + esc(content.title) + '</title>');
+  p.push('<style>');
+  p.push('@page { margin: 15mm 12mm; }');
+  p.push('</style>');
   p.push('</head>');
   p.push('<body style="font-family:Georgia,serif;color:#333;margin:0;padding:20px 30px;font-size:14px;line-height:1.7;">');
 
@@ -90,9 +117,29 @@ export async function GET(
   p.push(content.body);
   p.push('</div>');
 
-  // Attachments
-  if (content._count.attachments > 0) {
-    p.push('<p style="font-family:Helvetica,Arial,sans-serif;font-size:11px;color:#999;margin-top:28px;padding-top:10px;border-top:1px solid #ddd;">Allegati presenti: ' + content._count.attachments + '</p>');
+  // Images — inline in the document
+  if (imageUrls.length > 0) {
+    p.push('<div style="margin-top:28px;padding-top:14px;border-top:1px solid #ddd;">');
+    p.push('<p style="font-family:Helvetica,Arial,sans-serif;font-size:11px;font-weight:bold;color:#666;text-transform:uppercase;letter-spacing:1px;margin:0 0 14px 0;">Allegati immagine</p>');
+    for (const img of imageUrls) {
+      p.push('<div style="margin-bottom:16px;">');
+      p.push('<img src="' + esc(img.url) + '" alt="' + esc(img.fileName) + '" style="max-width:100%;height:auto;border:1px solid #ddd;" />');
+      p.push('<p style="font-family:Helvetica,Arial,sans-serif;font-size:10px;color:#999;margin:4px 0 0 0;">' + esc(img.fileName) + '</p>');
+      p.push('</div>');
+    }
+    p.push('</div>');
+  }
+
+  // Document attachments — listed by name
+  if (documents.length > 0) {
+    p.push('<div style="margin-top:28px;padding-top:14px;border-top:1px solid #ddd;">');
+    p.push('<p style="font-family:Helvetica,Arial,sans-serif;font-size:11px;font-weight:bold;color:#666;text-transform:uppercase;letter-spacing:1px;margin:0 0 10px 0;">Documenti allegati</p>');
+    for (const doc of documents) {
+      p.push('<p style="font-family:Helvetica,Arial,sans-serif;font-size:12px;color:#555;margin:0 0 4px 0;">');
+      p.push('&#128196; ' + esc(doc.originalFileName) + ' <span style="color:#999;">(' + formatSize(doc.fileSize) + ')</span>');
+      p.push('</p>');
+    }
+    p.push('</div>');
   }
 
   // Footer
