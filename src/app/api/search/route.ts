@@ -85,9 +85,9 @@ export async function GET(request: NextRequest) {
   }
 
   // Build safe type filters using Prisma.sql
-  const typeCondition = type ? Prisma.sql`AND c."type" = ${type}` : Prisma.empty;
+  const typeCondition = type ? Prisma.sql`AND c."type"::text = ${type}` : Prisma.empty;
   const brandBookCondition = (session.user.role === "OPERATOR" || session.user.role === "HOD")
-    ? Prisma.sql`AND c."type" != 'BRAND_BOOK'`
+    ? Prisma.sql`AND c."type"::text != 'BRAND_BOOK'`
     : Prisma.empty;
 
   // Status filter:
@@ -95,8 +95,8 @@ export async function GET(request: NextRequest) {
   //  - HOD/HM/ADMIN/SUPER_ADMIN: all active states (PUBLISHED + DRAFT + REVIEW_*+RETURNED)
   //    Always excluded: ARCHIVED (never returned in search)
   const statusCondition = session.user.role === "OPERATOR"
-    ? Prisma.sql`AND c.status = 'PUBLISHED'`
-    : Prisma.sql`AND c.status != 'ARCHIVED'`;
+    ? Prisma.sql`AND c.status::text = 'PUBLISHED'`
+    : Prisma.sql`AND c.status::text != 'ARCHIVED'`;
 
   // Visibility filter:
   //  - OPERATOR: filter by ContentTarget (targetAudience): ROLE/OPERATOR,
@@ -121,58 +121,66 @@ export async function GET(request: NextRequest) {
     : Prisma.sql`AND (c."departmentId" IS NULL OR c."departmentId" = ANY(${departmentFilter}))`;
 
   // Full-text search with PostgreSQL (safe parameterized query)
-  const results = await prisma.$queryRaw<
-    { id: string; title: string; type: string; snippet: string; rank: number }[]
-  >`
-    SELECT
-      c.id,
-      c.title,
-      c."type",
-      ts_headline('italian', c.body, to_tsquery('italian', ${sanitized}),
-        'StartSel=<mark>, StopSel=</mark>, MaxWords=35, MinWords=15'
-      ) as snippet,
-      ts_rank(to_tsvector('italian', c.title || ' ' || c.body), to_tsquery('italian', ${sanitized})) as rank
-    FROM "Content" c
-    WHERE c."isDeleted" = false
-      ${statusCondition}
-      AND c."propertyId" = ANY(${filteredPropertyIds})
-      ${visibilityCondition}
-      ${typeCondition}
-      ${brandBookCondition}
-      AND (
-        to_tsvector('italian', c.title || ' ' || c.body) @@ to_tsquery('italian', ${sanitized})
-        OR c.title ILIKE '%' || ${q} || '%'
-      )
-    ORDER BY rank DESC
-    LIMIT ${pageSize} OFFSET ${offset}
-  `;
+  try {
+    const results = await prisma.$queryRaw<
+      { id: string; title: string; type: string; snippet: string; rank: number }[]
+    >`
+      SELECT
+        c.id,
+        c.title,
+        c."type",
+        ts_headline('italian', c.body, to_tsquery('italian', ${sanitized}),
+          'StartSel=<mark>, StopSel=</mark>, MaxWords=35, MinWords=15'
+        ) as snippet,
+        ts_rank(to_tsvector('italian', c.title || ' ' || c.body), to_tsquery('italian', ${sanitized})) as rank
+      FROM "Content" c
+      WHERE c."isDeleted" = false
+        ${statusCondition}
+        AND c."propertyId" = ANY(${filteredPropertyIds})
+        ${visibilityCondition}
+        ${typeCondition}
+        ${brandBookCondition}
+        AND (
+          to_tsvector('italian', c.title || ' ' || c.body) @@ to_tsquery('italian', ${sanitized})
+          OR c.title ILIKE '%' || ${q} || '%'
+        )
+      ORDER BY rank DESC
+      LIMIT ${pageSize} OFFSET ${offset}
+    `;
 
-  // Count total
-  const countResult = await prisma.$queryRaw<{ count: bigint }[]>`
-    SELECT COUNT(*) as count
-    FROM "Content" c
-    WHERE c."isDeleted" = false
-      ${statusCondition}
-      AND c."propertyId" = ANY(${filteredPropertyIds})
-      ${visibilityCondition}
-      ${typeCondition}
-      ${brandBookCondition}
-      AND (
-        to_tsvector('italian', c.title || ' ' || c.body) @@ to_tsquery('italian', ${sanitized})
-        OR c.title ILIKE '%' || ${q} || '%'
-      )
-  `;
+    // Count total
+    const countResult = await prisma.$queryRaw<{ count: bigint }[]>`
+      SELECT COUNT(*) as count
+      FROM "Content" c
+      WHERE c."isDeleted" = false
+        ${statusCondition}
+        AND c."propertyId" = ANY(${filteredPropertyIds})
+        ${visibilityCondition}
+        ${typeCondition}
+        ${brandBookCondition}
+        AND (
+          to_tsvector('italian', c.title || ' ' || c.body) @@ to_tsquery('italian', ${sanitized})
+          OR c.title ILIKE '%' || ${q} || '%'
+        )
+    `;
 
-  const total = Number(countResult[0]?.count ?? 0);
+    const total = Number(countResult[0]?.count ?? 0);
 
-  return NextResponse.json({
-    data: results.map((r) => ({
-      id: r.id,
-      title: r.title,
-      type: r.type,
-      snippet: r.snippet,
-      rank: Number(r.rank),
-    })),
-    meta: { page, pageSize, total },
-  });
+    return NextResponse.json({
+      data: results.map((r) => ({
+        id: r.id,
+        title: r.title,
+        type: r.type,
+        snippet: r.snippet,
+        rank: Number(r.rank),
+      })),
+      meta: { page, pageSize, total },
+    });
+  } catch (err) {
+    console.error("[search] Query failed:", err, { q, sanitized, userId, role: session.user.role, filteredPropertyIds, departmentFilter, type });
+    return NextResponse.json(
+      { error: "Errore nella ricerca", details: String(err) },
+      { status: 500 }
+    );
+  }
 }
