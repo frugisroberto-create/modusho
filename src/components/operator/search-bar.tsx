@@ -36,7 +36,7 @@ export function SearchBar() {
     setError(null);
     try {
       const res = await fetch(
-        `/api/search?q=${encodeURIComponent(q)}&propertyId=${currentPropertyId}&pageSize=8`,
+        `/api/search?q=${encodeURIComponent(q)}&propertyId=${currentPropertyId}&status=PUBLISHED&pageSize=8`,
         { cache: "no-store" }
       );
       if (res.status === 401) {
