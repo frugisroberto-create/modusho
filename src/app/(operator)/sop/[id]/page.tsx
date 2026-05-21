@@ -10,6 +10,7 @@ import { ExportPdfButton } from "@/components/shared/export-pdf-button";
 import { AttachmentUploader } from "@/components/shared/attachment-uploader";
 import { MobileHide } from "@/components/mobile-hide";
 import { ValidityBadge } from "@/components/shared/validity-badge";
+import { ContentTimeline } from "@/components/shared/content-timeline";
 import Link from "next/link";
 import { sanitizeHtml } from "@/lib/sanitize";
 
@@ -217,6 +218,11 @@ export default async function SopDetailPage({ params }: Props) {
           <SopViewRegistry contentId={content.id} />
         )}
       </MobileHide>
+
+      {/* ── Cronologia e note — HOD+ ── */}
+      {!isOperator && (
+        <ContentTimeline contentId={content.id} />
+      )}
     </div>
   );
 }
