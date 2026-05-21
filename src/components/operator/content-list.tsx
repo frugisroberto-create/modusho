@@ -108,6 +108,7 @@ export function ContentList({ contentType, detailPath, title, description, creat
       <LiveSearchBar
         propertyId={currentPropertyId}
         contentType={contentType}
+        status="PUBLISHED"
         placeholder={searchPlaceholder || (contentType === "SOP" ? "Cerca una procedura..." : "Cerca un documento...")}
       />
 

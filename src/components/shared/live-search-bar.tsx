@@ -31,10 +31,11 @@ function getDetailPath(type: string): string {
 interface LiveSearchBarProps {
   propertyId?: string;
   contentType?: string;
+  status?: string;
   placeholder?: string;
 }
 
-export function LiveSearchBar({ propertyId, contentType, placeholder }: LiveSearchBarProps) {
+export function LiveSearchBar({ propertyId, contentType, status, placeholder }: LiveSearchBarProps) {
   const [query, setQuery] = useState("");
   const [results, setResults] = useState<SearchResult[]>([]);
   const [total, setTotal] = useState(0);
@@ -52,6 +53,7 @@ export function LiveSearchBar({ propertyId, contentType, placeholder }: LiveSear
       const params = new URLSearchParams({ q, pageSize: "8" });
       if (propertyId) params.set("propertyId", propertyId);
       if (contentType) params.set("type", contentType);
+      if (status) params.set("status", status);
       const res = await fetch(`/api/search?${params}`, { cache: "no-store" });
       if (res.status === 401) {
         window.location.href = "/login";
@@ -76,7 +78,7 @@ export function LiveSearchBar({ propertyId, contentType, placeholder }: LiveSear
     } finally {
       setLoading(false);
     }
-  }, [query, propertyId, contentType]);
+  }, [query, propertyId, contentType, status]);
 
   useEffect(() => {
     function handleClickOutside(e: MouseEvent) {

@@ -11,6 +11,7 @@ const searchSchema = z.object({
   propertyId: z.string().optional(),
   departmentId: z.string().optional(),
   type: z.enum(["SOP", "DOCUMENT", "MEMO", "STANDARD_BOOK", "BRAND_BOOK"]).optional(),
+  status: z.enum(["PUBLISHED"]).optional(),
   page: z.coerce.number().int().min(1).default(1),
   pageSize: z.coerce.number().int().min(1).max(50).default(20),
 });
@@ -31,7 +32,7 @@ export async function GET(request: NextRequest) {
     );
   }
 
-  const { q, propertyId, departmentId, type, page, pageSize } = parsed.data;
+  const { q, propertyId, departmentId, type, status, page, pageSize } = parsed.data;
   const userId = session.user.id;
 
   // RBAC: determina property accessibili
@@ -94,7 +95,7 @@ export async function GET(request: NextRequest) {
   //  - OPERATOR: only PUBLISHED
   //  - HOD/HM/ADMIN/SUPER_ADMIN: all active states (PUBLISHED + DRAFT + REVIEW_*+RETURNED)
   //    Always excluded: ARCHIVED (never returned in search)
-  const statusCondition = session.user.role === "OPERATOR"
+  const statusCondition = (session.user.role === "OPERATOR" || status === "PUBLISHED")
     ? Prisma.sql`AND c.status::text = 'PUBLISHED'`
     : Prisma.sql`AND c.status::text != 'ARCHIVED'`;
 
