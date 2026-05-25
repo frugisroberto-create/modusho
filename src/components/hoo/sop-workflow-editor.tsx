@@ -97,6 +97,7 @@ export function SopWorkflowEditor({ workflowId, currentUserId, currentUserRole, 
   const [editBody, setEditBody] = useState("");
   const [saving, setSaving] = useState(false);
   const [dirty, setDirty] = useState(false);
+  const initializedRef = useRef(false);
 
   // Avviso modifiche non salvate
   const dirtyRef = useRef(false);
@@ -189,6 +190,7 @@ export function SopWorkflowEditor({ workflowId, currentUserId, currentUserRole, 
       setEditBody(data.body);
       setDueDateMonths(data.reviewDueMonths);
       setDirty(false);
+      initializedRef.current = false;
     } catch (e) {
       setError(e instanceof Error ? e.message : "Errore sconosciuto");
     } finally {
@@ -603,7 +605,7 @@ export function SopWorkflowEditor({ workflowId, currentUserId, currentUserRole, 
           {wf.canEditText ? (
             <SopEditor
               content={editBody}
-              onChange={(html) => { setEditBody(html); setDirty(true); }}
+              onChange={(html) => { setEditBody(html); if (initializedRef.current) { setDirty(true); } else { initializedRef.current = true; } }}
               placeholder="Contenuto della procedura..."
             />
           ) : (
