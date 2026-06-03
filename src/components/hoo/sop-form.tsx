@@ -38,6 +38,10 @@ export function SopForm({ mode, contentId, initialData, userRole, userDepartment
   const [properties, setProperties] = useState<Property[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
+  const [batchProgress, setBatchProgress] = useState<{ done: number; total: number; errors: string[] } | null>(null);
+
+  const isAllProperties = propertyId === "__ALL__";
+  const canSelectAllProperties = mode === "create" && (effectiveRole === "ADMIN" || effectiveRole === "SUPER_ADMIN");
 
   // RACI: coinvolgere HOD?
   const canInvolveHod = effectiveRole === "HOTEL_MANAGER" || effectiveRole === "CORPORATE" || effectiveRole === "ADMIN" || effectiveRole === "SUPER_ADMIN";
@@ -123,7 +127,18 @@ export function SopForm({ mode, contentId, initialData, userRole, userDepartment
   }, [mode, contentId]);
 
   const selectedProperty = properties.find(p => p.id === propertyId);
-  const allDepartments = selectedProperty?.departments || [];
+  // Per "Tutte le strutture": mostra i reparti per codice che esistono in almeno una property
+  const allDepartments = isAllProperties
+    ? (() => {
+        const byCode = new Map<string, { id: string; name: string; code: string }>();
+        for (const p of properties) {
+          for (const d of p.departments) {
+            if (!byCode.has(d.code)) byCode.set(d.code, d);
+          }
+        }
+        return Array.from(byCode.values());
+      })()
+    : selectedProperty?.departments || [];
   // Reparto della SOP: HOD/CORPORATE limitati ai propri reparti. HM/ADMIN: tutti.
   const creatableDepartments = (effectiveRole === "HOD" && userDepartmentId)
     ? allDepartments.filter(d => d.id === userDepartmentId)
@@ -147,6 +162,7 @@ export function SopForm({ mode, contentId, initialData, userRole, userDepartment
 
   const handleSubmit = async () => {
     setError("");
+    setBatchProgress(null);
     if (!title.trim() || !body.trim() || !propertyId) {
       setError("Titolo, contenuto e struttura sono obbligatori");
       return;
@@ -155,7 +171,7 @@ export function SopForm({ mode, contentId, initialData, userRole, userDepartment
       setError("Seleziona il reparto della SOP");
       return;
     }
-    if (totalTargets === 0) {
+    if (!isAllProperties && totalTargets === 0) {
       setError("Seleziona almeno un destinatario");
       return;
     }
@@ -166,8 +182,63 @@ export function SopForm({ mode, contentId, initialData, userRole, userDepartment
 
     setLoading(true);
     try {
-      if (mode === "create") {
-        // Usa il nuovo workflow RACI
+      if (mode === "create" && isAllProperties) {
+        // Batch: crea una SOP per ogni property
+        const selectedDeptCode = allDepartments.find(d => d.id === departmentId)?.code;
+        if (!selectedDeptCode) {
+          setError("Reparto non trovato");
+          setLoading(false);
+          return;
+        }
+
+        const errors: string[] = [];
+        let done = 0;
+        setBatchProgress({ done: 0, total: properties.length, errors: [] });
+
+        for (const prop of properties) {
+          const propDept = prop.departments.find(d => d.code === selectedDeptCode);
+          if (!propDept) {
+            errors.push(`${prop.name}: reparto ${selectedDeptCode} non presente`);
+            done++;
+            setBatchProgress({ done, total: properties.length, errors: [...errors] });
+            continue;
+          }
+
+          const payload = {
+            title, body, propertyId: prop.id, departmentId: propDept.id,
+            involveHod: false,
+            targetAllDepartments: true,
+            targetDepartmentIds: [] as string[],
+            targetRoles: [] as string[],
+            targetUserIds: [] as string[],
+          };
+
+          const res = await fetch("/api/sop-workflow", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify(payload),
+          });
+
+          if (!res.ok) {
+            const json = await res.json().catch(() => null);
+            errors.push(`${prop.name}: ${json?.error || "errore"}`);
+          }
+
+          done++;
+          setBatchProgress({ done, total: properties.length, errors: [...errors] });
+        }
+
+        if (errors.length === 0) {
+          router.push("/approvals");
+          router.refresh();
+        } else if (errors.length < properties.length) {
+          setError(`Creata su ${properties.length - errors.length} strutture. Errori: ${errors.join("; ")}`);
+        } else {
+          setError(`Nessuna SOP creata. Errori: ${errors.join("; ")}`);
+        }
+
+      } else if (mode === "create") {
+        // Singola property: workflow RACI
         const payload = {
           title, body, propertyId, departmentId,
           involveHod,
@@ -184,7 +255,6 @@ export function SopForm({ mode, contentId, initialData, userRole, userDepartment
         });
         if (res.ok) {
           const json = await res.json();
-          // Redirect al workflow editor dove note/allegati/versioni sono disponibili
           router.push(`/sop-workflow/${json.data.id}`);
           router.refresh();
         } else {
@@ -217,7 +287,7 @@ export function SopForm({ mode, contentId, initialData, userRole, userDepartment
     } finally { setLoading(false); }
   };
 
-  const isValid = title.trim() && body.trim() && propertyId && departmentId && totalTargets > 0;
+  const isValid = title.trim() && body.trim() && propertyId && departmentId && (isAllProperties || totalTargets > 0);
 
   return (
     <div className="max-w-3xl space-y-6">
@@ -239,18 +309,29 @@ export function SopForm({ mode, contentId, initialData, userRole, userDepartment
               setTargetAudience({ allDepartments: false, departmentIds: [], roles: [], userIds: [] });
               setInvolveHod(false);
               setHodUserId("");
-              // Auto-select department if only one
-              const prop = properties.find(p => p.id === newPropId);
-              if (prop?.departments?.length === 1) {
-                setDepartmentId(prop.departments[0].id);
-              } else {
+              if (newPropId === "__ALL__") {
                 setDepartmentId("");
+              } else {
+                // Auto-select department if only one
+                const prop = properties.find(p => p.id === newPropId);
+                if (prop?.departments?.length === 1) {
+                  setDepartmentId(prop.departments[0].id);
+                } else {
+                  setDepartmentId("");
+                }
               }
             }}
             className="w-full">
             <option value="">Seleziona struttura</option>
+            {canSelectAllProperties && <option value="__ALL__">Tutte le strutture</option>}
             {properties.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
           </select>
+          {isAllProperties && (
+            <p className="text-xs font-ui text-terracotta mt-1.5">
+              Verra creata una bozza SOP separata per ciascuna struttura ({properties.length}).
+              Il reparto selezionato deve esistere in tutte le strutture.
+            </p>
+          )}
         </div>
 
         {/* Reparto proprietario della SOP */}
@@ -269,8 +350,8 @@ export function SopForm({ mode, contentId, initialData, userRole, userDepartment
           </div>
         )}
 
-        {/* Coinvolgimento HOD (solo HM/ADMIN/SUPER_ADMIN in creazione) */}
-        {mode === "create" && canInvolveHod && propertyId && (
+        {/* Coinvolgimento HOD (solo HM/ADMIN/SUPER_ADMIN in creazione, non in batch) */}
+        {mode === "create" && canInvolveHod && propertyId && !isAllProperties && (
           <div className="bg-ivory border border-ivory-dark p-4 space-y-3">
             <label className="flex items-center gap-2 cursor-pointer">
               <input type="checkbox" checked={involveHod}
@@ -303,8 +384,8 @@ export function SopForm({ mode, contentId, initialData, userRole, userDepartment
         )}
       </div>
 
-      {/* Destinatari */}
-      {propertyId && (
+      {/* Destinatari (nascosti in batch — tutte le strutture usa "tutti gli operatori") */}
+      {propertyId && !isAllProperties && (
         <TargetAudienceSelector
           propertyId={propertyId}
           userRole={effectiveRole}
@@ -337,6 +418,28 @@ export function SopForm({ mode, contentId, initialData, userRole, userDepartment
         </div>
       )}
 
+      {/* Progresso batch */}
+      {batchProgress && (
+        <div className="bg-ivory border border-ivory-dark p-4">
+          <div className="flex items-center justify-between mb-2">
+            <span className="text-sm font-ui font-medium text-charcoal">
+              Creazione in corso: {batchProgress.done}/{batchProgress.total}
+            </span>
+            <span className="text-sm font-ui text-terracotta font-semibold">
+              {Math.round((batchProgress.done / batchProgress.total) * 100)}%
+            </span>
+          </div>
+          <div className="w-full h-2 bg-ivory-dark overflow-hidden">
+            <div className="h-full bg-terracotta transition-all" style={{ width: `${(batchProgress.done / batchProgress.total) * 100}%` }} />
+          </div>
+          {batchProgress.errors.length > 0 && (
+            <div className="mt-2 text-xs font-ui text-alert-red">
+              {batchProgress.errors.map((e, i) => <p key={i}>— {e}</p>)}
+            </div>
+          )}
+        </div>
+      )}
+
       {/* Errore */}
       {error && <p className="text-sm font-ui text-alert-red">{error}</p>}
 
@@ -347,7 +450,7 @@ export function SopForm({ mode, contentId, initialData, userRole, userDepartment
           {!body.trim() && <p>— Inserisci il contenuto</p>}
           {!propertyId && <p>— Seleziona una struttura</p>}
           {!departmentId && <p>— Seleziona il reparto della SOP</p>}
-          {totalTargets === 0 && <p>— Seleziona almeno un destinatario</p>}
+          {!isAllProperties && totalTargets === 0 && <p>— Seleziona almeno un destinatario</p>}
         </div>
       )}
 
@@ -355,7 +458,7 @@ export function SopForm({ mode, contentId, initialData, userRole, userDepartment
       <div className="flex gap-3 pt-2">
         <button onClick={handleSubmit} disabled={loading || !isValid}
           className="btn-primary disabled:opacity-50">
-          {loading ? "Salvataggio..." : mode === "create" ? "Crea bozza" : "Salva modifiche"}
+          {loading ? (isAllProperties ? "Creazione in corso..." : "Salvataggio...") : mode === "create" ? (isAllProperties ? `Crea bozza su ${properties.length} strutture` : "Crea bozza") : "Salva modifiche"}
         </button>
         <button onClick={() => router.back()} className="btn-outline">
           Annulla
