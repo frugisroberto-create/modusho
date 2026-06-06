@@ -3,7 +3,6 @@ import CredentialsProvider from "next-auth/providers/credentials";
 import bcrypt from "bcryptjs";
 import { prisma } from "./prisma";
 import { checkRateLimit, checkEmailRateLimit, recordFailedAttempt, resetAttempts } from "./rate-limit";
-import { headers } from "next/headers";
 import "@/types";
 
 export const authOptions: NextAuthOptions = {
@@ -25,7 +24,7 @@ export const authOptions: NextAuthOptions = {
           || "unknown";
 
         // Rate limit per IP (5 tentativi / 15 min)
-        const ipCheck = checkRateLimit(ip);
+        const ipCheck = await checkRateLimit(ip);
         if (!ipCheck.allowed) {
           const retryMin = Math.ceil(ipCheck.retryAfterMs / 60000);
           console.warn(`[auth] BLOCKED-IP ip=${ip} email=${credentials.email} — riprova tra ${retryMin} min`);
@@ -33,7 +32,7 @@ export const authOptions: NextAuthOptions = {
         }
 
         // Rate limit per email/account (10 tentativi / 30 min)
-        const emailCheck = checkEmailRateLimit(credentials.email);
+        const emailCheck = await checkEmailRateLimit(credentials.email);
         if (!emailCheck.allowed) {
           const retryMin = Math.ceil(emailCheck.retryAfterMs / 60000);
           console.warn(`[auth] BLOCKED-ACCOUNT ip=${ip} email=${credentials.email} — account bloccato, riprova tra ${retryMin} min`);
@@ -45,7 +44,7 @@ export const authOptions: NextAuthOptions = {
         });
 
         if (!user || !user.isActive) {
-          recordFailedAttempt(ip, credentials.email);
+          await recordFailedAttempt(ip, credentials.email);
           console.warn(`[auth] FAILED ip=${ip} email=${credentials.email} — utente non trovato o disattivato`);
           return null;
         }
@@ -56,13 +55,13 @@ export const authOptions: NextAuthOptions = {
         );
 
         if (!isPasswordValid) {
-          recordFailedAttempt(ip, credentials.email);
+          await recordFailedAttempt(ip, credentials.email);
           console.warn(`[auth] FAILED ip=${ip} email=${credentials.email} — password errata`);
           return null;
         }
 
         // Login riuscito: reset contatore tentativi
-        resetAttempts(ip, credentials.email);
+        await resetAttempts(ip, credentials.email);
         console.log(`[auth] OK ip=${ip} email=${credentials.email} role=${user.role}`);
 
         return {

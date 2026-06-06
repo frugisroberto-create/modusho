@@ -1,8 +1,8 @@
 import { redirect } from "next/navigation";
-import { headers } from "next/headers";
 import { getSessionUser } from "@/lib/session";
 import { SearchBar } from "@/components/operator/search-bar";
 import { PendingReads } from "@/components/operator/pending-reads";
+import { OnboardingProgress } from "@/components/operator/onboarding-progress";
 import { SopActivities } from "@/components/operator/sop-activities";
 import { SopExpiryAlert } from "@/components/operator/sop-expiry-alert";
 import { PropertyName } from "@/components/operator/property-name";
@@ -15,16 +15,8 @@ export default async function OperatorHome({ searchParams }: Props) {
   const user = await getSessionUser();
   const params = await searchParams;
 
-  // ADMIN/SUPER_ADMIN su desktop: landing su approvazioni.
-  // Su mobile: resta sulla home hotel (le approvazioni sono raggiungibili
-  // via sub-nav, ma la landing mobile privilegia la consultazione rapida).
-  if (user && (user.role === "ADMIN" || user.role === "SUPER_ADMIN") && params.view !== "hotel") {
-    const ua = (await headers()).get("user-agent") ?? "";
-    const isMobile = /iPhone|iPad|iPod|Android|webOS|BlackBerry|IEMobile|Opera Mini/i.test(ua);
-    if (!isMobile) {
-      redirect("/approvals");
-    }
-  }
+  // ADMIN/SUPER_ADMIN atterrano sulla home hotel (barra di ricerca + pending reads).
+  // Le approvazioni sono raggiungibili via sub-nav.
 
   return (
     <div>
@@ -43,6 +35,9 @@ export default async function OperatorHome({ searchParams }: Props) {
 
       {/* ── Sezioni sotto hero ── */}
       <div className="max-w-[960px] mx-auto space-y-10 pb-16">
+        {/* Onboarding (condizionale: scompare se non attivo o completato) */}
+        <OnboardingProgress />
+
         {/* Da prendere visione (condizionale: scompare se vuoto) */}
         <PendingReads />
 

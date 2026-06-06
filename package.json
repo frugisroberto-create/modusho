@@ -7,6 +7,8 @@
     "build": "prisma generate && next build",
     "start": "next start",
     "lint": "next lint",
+    "test": "vitest run",
+    "test:watch": "vitest",
     "db:generate": "prisma generate",
     "db:push": "prisma db push",
     "db:migrate": "prisma migrate dev",
@@ -55,6 +57,8 @@
   "devDependencies": {
     "@types/bcryptjs": "^2.4.6",
     "@types/web-push": "^3.6.4",
-    "ts-node": "^10.9.2"
+    "@vitest/coverage-v8": "^4.1.8",
+    "ts-node": "^10.9.2",
+    "vitest": "^4.1.8"
   }
 }

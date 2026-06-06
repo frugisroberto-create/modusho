@@ -121,6 +121,11 @@ model User {
   pushSubscriptions    PushSubscription[]     @relation("PushSubscriptionUser")
   notifications        Notification[]
 
+  onboardingAssignments    OnboardingAssignment[]  @relation("OnboardingAssignmentUser")
+  onboardingAssignedBy     OnboardingAssignment[]  @relation("OnboardingAssignedBy")
+  onboardingTemplatesCreated OnboardingTemplate[]  @relation("OnboardingTemplateCreatedBy")
+  onboardingTemplatesUpdated OnboardingTemplate[]  @relation("OnboardingTemplateUpdatedBy")
+
   @@index([role])
   @@index([email])
 }
@@ -154,6 +159,8 @@ model Property {
   contents            Content[]
   memos               Memo[]
   staticDocuments     StaticDocument[]
+  onboardingTemplates    OnboardingTemplate[]
+  onboardingAssignments  OnboardingAssignment[]
 
   @@index([code])
 }
@@ -168,6 +175,7 @@ model Department {
   propertyAssignments PropertyAssignment[]
   contents            Content[]
   contentTargets      ContentTarget[]       @relation("ContentTargetDepartment")
+  onboardingTemplates OnboardingTemplate[]
 
   @@unique([propertyId, code])
   @@index([propertyId])
@@ -232,6 +240,8 @@ model Content {
   memo             Memo?
   sopWorkflow      SopWorkflow?
   sopViewRecords   SopViewRecord[]        @relation("SopViewRecords")
+  onboardingSections         OnboardingSection[]         @relation("OnboardingSectionContent")
+  onboardingAssignedSections OnboardingAssignedSection[] @relation("OnboardingAssignedSectionContent")
 
   @@index([propertyId])
   @@index([departmentId])
@@ -524,6 +534,15 @@ enum NotificationType {
   NOTE_ADDED
   SUBMITTED
   ACK_REMINDER
+  ONBOARDING_ASSIGNED
+}
+
+enum OnboardingSectionType {
+  WELCOME
+  RULES
+  JOB_DESCRIPTION
+  DOCUMENT
+  SOP
 }
 
 model Notification {
@@ -540,4 +559,100 @@ model Notification {
 
   @@index([userId, readAt])
   @@index([userId, createdAt])
+}
+
+// ─── Onboarding ──────────────────────────────────────────────────────
+
+model OnboardingTemplate {
+  id           String   @id @default(cuid())
+  propertyId   String
+  departmentId String?
+  isActive     Boolean  @default(true)
+  createdById  String
+  updatedById  String
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  property   Property    @relation(fields: [propertyId], references: [id])
+  department Department? @relation(fields: [departmentId], references: [id])
+  createdBy  User        @relation("OnboardingTemplateCreatedBy", fields: [createdById], references: [id])
+  updatedBy  User        @relation("OnboardingTemplateUpdatedBy", fields: [updatedById], references: [id])
+
+  sections OnboardingSection[]
+
+  @@unique([propertyId, departmentId])
+  @@index([propertyId])
+}
+
+model OnboardingSection {
+  id          String                @id @default(cuid())
+  templateId  String
+  type        OnboardingSectionType
+  title       String
+  body        String?               @db.Text
+  fileUrl     String?
+  contentId   String?
+  sortOrder   Int
+  requiresAck Boolean               @default(true)
+  createdAt   DateTime              @default(now())
+  updatedAt   DateTime              @updatedAt
+
+  template OnboardingTemplate @relation(fields: [templateId], references: [id], onDelete: Cascade)
+  content  Content?            @relation("OnboardingSectionContent", fields: [contentId], references: [id])
+
+  @@index([templateId, sortOrder])
+}
+
+model OnboardingAssignment {
+  id           String    @id @default(cuid())
+  userId       String
+  propertyId   String
+  assignedById String
+  dueDate      DateTime?
+  startedAt    DateTime?
+  completedAt  DateTime?
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+
+  user       User     @relation("OnboardingAssignmentUser", fields: [userId], references: [id], onDelete: Cascade)
+  property   Property @relation(fields: [propertyId], references: [id])
+  assignedBy User     @relation("OnboardingAssignedBy", fields: [assignedById], references: [id])
+
+  sections OnboardingAssignedSection[]
+
+  @@unique([userId, propertyId])
+  @@index([userId])
+  @@index([propertyId])
+  @@index([assignedById])
+}
+
+// ─── Rate Limiting (persistente su DB) ───────────────────────────────
+
+model LoginAttempt {
+  id        String   @id @default(cuid())
+  key       String   // IP address o email (lowercase)
+  type      String   // "ip" o "email"
+  createdAt DateTime @default(now())
+
+  @@index([key, type, createdAt])
+}
+
+model OnboardingAssignedSection {
+  id             String                @id @default(cuid())
+  assignmentId   String
+  type           OnboardingSectionType
+  title          String
+  body           String?               @db.Text
+  fileUrl        String?
+  contentId      String?
+  sortOrder      Int
+  requiresAck    Boolean               @default(true)
+  viewedAt       DateTime?
+  acknowledgedAt DateTime?
+
+  assignment OnboardingAssignment @relation(fields: [assignmentId], references: [id], onDelete: Cascade)
+  content    Content?              @relation("OnboardingAssignedSectionContent", fields: [contentId], references: [id])
+
+  @@index([assignmentId, sortOrder])
+  @@index([contentId])
 }

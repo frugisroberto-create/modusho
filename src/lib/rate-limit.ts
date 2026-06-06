@@ -1,16 +1,16 @@
 /**
- * Rate limiter in-memory per login.
+ * Rate limiter persistente su PostgreSQL.
  *
  * Due livelli di protezione:
- * 1. Per IP: 5 tentativi falliti in 15 minuti → blocco IP
- * 2. Per email: 10 tentativi falliti in 30 minuti → blocco account
+ * 1. Per IP: 5 tentativi falliti in 15 minuti -> blocco IP
+ * 2. Per email: 10 tentativi falliti in 30 minuti -> blocco account
  *
- * Il doppio livello copre sia brute force da un singolo IP
- * sia attacchi distribuiti (IP diversi, stessa email).
- *
- * Su Vercel Fluid Compute le istanze vengono riutilizzate,
- * quindi le mappe restano in memoria per la durata dell'istanza.
+ * I record vengono contati con una query sul DB (tabella LoginAttempt).
+ * I record scaduti vengono puliti periodicamente dal cron /api/cron/cleanup-login-attempts
+ * oppure in modo lazy ad ogni check (DELETE dei record oltre la finestra).
  */
+
+import { prisma } from "./prisma";
 
 const IP_MAX_ATTEMPTS = 5;
 const IP_WINDOW_MS = 15 * 60 * 1000; // 15 minuti
@@ -18,86 +18,98 @@ const IP_WINDOW_MS = 15 * 60 * 1000; // 15 minuti
 const EMAIL_MAX_ATTEMPTS = 10;
 const EMAIL_WINDOW_MS = 30 * 60 * 1000; // 30 minuti
 
-interface AttemptRecord {
-  count: number;
-  firstAttempt: number;
+interface RateLimitResult {
+  allowed: boolean;
+  remainingAttempts: number;
+  retryAfterMs: number;
 }
 
-const ipAttempts = new Map<string, AttemptRecord>();
-const emailAttempts = new Map<string, AttemptRecord>();
+async function checkLimit(
+  key: string,
+  type: "ip" | "email",
+  maxAttempts: number,
+  windowMs: number
+): Promise<RateLimitResult> {
+  const windowStart = new Date(Date.now() - windowMs);
 
-// Pulizia periodica delle entry scadute (ogni 5 minuti)
-setInterval(() => {
-  const now = Date.now();
-  for (const [key, record] of ipAttempts) {
-    if (now - record.firstAttempt > IP_WINDOW_MS) ipAttempts.delete(key);
+  const count = await prisma.loginAttempt.count({
+    where: {
+      key,
+      type,
+      createdAt: { gte: windowStart },
+    },
+  });
+
+  if (count >= maxAttempts) {
+    // Trova il primo tentativo nella finestra per calcolare retryAfter
+    const oldest = await prisma.loginAttempt.findFirst({
+      where: { key, type, createdAt: { gte: windowStart } },
+      orderBy: { createdAt: "asc" },
+      select: { createdAt: true },
+    });
+
+    const retryAfterMs = oldest
+      ? windowMs - (Date.now() - oldest.createdAt.getTime())
+      : windowMs;
+
+    return { allowed: false, remainingAttempts: 0, retryAfterMs: Math.max(0, retryAfterMs) };
   }
-  for (const [key, record] of emailAttempts) {
-    if (now - record.firstAttempt > EMAIL_WINDOW_MS) emailAttempts.delete(key);
-  }
-}, 5 * 60 * 1000);
 
-function checkMap(map: Map<string, AttemptRecord>, key: string, maxAttempts: number, windowMs: number): { allowed: boolean; remainingAttempts: number; retryAfterMs: number } {
-  const now = Date.now();
-  const record = map.get(key);
-
-  if (!record) {
-    return { allowed: true, remainingAttempts: maxAttempts, retryAfterMs: 0 };
-  }
-
-  if (now - record.firstAttempt > windowMs) {
-    map.delete(key);
-    return { allowed: true, remainingAttempts: maxAttempts, retryAfterMs: 0 };
-  }
-
-  if (record.count >= maxAttempts) {
-    const retryAfterMs = windowMs - (now - record.firstAttempt);
-    return { allowed: false, remainingAttempts: 0, retryAfterMs };
-  }
-
-  return { allowed: true, remainingAttempts: maxAttempts - record.count, retryAfterMs: 0 };
-}
-
-function recordMap(map: Map<string, AttemptRecord>, key: string, windowMs: number): void {
-  const now = Date.now();
-  const record = map.get(key);
-  if (!record || now - record.firstAttempt > windowMs) {
-    map.set(key, { count: 1, firstAttempt: now });
-  } else {
-    record.count++;
-  }
+  return { allowed: true, remainingAttempts: maxAttempts - count, retryAfterMs: 0 };
 }
 
 /**
  * Controlla rate limit per IP.
  */
-export function checkRateLimit(ip: string): { allowed: boolean; remainingAttempts: number; retryAfterMs: number } {
-  return checkMap(ipAttempts, ip, IP_MAX_ATTEMPTS, IP_WINDOW_MS);
+export async function checkRateLimit(ip: string): Promise<RateLimitResult> {
+  return checkLimit(ip, "ip", IP_MAX_ATTEMPTS, IP_WINDOW_MS);
 }
 
 /**
  * Controlla rate limit per email (blocco account).
  */
-export function checkEmailRateLimit(email: string): { allowed: boolean; remainingAttempts: number; retryAfterMs: number } {
-  return checkMap(emailAttempts, email.toLowerCase(), EMAIL_MAX_ATTEMPTS, EMAIL_WINDOW_MS);
+export async function checkEmailRateLimit(email: string): Promise<RateLimitResult> {
+  return checkLimit(email.toLowerCase(), "email", EMAIL_MAX_ATTEMPTS, EMAIL_WINDOW_MS);
 }
 
 /**
  * Registra tentativo fallito per IP e email.
  */
-export function recordFailedAttempt(ip: string, email?: string): void {
-  recordMap(ipAttempts, ip, IP_WINDOW_MS);
+export async function recordFailedAttempt(ip: string, email?: string): Promise<void> {
+  const records = [
+    prisma.loginAttempt.create({ data: { key: ip, type: "ip" } }),
+  ];
   if (email) {
-    recordMap(emailAttempts, email.toLowerCase(), EMAIL_WINDOW_MS);
+    records.push(
+      prisma.loginAttempt.create({ data: { key: email.toLowerCase(), type: "email" } })
+    );
   }
+  await Promise.all(records);
 }
 
 /**
  * Reset tentativi dopo login riuscito.
  */
-export function resetAttempts(ip: string, email?: string): void {
-  ipAttempts.delete(ip);
+export async function resetAttempts(ip: string, email?: string): Promise<void> {
+  const deletes = [
+    prisma.loginAttempt.deleteMany({ where: { key: ip, type: "ip" } }),
+  ];
   if (email) {
-    emailAttempts.delete(email.toLowerCase());
+    deletes.push(
+      prisma.loginAttempt.deleteMany({ where: { key: email.toLowerCase(), type: "email" } })
+    );
   }
+  await Promise.all(deletes);
+}
+
+/**
+ * Pulizia record scaduti. Chiamata dal cron o on-demand.
+ * Elimina tutti i record piu vecchi della finestra piu lunga (30 min).
+ */
+export async function cleanupExpiredAttempts(): Promise<number> {
+  const cutoff = new Date(Date.now() - EMAIL_WINDOW_MS);
+  const result = await prisma.loginAttempt.deleteMany({
+    where: { createdAt: { lt: cutoff } },
+  });
+  return result.count;
 }
