@@ -78,7 +78,7 @@ export default async function HooSopDetailPage({ params }: Props) {
 
         <div className="flex items-center gap-2">
           {content.status === "PUBLISHED" && <ExportPdfButton contentId={content.id} />}
-          <ContentActions contentId={content.id} contentType={content.type} contentStatus={content.status} userRole={user.role} />
+          <ContentActions contentId={content.id} contentType={content.type} contentStatus={content.status} userRole={user.role} canEdit={user.canEdit} />
         </div>
       </div>
 

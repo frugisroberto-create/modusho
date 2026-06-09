@@ -9,6 +9,7 @@ interface ContentActionsProps {
   contentType?: string;
   contentStatus: string;
   userRole: string;
+  canEdit?: boolean;
   sopWorkflowId?: string;
 }
 
@@ -22,7 +23,7 @@ function getListRoute(contentType?: string): string {
 
 const BTN_DANGER = "btn-outline-sm !border-alert-red !text-alert-red hover:!bg-alert-red hover:!text-white";
 
-export function ContentActions({ contentId, contentType, contentStatus, userRole, sopWorkflowId }: ContentActionsProps) {
+export function ContentActions({ contentId, contentType, contentStatus, userRole, canEdit = false, sopWorkflowId }: ContentActionsProps) {
   const router = useRouter();
   const [archiveModal, setArchiveModal] = useState(false);
   const [editModal, setEditModal] = useState(false);
@@ -30,7 +31,9 @@ export function ContentActions({ contentId, contentType, contentStatus, userRole
   const [archiveNote, setArchiveNote] = useState("");
   const [loading, setLoading] = useState(false);
 
-  const canAct = userRole === "HOTEL_MANAGER" || userRole === "CORPORATE" || userRole === "ADMIN" || userRole === "SUPER_ADMIN";
+  // SUPER_ADMIN/ADMIN possono sempre agire; gli altri servono canEdit
+  const isAdmin = userRole === "ADMIN" || userRole === "SUPER_ADMIN";
+  const canAct = isAdmin || ((userRole === "HOTEL_MANAGER" || userRole === "CORPORATE") && canEdit);
   if (!canAct) return null;
 
   const handleArchive = async () => {
