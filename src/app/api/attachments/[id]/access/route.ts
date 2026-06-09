@@ -19,7 +19,7 @@ import { prisma } from "@/lib/prisma";
 import { canUserAccessContent } from "@/lib/rbac";
 import { getPresignedDownloadUrl } from "@/lib/attachments/storage";
 
-const PRESIGNED_TTL = 120; // seconds
+const PRESIGNED_TTL = 30; // seconds
 
 export async function GET(
   request: NextRequest,
