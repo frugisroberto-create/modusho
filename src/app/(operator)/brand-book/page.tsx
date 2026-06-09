@@ -7,7 +7,7 @@ export default async function BrandBookPage() {
   if (!user) redirect("/login");
 
   // Brand Book: solo HM+
-  if (!["HOTEL_MANAGER", "ADMIN", "SUPER_ADMIN"].includes(user.role)) {
+  if (!["HOTEL_MANAGER", "CORPORATE", "ADMIN", "SUPER_ADMIN"].includes(user.role)) {
     redirect("/");
   }
 
