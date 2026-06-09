@@ -11,15 +11,17 @@ interface HooProperty {
 
 interface HooSubNavProps {
   userRole: string;
+  canEdit?: boolean;
   properties: HooProperty[];
   currentPropertyId: string;
   onPropertyChange: (id: string) => void;
 }
 
-const SUB_NAV_ITEMS: { href: string; label: string; minRole?: string; excludeRoles?: string[] }[] = [
+const SUB_NAV_ITEMS: { href: string; label: string; minRole?: string; excludeRoles?: string[]; requiresCanEdit?: boolean }[] = [
   { href: "/dashboard", label: "Overview", minRole: "HOTEL_MANAGER", excludeRoles: ["CORPORATE"] },
-  { href: "/approvals", label: "Approvazioni", minRole: "HOD" },
+  { href: "/approvals", label: "Approvazioni", minRole: "HOD", requiresCanEdit: true },
   { href: "/compliance", label: "Presa visione", minRole: "HOD" },
+  { href: "/onboarding", label: "Onboarding", minRole: "HOTEL_MANAGER" },
   { href: "/users", label: "Gestione utenti", minRole: "ADMIN" },
   { href: "/properties", label: "Strutture", minRole: "ADMIN" },
   { href: "/reports", label: "Report", minRole: "HOTEL_MANAGER", excludeRoles: ["CORPORATE"] },
@@ -29,14 +31,21 @@ const ROLE_LEVEL: Record<string, number> = {
   OPERATOR: 0, HOD: 1, HOTEL_MANAGER: 2, CORPORATE: 2, ADMIN: 3, SUPER_ADMIN: 4,
 };
 
-export function HooSubNav({ userRole, properties, currentPropertyId, onPropertyChange }: HooSubNavProps) {
+export function HooSubNav({ userRole, canEdit = false, properties, currentPropertyId, onPropertyChange }: HooSubNavProps) {
   const pathname = usePathname();
+  const isAdmin = userRole === "ADMIN" || userRole === "SUPER_ADMIN";
+
+  // CORPORATE senza canEdit: solo consultazione, nessuna funzione di gestione
+  if (userRole === "CORPORATE" && !canEdit) return null;
 
   const visibleItems = SUB_NAV_ITEMS.filter((item) => {
     if (item.excludeRoles?.includes(userRole)) return false;
+    if (item.requiresCanEdit && !isAdmin && !canEdit) return false;
     if (!item.minRole) return true;
     return (ROLE_LEVEL[userRole] ?? 0) >= (ROLE_LEVEL[item.minRole] ?? 0);
   });
+
+  if (visibleItems.length === 0) return null;
 
   return (
     <div className="bg-ivory border-b border-ivory-dark">

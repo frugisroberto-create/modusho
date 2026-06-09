@@ -28,11 +28,12 @@ export function useHooContext() {
 interface HooShellProps {
   userName: string;
   userRole: string;
+  canEdit?: boolean;
   properties: HooProperty[];
   children: React.ReactNode;
 }
 
-export function HooShell({ userName, userRole, properties, children }: HooShellProps) {
+export function HooShell({ userName, userRole, canEdit, properties, children }: HooShellProps) {
   const [currentPropertyId, setCurrentPropertyId] = useState("");
 
   return (
@@ -47,6 +48,7 @@ export function HooShell({ userName, userRole, properties, children }: HooShellP
         />
         <HooSubNav
           userRole={userRole}
+          canEdit={canEdit}
           properties={properties}
           currentPropertyId={currentPropertyId}
           onPropertyChange={setCurrentPropertyId}

@@ -34,6 +34,7 @@ export default async function HooLayout({
     <HooShell
       userName={user.name}
       userRole={user.role}
+      canEdit={user.canEdit}
       properties={properties}
     >
       {children}
