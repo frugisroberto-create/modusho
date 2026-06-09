@@ -48,7 +48,7 @@ const ROLE_PRESETS: Record<RoleOption, { canEdit: boolean; canApprove: boolean; 
   OPERATOR: { canEdit: false, canApprove: false, canPublish: false, contentTypes: [] },
   HOD: { canEdit: true, canApprove: false, canPublish: false, contentTypes: ["SOP", "DOCUMENT", "MEMO"] },
   HOTEL_MANAGER: { canEdit: true, canApprove: false, canPublish: true, contentTypes: ["SOP", "DOCUMENT", "MEMO"] },
-  CORPORATE: { canEdit: true, canApprove: true, canPublish: false, contentTypes: ["SOP", "DOCUMENT", "MEMO"] },
+  CORPORATE: { canEdit: false, canApprove: false, canPublish: false, contentTypes: [] },
   ADMIN: { canEdit: true, canApprove: true, canPublish: true, contentTypes: ["SOP", "DOCUMENT", "MEMO"] },
 };
 
@@ -593,7 +593,7 @@ export function UserForm({ mode, userId, onSuccess, initialData }: UserFormProps
       </section>
 
       {/* SEZIONE 5b — Reparti destinabili (solo CORPORATE) */}
-      {role === "CORPORATE" && selectedPropertyIds.length > 0 && (
+      {role === "CORPORATE" && canEdit && selectedPropertyIds.length > 0 && (
         <section className="bg-ivory-medium border border-ivory-dark p-6 space-y-4">
           <h2 className="text-base font-heading font-semibold text-charcoal-dark">Reparti destinabili</h2>
           <p className="text-xs font-ui text-sage-light">
