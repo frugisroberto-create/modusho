@@ -51,7 +51,15 @@ export default withAuth(
       }
     }
 
-    // 4a. Dashboard: HM+ ma non CORPORATE (redirect a approvazioni)
+    // 4a. CORPORATE senza canEdit: solo consultazione, niente gestione
+    if (userRole === "CORPORATE" && token.canEdit !== true) {
+      if (pathname.startsWith("/dashboard") || pathname.startsWith("/approvals") ||
+          pathname.startsWith("/compliance") || pathname.startsWith("/reports")) {
+        return NextResponse.redirect(new URL("/", req.url));
+      }
+    }
+
+    // 4a1. Dashboard: HM+ ma non CORPORATE
     if (pathname.startsWith("/dashboard")) {
       if (userRole === "CORPORATE") {
         return NextResponse.redirect(new URL("/approvals", req.url));
