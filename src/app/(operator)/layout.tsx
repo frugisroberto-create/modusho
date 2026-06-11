@@ -42,6 +42,7 @@ export default async function OperatorLayout({
       <OperatorShell
         userName={user.name}
         userRole={user.role}
+        canEdit={user.canEdit}
         properties={properties}
         defaultPropertyId={defaultPropertyId}
       >

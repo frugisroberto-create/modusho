@@ -16,6 +16,7 @@ interface Property {
 interface OperatorHeaderProps {
   userName: string;
   userRole: string;
+  canEdit?: boolean;
   properties: Property[];
   currentPropertyId: string;
   onPropertyChange: (propertyId: string) => void;
@@ -48,13 +49,15 @@ const MOBILE_NAV: { href: string; label: string; icon: string }[] = [
 export function OperatorHeader({
   userName,
   userRole,
+  canEdit = false,
   properties,
   currentPropertyId,
   onPropertyChange,
 }: OperatorHeaderProps) {
   const pathname = usePathname();
   const [userMenuOpen, setUserMenuOpen] = useState(false);
-  const canAccessDashboard = ["HOD", "HOTEL_MANAGER", "CORPORATE", "ADMIN", "SUPER_ADMIN"].includes(userRole);
+  const isAdmin = userRole === "ADMIN" || userRole === "SUPER_ADMIN";
+  const canAccessDashboard = isAdmin || userRole === "HOD" || userRole === "HOTEL_MANAGER" || (userRole === "CORPORATE" && canEdit);
   const currentProperty = properties.find((p) => p.id === currentPropertyId);
   const initials = userName.split(" ").map(n => n[0]).join("").slice(0, 2);
 

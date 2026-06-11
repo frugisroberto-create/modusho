@@ -30,6 +30,7 @@ export function useOperatorContext() {
 interface OperatorShellProps {
   userName: string;
   userRole: string;
+  canEdit?: boolean;
   properties: Property[];
   defaultPropertyId: string;
   children: React.ReactNode;
@@ -40,6 +41,7 @@ const PROPERTY_STORAGE_KEY = "modusho_currentPropertyId";
 export function OperatorShell({
   userName,
   userRole,
+  canEdit,
   properties,
   defaultPropertyId,
   children,
@@ -76,6 +78,7 @@ export function OperatorShell({
         <OperatorHeader
           userName={userName}
           userRole={userRole}
+          canEdit={canEdit}
           properties={properties}
           currentPropertyId={currentPropertyId}
           onPropertyChange={setCurrentPropertyId}
