@@ -207,6 +207,11 @@ export default function UserDetailPage() {
         </div>
       </section>
 
+      {/* Onboarding */}
+      {user.role === "OPERATOR" && user.isActive && (
+        <OnboardingCard userId={user.id} propertyAssignments={user.propertyAssignments} />
+      )}
+
       {/* Azioni */}
       <div className="pt-2 flex items-center gap-3">
         <button onClick={handleDeactivate} disabled={deactivating}
@@ -267,5 +272,75 @@ export default function UserDetailPage() {
         </div>
       )}
     </div>
+  );
+}
+
+// ─── Onboarding Card ─────────────────────────────────────────────────
+
+function OnboardingCard({
+  userId,
+  propertyAssignments,
+}: {
+  userId: string;
+  propertyAssignments: { id: string; property: { id: string; name: string; code: string }; department: { id: string; name: string; code: string } | null }[];
+}) {
+  const [onboardings, setOnboardings] = useState<Record<string, { id: string; percentage: number; completedAt: string | null }>>({});
+  const [loading, setLoading] = useState(true);
+
+  const propertyIds = [...new Set(propertyAssignments.map((a) => a.property.id))];
+
+  useEffect(() => {
+    (async () => {
+      setLoading(true);
+      try {
+        const res = await fetch(`/api/onboarding/assignments?pageSize=50`);
+        if (res.ok) {
+          const json = await res.json();
+          const map: typeof onboardings = {};
+          for (const a of json.data) {
+            if (a.user.id === userId) {
+              map[a.property.id] = { id: a.id, percentage: a.percentage, completedAt: a.completedAt };
+            }
+          }
+          setOnboardings(map);
+        }
+      } finally {
+        setLoading(false);
+      }
+    })();
+  }, [userId]);
+
+  if (loading) return null;
+
+  return (
+    <section className="bg-ivory-medium border border-ivory-dark p-5">
+      <h2 className="text-sm font-heading font-semibold text-charcoal-dark mb-3">Onboarding</h2>
+      {propertyIds.map((pid) => {
+        const prop = propertyAssignments.find((a) => a.property.id === pid)?.property;
+        const ob = onboardings[pid];
+        return (
+          <div key={pid} className="flex items-center justify-between py-2">
+            <span className="text-sm font-ui text-charcoal">{prop?.name}</span>
+            {ob ? (
+              <div className="flex items-center gap-3">
+                <div className="w-24 h-2 bg-ivory-dark overflow-hidden">
+                  <div className="h-full bg-terracotta" style={{ width: `${ob.percentage}%` }} />
+                </div>
+                <span className="text-[11px] font-ui text-charcoal/50">
+                  {ob.completedAt ? "Completato" : `${ob.percentage}%`}
+                </span>
+              </div>
+            ) : (
+              <a
+                href={`/onboarding/assign/${userId}?propertyId=${pid}`}
+                className="text-[11px] font-ui font-semibold uppercase tracking-wider text-terracotta hover:underline"
+              >
+                Assegna onboarding
+              </a>
+            )}
+          </div>
+        );
+      })}
+    </section>
   );
 }

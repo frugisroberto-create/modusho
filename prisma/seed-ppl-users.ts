@@ -46,6 +46,7 @@ const users = [
   { name: "Annamaria Ventura",             email: "venturaannamaria107@gmail.com",       password: "pVnUNCQxg01!", dept: "RM" },
   { name: "Mihaela Serban",                email: "mserban799@gmail.com",                password: "%Ox8OXgNAUIn", dept: "RM" },
   { name: "Martina Toma",                  email: "tomamartina50@gmail.com",             password: "G0R3p50pC#eb", dept: "RM" },
+  { name: "Em Serban",                     email: "emserban799@gmail.com",               password: "e6rDDGlDa7DM", dept: "RM" },
   { name: "Simone De Matteis",            email: "simone.dematteis@libero.it",          password: "vTlMCh8Tppr#", dept: "FO" },
   { name: "Maurizio Rizzo",               email: "rizzomauriziohp@libero.it",           password: "N^CItHkOFu@7", dept: "FB" },
   { name: "Diletta Petio",                email: "mammadile@libero.it",                 password: "f4R7!zSy&wRd", dept: "SP" },

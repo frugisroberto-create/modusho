@@ -69,6 +69,9 @@ export async function POST(
     },
   });
 
+  // Sync with onboarding: if this content is in an active onboarding, mark that section too
+  await syncOnboardingSection(contentId, userId);
+
   return NextResponse.json({
     data: {
       contentId: acknowledgment.contentId,
@@ -76,4 +79,34 @@ export async function POST(
       alreadyAcknowledged: false,
     },
   });
+}
+
+async function syncOnboardingSection(contentId: string, userId: string) {
+  try {
+    const { checkOnboardingCompletion } = await import("@/lib/onboarding");
+    const now = new Date();
+
+    // Find any active onboarding assigned section referencing this content
+    const sections = await prisma.onboardingAssignedSection.findMany({
+      where: {
+        contentId,
+        acknowledgedAt: null,
+        assignment: { userId, completedAt: null },
+      },
+      select: { id: true, assignmentId: true, viewedAt: true },
+    });
+
+    for (const section of sections) {
+      await prisma.onboardingAssignedSection.update({
+        where: { id: section.id },
+        data: {
+          viewedAt: section.viewedAt ?? now,
+          acknowledgedAt: now,
+        },
+      });
+      await checkOnboardingCompletion(section.assignmentId);
+    }
+  } catch {
+    // Best-effort sync — don't break the main ack flow
+  }
 }

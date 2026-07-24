@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useCallback } from "react";
 import Link from "next/link";
+import { OnboardingDashboardWidget } from "@/components/hoo/onboarding-dashboard-widget";
 
 interface DashboardData {
   header: {
@@ -217,6 +218,9 @@ export default function GovernanceDashboardPage() {
           </div>
         </section>
       )}
+
+      {/* ── Onboarding monitoring ── */}
+      <OnboardingDashboardWidget propertyId={propertyFilter || undefined} />
 
       {/* ══════════════════════════════════════════════════════════════════
           LIVELLO 3 — Confronto hotel + drill-down reparti
