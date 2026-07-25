@@ -151,6 +151,8 @@ export default withAuth(
 
 export const config = {
   matcher: [
-    "/((?!login|api/auth|api/health|api/cron|_next/static|_next/image|favicon.ico|images|manifest.json|sw.js|icons).*)",
+    // attiva/reimposta/password-dimenticata sono pubbliche: ci si arriva dal
+    // link nell'email, quando ancora non esiste una sessione.
+    "/((?!login|attiva|reimposta|password-dimenticata|api/auth|api/health|api/cron|_next/static|_next/image|favicon.ico|images|manifest.json|sw.js|icons).*)",
   ],
 };

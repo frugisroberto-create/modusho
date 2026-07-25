@@ -1,6 +1,7 @@
 "use client";
 
 import { Suspense, useState } from "react";
+import Link from "next/link";
 import { signIn } from "next-auth/react";
 import { useSearchParams } from "next/navigation";
 
@@ -75,6 +76,15 @@ function LoginForm() {
           {loading ? "Accesso in corso..." : "Accedi"}
         </button>
       </form>
+
+      <div className="mt-5 text-center">
+        <Link
+          href="/password-dimenticata"
+          className="text-[12px] font-ui text-terracotta hover:text-terracotta-light transition-colors"
+        >
+          Password dimenticata?
+        </Link>
+      </div>
     </div>
   );
 }

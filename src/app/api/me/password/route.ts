@@ -25,7 +25,10 @@ import {
 } from "@/lib/rate-limit";
 
 const bodySchema = z.object({
-  currentPassword: z.string().min(1, "Inserisci la password attuale."),
+  // Facoltativa SOLO nel primo cambio forzato (mustChangePassword a true sul
+  // record utente): lì l'utente ha appena fatto login e la pagina bloccante
+  // chiede due soli campi. In ogni altro caso è obbligatoria e viene verificata.
+  currentPassword: z.string().optional(),
   newPassword: passwordSchema,
 });
 
@@ -58,18 +61,28 @@ export async function POST(request: NextRequest) {
 
   const user = await prisma.user.findUnique({
     where: { id: session.user.id },
-    select: { id: true, email: true, passwordHash: true, isActive: true },
+    select: { id: true, email: true, passwordHash: true, isActive: true, mustChangePassword: true },
   });
 
   if (!user || !user.isActive) {
     return NextResponse.json({ error: "Accesso negato" }, { status: 403 });
   }
 
-  const currentValid = await bcrypt.compare(currentPassword, user.passwordHash);
-  if (!currentValid) {
-    await recordFailedAttempt(ip, email);
-    console.warn(`[auth] CAMBIO-PASSWORD password attuale errata userId=${user.id} ip=${ip}`);
-    return NextResponse.json({ error: "La password attuale non è corretta." }, { status: 400 });
+  // Il primo cambio forzato non richiede la password attuale: la fonte di
+  // verità è il flag sul record utente, mai quello che dichiara il client.
+  const isForcedFirstChange = user.mustChangePassword === true;
+
+  if (!isForcedFirstChange) {
+    if (!currentPassword) {
+      return NextResponse.json({ error: "Inserisci la password attuale." }, { status: 400 });
+    }
+
+    const currentValid = await bcrypt.compare(currentPassword, user.passwordHash);
+    if (!currentValid) {
+      await recordFailedAttempt(ip, email);
+      console.warn(`[auth] CAMBIO-PASSWORD password attuale errata userId=${user.id} ip=${ip}`);
+      return NextResponse.json({ error: "La password attuale non è corretta." }, { status: 400 });
+    }
   }
 
   const sameAsBefore = await bcrypt.compare(newPassword, user.passwordHash);
