@@ -21,7 +21,6 @@ const SUB_NAV_ITEMS: { href: string; label: string; minRole?: string; excludeRol
   { href: "/dashboard", label: "Overview", minRole: "HOTEL_MANAGER", excludeRoles: ["CORPORATE"] },
   { href: "/approvals", label: "Approvazioni", minRole: "HOD", requiresCanEdit: true },
   { href: "/compliance", label: "Presa visione", minRole: "HOD" },
-  { href: "/onboarding", label: "Onboarding", minRole: "HOTEL_MANAGER" },
   { href: "/users", label: "Gestione utenti", minRole: "ADMIN" },
   { href: "/properties", label: "Strutture", minRole: "ADMIN" },
   { href: "/reports", label: "Report", minRole: "HOTEL_MANAGER", excludeRoles: ["CORPORATE"] },

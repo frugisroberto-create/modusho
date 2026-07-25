@@ -2,7 +2,6 @@ import { redirect } from "next/navigation";
 import { getSessionUser } from "@/lib/session";
 import { SearchBar } from "@/components/operator/search-bar";
 import { PendingReads } from "@/components/operator/pending-reads";
-import { OnboardingProgress } from "@/components/operator/onboarding-progress";
 import { SopActivities } from "@/components/operator/sop-activities";
 import { SopExpiryAlert } from "@/components/operator/sop-expiry-alert";
 import { PropertyName } from "@/components/operator/property-name";
@@ -35,9 +34,6 @@ export default async function OperatorHome({ searchParams }: Props) {
 
       {/* ── Sezioni sotto hero ── */}
       <div className="max-w-[960px] mx-auto space-y-10 pb-16">
-        {/* Onboarding (condizionale: scompare se non attivo o completato) */}
-        <OnboardingProgress />
-
         {/* Da prendere visione (condizionale: scompare se vuoto) */}
         <PendingReads />
 
