@@ -11,6 +11,9 @@ const ROLE_HIERARCHY: Record<Role, number> = {
   SUPER_ADMIN: 4,
 };
 
+/** Rotta di cambio password obbligatorio e sua API: sempre raggiungibili. */
+const FORCED_PASSWORD_ALLOWLIST = ["/cambia-password-obbligatorio", "/api/me/password"];
+
 export default withAuth(
   function middleware(req) {
     const { pathname } = req.nextUrl;
@@ -18,6 +21,32 @@ export default withAuth(
 
     if (!token || !token.role) {
       return NextResponse.redirect(new URL("/login", req.url));
+    }
+
+    // Sessione decaduta (password cambiata dopo l'emissione del token).
+    if (token.invalidated === true) {
+      if (pathname.startsWith("/api/")) {
+        return NextResponse.json({ error: "Sessione scaduta" }, { status: 401 });
+      }
+      return NextResponse.redirect(new URL("/login", req.url));
+    }
+
+    // Cambio password forzato: blocca TUTTO tranne la pagina di cambio e la sua API.
+    // Il logout e gli asset sono già fuori dal matcher.
+    if (token.mustChangePassword === true) {
+      const allowed = FORCED_PASSWORD_ALLOWLIST.some((p) => pathname.startsWith(p));
+      if (!allowed) {
+        if (pathname.startsWith("/api/")) {
+          return NextResponse.json(
+            { error: "Devi prima cambiare la password." },
+            { status: 403 }
+          );
+        }
+        const target = new URL("/cambia-password-obbligatorio", req.url);
+        // Conserva la destinazione: dopo il salvataggio si prosegue di lì.
+        if (pathname !== "/") target.searchParams.set("next", pathname);
+        return NextResponse.redirect(target);
+      }
     }
 
     const userRole = token.role as Role;
