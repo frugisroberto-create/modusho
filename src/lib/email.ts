@@ -204,7 +204,7 @@ export function buildActivationEmail(params: ActivationEmailParams): EmailMessag
   const html = renderLayout({
     title: `Ciao ${escapeHtml(name)}, il tuo accesso è pronto.`,
     bodyHtml,
-    ctaLabel: "Attiva il tuo accesso",
+    ctaLabel: "ATTIVA IL TUO ACCESSO",
     ctaUrl: activationUrl,
     notesHtml,
   });
@@ -251,7 +251,7 @@ export function buildResetEmail(params: ResetEmailParams): EmailMessage {
   const html = renderLayout({
     title: `Ciao ${escapeHtml(name)}, ecco il link per la password.`,
     bodyHtml,
-    ctaLabel: "Crea la nuova password",
+    ctaLabel: "CREA LA NUOVA PASSWORD",
     ctaUrl: resetUrl,
     notesHtml,
   });
