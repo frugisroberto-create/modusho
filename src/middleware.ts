@@ -73,9 +73,19 @@ export default withAuth(
       }
     }
 
-    // 3. Utenti e Strutture: solo ADMIN+
-    if (pathname.startsWith("/users") || pathname.startsWith("/properties")) {
+    // 3. Strutture: solo ADMIN+
+    if (pathname.startsWith("/properties")) {
       if (ROLE_HIERARCHY[userRole] < ROLE_HIERARCHY.ADMIN) {
+        return NextResponse.redirect(new URL("/unauthorized", req.url));
+      }
+    }
+
+    // 3b. Gestione utenti: da HOD in su, MAI CORPORATE.
+    //     L'HOD entra anche senza canCreateUsers: vede la lista del proprio
+    //     reparto in sola lettura per sollecitare chi non si è attivato.
+    //     Il perimetro fine (chi vede chi, chi tocca cosa) lo impongono le API.
+    if (pathname.startsWith("/users")) {
+      if (userRole === "CORPORATE" || ROLE_HIERARCHY[userRole] < ROLE_HIERARCHY.HOD) {
         return NextResponse.redirect(new URL("/unauthorized", req.url));
       }
     }

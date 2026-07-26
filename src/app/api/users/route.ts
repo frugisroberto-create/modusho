@@ -2,13 +2,25 @@ import { NextRequest, NextResponse } from "next/server";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
-import bcrypt from "bcryptjs";
 import { z } from "zod/v4";
+import { issueToken } from "@/lib/auth-tokens";
+import { buildActivationEmail, sendEmail, getAppUrl } from "@/lib/email";
+import { recordUserAudit } from "@/lib/user-audit";
+import { loadActor, buildVisibilityWhere } from "@/lib/user-scope-db";
+import {
+  canAccessUserManagement,
+  canCreateUser,
+  getRolePresets,
+  getVisibleRoles,
+  isSameName,
+} from "@/lib/user-scope";
 
 const querySchema = z.object({
   role: z.enum(["OPERATOR", "HOD", "HOTEL_MANAGER", "CORPORATE", "ADMIN", "SUPER_ADMIN"]).optional(),
   propertyId: z.string().optional(),
   search: z.string().optional(),
+  /** Filtro sullo stato di attivazione. */
+  activation: z.enum(["all", "pending", "activated"]).optional(),
   page: z.coerce.number().int().min(1).default(1),
   pageSize: z.coerce.number().int().min(1).max(50).default(20),
 });
@@ -17,77 +29,65 @@ export async function GET(request: NextRequest) {
   const session = await getServerSession(authOptions);
   if (!session?.user) return NextResponse.json({ error: "Non autenticato" }, { status: 401 });
 
-  const userRole = session.user.role;
-  const isAdmin = userRole === "ADMIN" || userRole === "SUPER_ADMIN";
-  const isHM = userRole === "HOTEL_MANAGER";
-  const isCorporate = userRole === "CORPORATE";
-
-  if (!isAdmin && !isHM && !isCorporate) {
+  // CORPORATE mantiene l'accesso in sola lettura storico; OPERATOR mai.
+  const isCorporate = session.user.role === "CORPORATE";
+  if (!canAccessUserManagement(session.user) && !isCorporate) {
     return NextResponse.json({ error: "Accesso negato" }, { status: 403 });
   }
+
+  const actor = await loadActor(session.user.id);
+  if (!actor) return NextResponse.json({ error: "Accesso negato" }, { status: 403 });
 
   const params = Object.fromEntries(request.nextUrl.searchParams);
   const parsed = querySchema.safeParse(params);
   if (!parsed.success) return NextResponse.json({ error: "Parametri non validi" }, { status: 400 });
 
-  const { role, propertyId, search, page, pageSize } = parsed.data;
+  const { role, propertyId, search, activation, page, pageSize } = parsed.data;
   const isActiveParam = params.isActive;
 
-  const where: Record<string, unknown> = {};
-  if (role) where.role = role;
-  if (isActiveParam === "true") where.isActive = true;
-  else if (isActiveParam === "false") where.isActive = false;
-  if (search) {
-    where.OR = [
-      { name: { contains: search, mode: "insensitive" } },
-      { email: { contains: search, mode: "insensitive" } },
-    ];
+  // Perimetro: la clausola di visibilità è la traduzione SQL di canViewUser.
+  const scopeWhere = isCorporate
+    ? {
+        propertyAssignments: { some: { propertyId: { in: actor.propertyIds } } },
+      }
+    : buildVisibilityWhere(actor);
+
+  const filters: Record<string, unknown>[] = [];
+
+  if (role) {
+    // Un ruolo fuori dal perimetro non allarga la vista: restringe a nulla.
+    const visible = isCorporate
+      ? ["OPERATOR", "HOD", "HOTEL_MANAGER", "CORPORATE", "ADMIN", "SUPER_ADMIN"]
+      : getVisibleRoles(actor);
+    if (!visible.includes(role)) {
+      return NextResponse.json({ data: [], meta: { page, pageSize, total: 0 } });
+    }
+    filters.push({ role });
   }
 
-  // HOTEL_MANAGER / CORPORATE: accesso in sola lettura, limitato alle property assegnate
-  if (isHM || isCorporate) {
-    if (propertyId) {
-      // Se specifica una propertyId, verifica che HM sia assegnato
-      const hmAssignment = await prisma.propertyAssignment.findFirst({
-        where: { userId: session.user.id, propertyId },
-      });
-      if (!hmAssignment) {
-        return NextResponse.json({ error: "Accesso negato a questa struttura" }, { status: 403 });
-      }
-      where.propertyAssignments = { some: { propertyId } };
-    } else {
-      // Se non specifica propertyId, scope automatico su tutte le property assegnate
-      const hmProperties = await prisma.propertyAssignment.findMany({
-        where: { userId: session.user.id },
-        select: { propertyId: true },
-      });
-      if (hmProperties.length === 0) {
-        return NextResponse.json({ data: [], meta: { page, pageSize, total: 0 } });
-      }
-      const hmPropertyIds = hmProperties.map((p) => p.propertyId);
-      where.propertyAssignments = { some: { propertyId: { in: hmPropertyIds } } };
-    }
-  } else if (isAdmin) {
-    // ADMIN: scope to assigned properties (SUPER_ADMIN sees all)
-    if (userRole !== "SUPER_ADMIN") {
-      const adminProperties = await prisma.propertyAssignment.findMany({
-        where: { userId: session.user.id },
-        select: { propertyId: true },
-        distinct: ["propertyId"],
-      });
-      const adminPropertyIds = adminProperties.map((p) => p.propertyId);
-      if (propertyId) {
-        if (!adminPropertyIds.includes(propertyId)) {
-          return NextResponse.json({ error: "Accesso negato a questa struttura" }, { status: 403 });
-        }
-        where.propertyAssignments = { some: { propertyId } };
-      } else {
-        where.propertyAssignments = { some: { propertyId: { in: adminPropertyIds } } };
-      }
-    } else if (propertyId) {
-      where.propertyAssignments = { some: { propertyId } };
-    }
+  if (isActiveParam === "true") filters.push({ isActive: true });
+  else if (isActiveParam === "false") filters.push({ isActive: false });
+
+  if (activation === "pending") filters.push({ activatedAt: null });
+  else if (activation === "activated") filters.push({ activatedAt: { not: null } });
+
+  if (search) {
+    filters.push({
+      OR: [
+        { name: { contains: search, mode: "insensitive" } },
+        { email: { contains: search, mode: "insensitive" } },
+      ],
+    });
   }
+
+  if (propertyId) {
+    if (actor.role !== "SUPER_ADMIN" && !actor.propertyIds.includes(propertyId)) {
+      return NextResponse.json({ error: "Accesso negato a questa struttura" }, { status: 403 });
+    }
+    filters.push({ propertyAssignments: { some: { propertyId } } });
+  }
+
+  const where = { AND: [scopeWhere, ...filters] };
 
   const [users, total] = await Promise.all([
     prisma.user.findMany({
@@ -95,7 +95,9 @@ export async function GET(request: NextRequest) {
       select: {
         id: true, email: true, name: true, role: true,
         canView: true, canEdit: true, canApprove: true, canPublish: true,
+        canCreateUsers: true, activatedAt: true, createdById: true,
         isActive: true, lastLoginAt: true, createdAt: true,
+        createdBy: { select: { id: true, name: true, role: true } },
         propertyAssignments: {
           include: {
             property: { select: { id: true, name: true, code: true } },
@@ -111,13 +113,31 @@ export async function GET(request: NextRequest) {
     prisma.user.count({ where }),
   ]);
 
-  return NextResponse.json({ data: users, meta: { page, pageSize, total } });
+  // Data dell'ultimo invito, in una sola query per l'intera pagina.
+  const pendingIds = users.filter((u) => u.activatedAt === null).map((u) => u.id);
+  const lastInvites = pendingIds.length
+    ? await prisma.authToken.groupBy({
+        by: ["userId"],
+        where: { userId: { in: pendingIds }, type: "ACTIVATION" },
+        _max: { createdAt: true },
+      })
+    : [];
+  const lastInviteByUser = new Map(
+    lastInvites.map((row) => [row.userId, row._max.createdAt ?? null])
+  );
+
+  const data = users.map((user) => ({
+    ...user,
+    lastInviteAt: lastInviteByUser.get(user.id) ?? null,
+  }));
+
+  return NextResponse.json({ data, meta: { page, pageSize, total } });
 }
 
+// La password NON è più un campo: ogni utente sceglie la propria attivandosi.
 const createUserSchema = z.object({
   email: z.email(),
   name: z.string().min(1).max(200),
-  password: z.string().min(10).regex(/[A-Z]/, "Almeno una lettera maiuscola").regex(/[0-9]/, "Almeno un numero"),
   role: z.enum(["OPERATOR", "HOD", "HOTEL_MANAGER", "CORPORATE", "ADMIN"]),
   canView: z.boolean().default(true),
   canEdit: z.boolean().default(false),
@@ -130,22 +150,51 @@ const createUserSchema = z.object({
     departmentId: z.string().nullable().optional(),
   })).min(1, "Almeno una struttura richiesta"),
   contentTypes: z.array(z.enum(["SOP", "DOCUMENT", "MEMO"])).default([]),
+  /** L'utente ha già visto l'avviso sui nomi simili e vuole procedere. */
+  confirmDuplicateName: z.boolean().default(false),
 });
 
 export async function POST(request: NextRequest) {
   const session = await getServerSession(authOptions);
   if (!session?.user) return NextResponse.json({ error: "Non autenticato" }, { status: 401 });
-  if (session.user.role !== "ADMIN" && session.user.role !== "SUPER_ADMIN") {
-    return NextResponse.json({ error: "Accesso negato" }, { status: 403 });
-  }
+
+  const actor = await loadActor(session.user.id);
+  if (!actor) return NextResponse.json({ error: "Accesso negato" }, { status: 403 });
 
   const body = await request.json();
   const parsed = createUserSchema.safeParse(body);
-  if (!parsed.success) return NextResponse.json({ error: "Parametri non validi", details: parsed.error.issues }, { status: 400 });
+  if (!parsed.success) {
+    return NextResponse.json({ error: "Parametri non validi", details: parsed.error.issues }, { status: 400 });
+  }
 
-  const { email, name, password, role, canView, canEdit, canApprove, canPublish, targetDepartmentIds, viewDepartmentIds, propertyAssignments, contentTypes } = parsed.data;
+  const {
+    email, name, role, targetDepartmentIds, viewDepartmentIds,
+    propertyAssignments, confirmDuplicateName,
+  } = parsed.data;
 
-  // Validazioni coerenza ruolo-permessi
+  // ─── Perimetro: ogni assegnazione deve stare nel raggio dell'attore ───
+  for (const assignment of propertyAssignments) {
+    const verdict = canCreateUser(actor, {
+      role,
+      propertyId: assignment.propertyId,
+      departmentId: assignment.departmentId ?? null,
+    });
+    if (!verdict.allowed) {
+      return NextResponse.json({ error: verdict.reason }, { status: 403 });
+    }
+  }
+
+  const isAdminActor = actor.role === "ADMIN" || actor.role === "SUPER_ADMIN";
+  const presets = getRolePresets(role);
+
+  // HM e HOD non scelgono i flag: li riceve il sistema dai preset di ruolo.
+  const canView = isAdminActor ? parsed.data.canView : presets.canView;
+  const canEdit = isAdminActor ? parsed.data.canEdit : presets.canEdit;
+  const canApprove = isAdminActor ? parsed.data.canApprove : presets.canApprove;
+  const canPublish = isAdminActor ? parsed.data.canPublish : presets.canPublish;
+  const contentTypes = isAdminActor ? parsed.data.contentTypes : presets.contentTypes;
+
+  // ─── Coerenza ruolo↔permessi (regole preesistenti) ───
   if (role === "OPERATOR" && (canEdit || canApprove)) {
     return NextResponse.json({ error: "Un operatore non può avere permessi di modifica o approvazione" }, { status: 400 });
   }
@@ -159,9 +208,8 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: "Tipi contenuto non assegnabili senza permesso di modifica" }, { status: 400 });
   }
 
-  // Validazione coerenza ruolo-reparti: OPERATOR, HOD e CORPORATE devono avere departmentId specifici
   if (role === "OPERATOR" || role === "HOD" || role === "CORPORATE") {
-    const hasNullDept = propertyAssignments.some(a => !a.departmentId);
+    const hasNullDept = propertyAssignments.some((a) => !a.departmentId);
     if (hasNullDept) {
       const roleLabel = role === "OPERATOR" ? "Operatore" : role === "HOD" ? "HOD" : "Corporate";
       return NextResponse.json({
@@ -170,7 +218,6 @@ export async function POST(request: NextRequest) {
     }
   }
 
-  // CORPORATE con canApprove: verifica che non esista già un altro Corporate A sugli stessi reparti
   if (role === "CORPORATE" && canApprove) {
     for (const assignment of propertyAssignments) {
       if (!assignment.departmentId) continue;
@@ -191,21 +238,59 @@ export async function POST(request: NextRequest) {
     }
   }
 
-  // Solo SUPER_ADMIN può creare ADMIN
-  if (role === "ADMIN" && session.user.role !== "SUPER_ADMIN") {
+  if (role === "ADMIN" && actor.role !== "SUPER_ADMIN") {
     return NextResponse.json({ error: "Solo SUPER_ADMIN può creare utenti ADMIN" }, { status: 403 });
   }
 
-  const existing = await prisma.user.findUnique({ where: { email } });
-  if (existing) return NextResponse.json({ error: "Email già in uso" }, { status: 409 });
+  // ─── Email: identificativo unico ───
+  const normalizedEmail = email.trim().toLowerCase();
+  const existing = await prisma.user.findUnique({ where: { email: normalizedEmail } });
+  if (existing) {
+    return NextResponse.json(
+      { error: "Questa email è già registrata in ModusHO. Ogni persona ha un solo accesso: controlla se è già in elenco." },
+      { status: 409 }
+    );
+  }
 
-  const passwordHash = await bcrypt.hash(password, 12);
+  // ─── Doppioni di nome: avviso NON bloccante ───
+  if (!confirmDuplicateName) {
+    const propertyIds = propertyAssignments.map((a) => a.propertyId);
+    const candidates = await prisma.user.findMany({
+      where: {
+        isActive: true,
+        propertyAssignments: { some: { propertyId: { in: propertyIds } } },
+      },
+      select: { id: true, name: true, role: true },
+    });
+    const twin = candidates.find((c) => isSameName(c.name, name));
+    if (twin) {
+      return NextResponse.json(
+        {
+          warning: {
+            code: "DUPLICATE_NAME",
+            message: `In questa struttura c'è già ${twin.name}. Se è la stessa persona non crearne un altro: ogni persona ha un solo accesso.`,
+          },
+        },
+        { status: 409 }
+      );
+    }
+  }
 
+  // ─── Creazione: nessuna password, l'utente se la sceglie attivandosi ───
   const user = await prisma.user.create({
-    data: { email, name, passwordHash, role, canView, canEdit, canApprove, canPublish, targetDepartmentIds, viewDepartmentIds },
+    data: {
+      email: normalizedEmail,
+      name: name.trim(),
+      passwordHash: "", // vuoto = nessun accesso possibile finché non si attiva
+      role,
+      canView, canEdit, canApprove, canPublish,
+      targetDepartmentIds, viewDepartmentIds,
+      activatedAt: null,
+      createdById: actor.id,
+      // canCreateUsers non si accende mai in automatico: è sempre una concessione.
+    },
   });
 
-  // Property assignments
   for (const assignment of propertyAssignments) {
     await prisma.propertyAssignment.create({
       data: {
@@ -216,12 +301,63 @@ export async function POST(request: NextRequest) {
     });
   }
 
-  // Content permissions
   for (const ct of contentTypes) {
     await prisma.userContentPermission.create({
       data: { userId: user.id, contentType: ct },
     });
   }
 
-  return NextResponse.json({ data: { id: user.id } }, { status: 201 });
+  await recordUserAudit({
+    userId: user.id,
+    actorId: actor.id,
+    action: "CREATED",
+    meta: { role, propertyIds: propertyAssignments.map((a) => a.propertyId) },
+  });
+
+  // ─── Invito di attivazione, automatico ───
+  const { token } = await issueToken({
+    userId: user.id,
+    type: "ACTIVATION",
+    createdById: actor.id,
+  });
+
+  const context = await prisma.propertyAssignment.findFirst({
+    where: { userId: user.id },
+    select: {
+      property: { select: { name: true } },
+      department: { select: { name: true } },
+    },
+  });
+
+  const emailResult = await sendEmail(
+    buildActivationEmail({
+      name: user.name,
+      email: user.email,
+      activationUrl: `${getAppUrl()}/attiva/${token}`,
+      propertyName: context?.property?.name ?? null,
+      departmentName: context?.department?.name ?? null,
+    })
+  );
+
+  await recordUserAudit({
+    userId: user.id,
+    actorId: actor.id,
+    action: "INVITE_SENT",
+    meta: { adapter: emailResult.adapter, ok: emailResult.ok },
+  });
+
+  if (!emailResult.ok) {
+    console.error(`[users] invito non inviato userId=${user.id} — ${emailResult.error}`);
+  }
+
+  return NextResponse.json(
+    {
+      data: {
+        id: user.id,
+        inviteSent: emailResult.ok,
+        email: user.email,
+      },
+    },
+    { status: 201 }
+  );
 }

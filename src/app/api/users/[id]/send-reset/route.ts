@@ -1,9 +1,11 @@
 /**
- * POST /api/users/[id]/send-activation
+ * POST /api/users/[id]/send-reset
  *
- * (Ri)manda l'invito di attivazione. Il perimetro è quello della matrice:
- * ADMIN e HM nel proprio raggio, HOD col flag solo sugli utenti che ha creato
- * lui e che non si sono ancora attivati.
+ * Manda il link di reimpostazione password a un utente GIÀ attivato. Serve a
+ * chi si è perso la password e non riesce a usare "Password dimenticata?".
+ *
+ * Perimetro: ADMIN e HM nel proprio raggio. Chi non si è ancora attivato non
+ * riceve un reset ma un invito (rotta diversa): il messaggio lo dice.
  *
  * Guard anti-abuso: massimo un invio al minuto per utente destinatario.
  */
@@ -13,12 +15,11 @@ import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { issueToken } from "@/lib/auth-tokens";
-import { buildActivationEmail, sendEmail, getAppUrl } from "@/lib/email";
+import { buildResetEmail, sendEmail, getAppUrl } from "@/lib/email";
 import { recordUserAudit } from "@/lib/user-audit";
 import { loadActor, loadTarget } from "@/lib/user-scope-db";
-import { canSendActivation } from "@/lib/user-scope";
+import { canSendReset } from "@/lib/user-scope";
 
-/** Intervallo minimo fra due inviti allo stesso utente. */
 const RESEND_COOLDOWN_MS = 60 * 1000;
 
 export async function POST(
@@ -38,25 +39,16 @@ export async function POST(
   const target = await loadTarget(id);
   if (!target) return NextResponse.json({ error: "Utente non trovato" }, { status: 404 });
 
-  const verdict = canSendActivation(actor, target);
+  const verdict = canSendReset(actor, target);
   if (!verdict.allowed) {
-    return NextResponse.json({ error: verdict.reason }, { status: 403 });
+    // "Non ancora attivato" è una condizione dell'utente, non un divieto.
+    const status = target.activatedAt === null ? 400 : 403;
+    return NextResponse.json({ error: verdict.reason }, { status });
   }
 
   const recipient = await prisma.user.findUnique({
     where: { id },
-    select: {
-      id: true,
-      name: true,
-      email: true,
-      isActive: true,
-      propertyAssignments: {
-        select: {
-          property: { select: { name: true } },
-          department: { select: { name: true } },
-        },
-      },
-    },
+    select: { id: true, name: true, email: true, isActive: true },
   });
 
   if (!recipient) {
@@ -65,7 +57,7 @@ export async function POST(
 
   if (!recipient.isActive) {
     return NextResponse.json(
-      { error: "L'utente è disattivato: riattivalo prima di mandargli l'invito." },
+      { error: "L'utente è disattivato: riattivalo prima di mandargli il link." },
       { status: 400 }
     );
   }
@@ -73,7 +65,7 @@ export async function POST(
   const recent = await prisma.authToken.findFirst({
     where: {
       userId: recipient.id,
-      type: "ACTIVATION",
+      type: "RESET",
       createdAt: { gt: new Date(Date.now() - RESEND_COOLDOWN_MS) },
     },
     select: { createdAt: true },
@@ -81,38 +73,34 @@ export async function POST(
 
   if (recent) {
     return NextResponse.json(
-      { error: "Invito già inviato poco fa. Riprova tra un minuto." },
+      { error: "Link già inviato poco fa. Riprova tra un minuto." },
       { status: 429 }
     );
   }
 
   const { token, expiresAt } = await issueToken({
     userId: recipient.id,
-    type: "ACTIVATION",
+    type: "RESET",
     createdById: actor.id,
   });
 
-  const assignment = recipient.propertyAssignments[0];
-
   const result = await sendEmail(
-    buildActivationEmail({
+    buildResetEmail({
       name: recipient.name,
       email: recipient.email,
-      activationUrl: `${getAppUrl()}/attiva/${token}`,
-      propertyName: assignment?.property?.name ?? null,
-      departmentName: assignment?.department?.name ?? null,
+      resetUrl: `${getAppUrl()}/reimposta/${token}`,
     })
   );
 
   await recordUserAudit({
     userId: recipient.id,
     actorId: actor.id,
-    action: "INVITE_SENT",
-    meta: { adapter: result.adapter, ok: result.ok, reason: "resend" },
+    action: "RESET_SENT",
+    meta: { adapter: result.adapter, ok: result.ok },
   });
 
   if (!result.ok) {
-    console.error(`[auth] INVITO invio fallito userId=${recipient.id} — ${result.error}`);
+    console.error(`[auth] RESET invio fallito userId=${recipient.id} — ${result.error}`);
     return NextResponse.json(
       { error: "Non siamo riusciti a inviare l'email. Riprova tra poco." },
       { status: 502 }
@@ -120,7 +108,7 @@ export async function POST(
   }
 
   console.log(
-    `[auth] INVITO inviato userId=${recipient.id} da=${actor.id} adapter=${result.adapter}`
+    `[auth] RESET inviato userId=${recipient.id} da=${actor.id} adapter=${result.adapter}`
   );
 
   return NextResponse.json({
