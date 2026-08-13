@@ -33,10 +33,26 @@ interface LiveSearchBarProps {
   contentType?: string;
   status?: string;
   placeholder?: string;
+  /**
+   * Modalità controllata (opzionale). Serve alle liste, che tengono il testo
+   * cercato nell'indirizzo per poterlo ritrovare dopo un F5 o al ritorno dal
+   * dettaglio. Omettendo `value` il componente resta autonomo come prima.
+   */
+  value?: string;
+  onValueChange?: (value: string) => void;
 }
 
-export function LiveSearchBar({ propertyId, contentType, status, placeholder }: LiveSearchBarProps) {
-  const [query, setQuery] = useState("");
+export function LiveSearchBar({ propertyId, contentType, status, placeholder, value, onValueChange }: LiveSearchBarProps) {
+  const [internalQuery, setInternalQuery] = useState("");
+  const isControlled = value !== undefined;
+  const query = isControlled ? value : internalQuery;
+
+  // Il setter passa per un ref così gli effect qui sotto non devono dipendere
+  // dall'identità di `onValueChange`, che il chiamante può ricreare a ogni render.
+  const setQueryRef = useRef<(v: string) => void>(() => {});
+  setQueryRef.current = isControlled ? (onValueChange ?? (() => {})) : setInternalQuery;
+  const setQuery = useCallback((v: string) => setQueryRef.current(v), []);
+
   const [results, setResults] = useState<SearchResult[]>([]);
   const [total, setTotal] = useState(0);
   const [loading, setLoading] = useState(false);
@@ -90,13 +106,18 @@ export function LiveSearchBar({ propertyId, contentType, status, placeholder }: 
     return () => document.removeEventListener("mousedown", handleClickOutside);
   }, []);
 
-  // Reset when filters change
+  // Reset when filters change.
+  // Salta il primo giro: al mount non c'era nulla da azzerare (scriveva "" su
+  // "" e [] su []), ma in modalità controllata cancellerebbe il testo appena
+  // seminato dall'indirizzo.
+  const mountedRef = useRef(false);
   useEffect(() => {
+    if (!mountedRef.current) { mountedRef.current = true; return; }
     setQuery("");
     setResults([]);
     setOpen(false);
     setError(null);
-  }, [propertyId, contentType]);
+  }, [propertyId, contentType, setQuery]);
 
   return (
     <div ref={containerRef} className="relative w-full">
@@ -111,6 +132,7 @@ export function LiveSearchBar({ propertyId, contentType, status, placeholder }: 
           type="text"
           value={query}
           onChange={(e) => setQuery(e.target.value)}
+          name="q"
           onFocus={() => results.length > 0 && setOpen(true)}
           placeholder={placeholder || "Cerca nel contenuto..."}
           className="min-w-0 flex-1 px-5 py-3 text-sm font-ui text-charcoal bg-transparent"
