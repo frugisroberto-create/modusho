@@ -17,7 +17,15 @@ export async function getUserProperties(userId: string) {
     },
     distinct: ["propertyId"],
   });
-  return assignments.map((a) => a.property);
+  // Ordine deterministico: il chiamante usa properties[0] come struttura di
+  // default. L'ordinamento è in memoria e non in query: questo percorso lo
+  // attraversa ogni utente non-SUPER_ADMIN, e un `orderBy` su relazione
+  // combinato con `distinct` non è mai stato eseguito contro il database —
+  // se non venisse digerito farebbe fallire il layout all'accesso, non
+  // degradare. Il risultato è lo stesso, il rischio no.
+  return assignments
+    .map((a) => a.property)
+    .sort((a, b) => a.code.localeCompare(b.code));
 }
 
 export async function getUserDepartments(userId: string, propertyId: string) {
