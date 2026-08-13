@@ -22,6 +22,10 @@ export default async function OperatorLayout({
     properties = await prisma.property.findMany({
       where: { isActive: true },
       select: { id: true, name: true, code: true, tagline: true },
+      // Ordine deterministico: più sotto defaultPropertyId = properties[0].id,
+      // quindi senza orderBy il "default" dipende dall'ordine del DB.
+      // Allineato a (hoo)/layout.tsx.
+      orderBy: { code: "asc" },
     });
   } else {
     properties = await getUserProperties(user.id);
