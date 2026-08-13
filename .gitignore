@@ -31,3 +31,6 @@ HO_*.png
 HO_*.pdf
 Brand*.docx
 .vercel
+
+# File di ambiente locali (mai versionati: contengono credenziali)
+.env*.local
