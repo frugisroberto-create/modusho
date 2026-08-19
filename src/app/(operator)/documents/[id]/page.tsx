@@ -8,7 +8,7 @@ import { ContentTimeline } from "@/components/shared/content-timeline";
 import { ContentAckRegistry } from "@/components/shared/content-ack-registry";
 import { AttachmentUploader } from "@/components/shared/attachment-uploader";
 import { ExportPdfButton } from "@/components/shared/export-pdf-button";
-import Link from "next/link";
+import { ListBackLink } from "@/components/operator/list-back-link";
 import { sanitizeHtml } from "@/lib/sanitize";
 
 interface Props { params: Promise<{ id: string }> }
@@ -46,7 +46,7 @@ export default async function DocumentDetailPage({ params }: Props) {
   return (
     <div className="max-w-3xl mx-auto py-6">
       <nav className="flex items-center gap-2 text-sm font-ui text-sage-light mb-6">
-        <Link href="/documents" className="hover:text-terracotta transition-colors">Documenti</Link>
+        <ListBackLink href="/documents" label="Documenti" />
         <span className="text-ivory-dark">/</span>
         <span className="text-charcoal-dark">{content.title}</span>
       </nav>
