@@ -11,7 +11,7 @@ import { AttachmentUploader } from "@/components/shared/attachment-uploader";
 import { MobileHide } from "@/components/mobile-hide";
 import { ValidityBadge } from "@/components/shared/validity-badge";
 import { ContentTimeline } from "@/components/shared/content-timeline";
-import Link from "next/link";
+import { ListBackLink } from "@/components/operator/list-back-link";
 import { sanitizeHtml } from "@/lib/sanitize";
 
 interface Props { params: Promise<{ id: string }> }
@@ -104,7 +104,7 @@ export default async function SopDetailPage({ params }: Props) {
       <SopViewTracker contentId={content.id} />
 
       <nav className="flex items-center gap-2 text-sm font-ui text-sage-light mb-6">
-        <Link href="/sop" className="hover:text-terracotta transition-colors">SOP</Link>
+        <ListBackLink href="/sop" label="SOP" />
         <span className="text-ivory-dark">/</span>
         <span className="text-charcoal-dark">{content.title}</span>
       </nav>
