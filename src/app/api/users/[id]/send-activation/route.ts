@@ -93,12 +93,13 @@ export async function POST(
   });
 
   const assignment = recipient.propertyAssignments[0];
+  const activationUrl = `${getAppUrl()}/attiva/${token}`;
 
   const result = await sendEmail(
     buildActivationEmail({
       name: recipient.name,
       email: recipient.email,
-      activationUrl: `${getAppUrl()}/attiva/${token}`,
+      activationUrl,
       propertyName: assignment?.property?.name ?? null,
       departmentName: assignment?.department?.name ?? null,
     })
@@ -108,13 +109,25 @@ export async function POST(
     userId: recipient.id,
     actorId: actor.id,
     action: "INVITE_SENT",
-    meta: { adapter: result.adapter, ok: result.ok, reason: "resend" },
+    meta: {
+      adapter: result.adapter,
+      ok: result.ok,
+      reason: "resend",
+      ...(result.reason ? { failure: result.reason } : {}),
+    },
   });
 
   if (!result.ok) {
-    console.error(`[auth] INVITO invio fallito userId=${recipient.id} — ${result.error}`);
+    console.error(
+      `[auth] INVITO invio fallito userId=${recipient.id} motivo=${result.reason ?? "-"}`
+    );
     return NextResponse.json(
-      { error: "Non siamo riusciti a inviare l'email. Riprova tra poco." },
+      {
+        error: "Non siamo riusciti a inviare l'email. Riprova tra poco.",
+        // Anche quando la mail non parte il link serve, purché il destinatario
+        // non si sia già attivato: è il solo modo di consegnare l'invito a mano.
+        ...(target.activatedAt === null ? { activationUrl, activationExpiresAt: expiresAt.toISOString() } : {}),
+      },
       { status: 502 }
     );
   }
@@ -124,6 +137,15 @@ export async function POST(
   );
 
   return NextResponse.json({
-    data: { sent: true, adapter: result.adapter, expiresAt },
+    data: {
+      sent: true,
+      adapter: result.adapter,
+      expiresAt,
+      // Il link esce SOLO per chi non si è ancora attivato. Su un account già
+      // attivo l'unica via è la reimpostazione, che arriva alla sua casella.
+      ...(target.activatedAt === null
+        ? { activationUrl, activationExpiresAt: expiresAt.toISOString() }
+        : {}),
+    },
   });
 }

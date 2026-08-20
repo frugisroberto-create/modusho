@@ -16,13 +16,13 @@
 
 import crypto from "crypto";
 import { prisma } from "./prisma";
+import { TOKEN_TTL_MS } from "./token-ttl";
 import type { AuthTokenType } from "@prisma/client";
 
-/** Durata di validità per tipo di token. */
-export const TOKEN_TTL_MS: Record<AuthTokenType, number> = {
-  ACTIVATION: 30 * 24 * 60 * 60 * 1000, // 30 giorni
-  RESET: 60 * 60 * 1000, // 60 minuti
-};
+// Le durate stanno in `token-ttl` perché le condividiamo con i template email,
+// che non devono dipendere dal database. Qui restano esportate: è il posto in
+// cui il resto del progetto le ha sempre cercate.
+export { TOKEN_TTL_MS };
 
 /** Byte di entropia del token. */
 const TOKEN_BYTES = 32;

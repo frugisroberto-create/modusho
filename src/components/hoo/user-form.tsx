@@ -3,6 +3,7 @@
 import { useState, useEffect, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import { HelpTip } from "@/components/auth/help-tip";
+import { ActivationLinkBox } from "@/components/hoo/activation-link-box";
 import type { EditableField } from "@/lib/user-scope";
 
 type RoleOption = "OPERATOR" | "HOD" | "HOTEL_MANAGER" | "CORPORATE" | "ADMIN";
@@ -129,7 +130,13 @@ export function UserForm({
   const [error, setError] = useState("");
   const [warnings, setWarnings] = useState<string[]>([]);
   const [duplicateWarning, setDuplicateWarning] = useState<string | null>(null);
-  const [createdUser, setCreatedUser] = useState<{ id: string; email: string; inviteSent: boolean } | null>(null);
+  const [createdUser, setCreatedUser] = useState<{
+    id: string;
+    email: string;
+    inviteSent: boolean;
+    activationUrl?: string;
+    activationExpiresAt?: string;
+  } | null>(null);
 
   // Retrocessione: motivazione obbligatoria
   const [showDemotionModal, setShowDemotionModal] = useState(false);
@@ -138,6 +145,7 @@ export function UserForm({
   // Invio link password (modalità modifica)
   const [sendingLink, setSendingLink] = useState(false);
   const [linkFeedback, setLinkFeedback] = useState<{ text: string; ok: boolean } | null>(null);
+  const [resentLink, setResentLink] = useState<{ url: string; expiresAt: string } | null>(null);
 
   const isSimpleVeste = veste !== "admin";
 
@@ -270,6 +278,7 @@ export function UserForm({
     if (!userId) return;
     setSendingLink(true);
     setLinkFeedback(null);
+    setResentLink(null);
     const endpoint = isActivated ? "send-reset" : "send-activation";
     try {
       const res = await fetch(`/api/users/${userId}/${endpoint}`, { method: "POST" });
@@ -279,6 +288,14 @@ export function UserForm({
           ? { text: isActivated ? "Link di reimpostazione inviato." : "Invito inviato.", ok: true }
           : { text: json?.error ?? "Invio non riuscito", ok: false }
       );
+      // Il link esiste solo per chi non si è ancora attivato: su un account
+      // attivo l'API non lo restituisce, e qui non lo cerchiamo nemmeno.
+      if (!isActivated) {
+        const payload = res.ok ? json?.data : json;
+        if (payload?.activationUrl && payload?.activationExpiresAt) {
+          setResentLink({ url: payload.activationUrl, expiresAt: payload.activationExpiresAt });
+        }
+      }
     } finally { setSendingLink(false); }
   };
 
@@ -359,7 +376,13 @@ export function UserForm({
       if (res.ok) {
         if (isCreate) {
           const json = await res.json();
-          setCreatedUser({ id: json.data.id, email: json.data.email, inviteSent: json.data.inviteSent });
+          setCreatedUser({
+            id: json.data.id,
+            email: json.data.email,
+            inviteSent: json.data.inviteSent,
+            activationUrl: json.data.activationUrl,
+            activationExpiresAt: json.data.activationExpiresAt,
+          });
           return;
         }
         if (onSuccess) { onSuccess(); return; }
@@ -397,23 +420,39 @@ export function UserForm({
 
   // ─── Esito creazione ───
   if (createdUser) {
+    // Mail partita → conferma verde. Mail non partita → avviso arancione: è la
+    // stessa veste che il progetto usa ovunque per gli stati di attenzione.
+    const boxCls = createdUser.inviteSent
+      ? "bg-[#E8F5E9] border border-[#2E7D32]/20"
+      : "bg-[#FFF3E0] border border-[#E65100]/30";
+    const titleCls = createdUser.inviteSent ? "text-[#2E7D32]" : "text-[#E65100]";
+
     return (
       <div className="max-w-md mx-auto mt-8 space-y-6">
-        <div className="bg-[#E8F5E9] border border-[#2E7D32]/20 p-6 space-y-3">
-          <h2 className="text-base font-heading font-semibold text-[#2E7D32]">Utente creato</h2>
+        <div className={`${boxCls} p-6 space-y-4`}>
+          <h2 className={`text-base font-heading font-semibold ${titleCls}`}>Utente creato</h2>
           <p className="text-sm font-ui text-charcoal">
             {createdUser.inviteSent ? (
               <>
-                Abbiamo mandato l&apos;invito a <strong>{createdUser.email}</strong>. Riceverà
-                un&apos;email con il suo link personale per attivarsi e scegliere la password.
+                Abbiamo mandato l&apos;invito a <strong>{createdUser.email}</strong>. Se non
+                dovesse arrivargli, qui sotto trovi il suo link personale da fargli avere in un
+                altro modo.
               </>
             ) : (
               <>
                 L&apos;utente è stato creato, ma l&apos;email a <strong>{createdUser.email}</strong> non
-                è partita. Apri la sua scheda e usa &quot;Rimanda invito&quot;.
+                è partita. Usa il link qui sotto per fargliela avere.
               </>
             )}
           </p>
+
+          {createdUser.activationUrl && createdUser.activationExpiresAt && (
+            <ActivationLinkBox
+              url={createdUser.activationUrl}
+              expiresAt={createdUser.activationExpiresAt}
+            />
+          )}
+
           <p className="text-xs font-ui text-charcoal/60">
             Finché non si attiva lo vedrai <strong>In attesa</strong> nell&apos;elenco e potrai
             rimandargli l&apos;invito.
@@ -480,6 +519,11 @@ export function UserForm({
               <p className={`text-xs font-ui mt-2 ${linkFeedback.ok ? "text-sage" : "text-alert-red"}`}>
                 {linkFeedback.text}
               </p>
+            )}
+            {resentLink && (
+              <div className="mt-3">
+                <ActivationLinkBox url={resentLink.url} expiresAt={resentLink.expiresAt} />
+              </div>
             )}
             <p className="text-xs font-ui text-sage-light mt-2">
               La password la sceglie l&apos;utente: nessuno può vederla o impostarla al posto suo.

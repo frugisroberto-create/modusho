@@ -315,11 +315,16 @@ export async function POST(request: NextRequest) {
   });
 
   // ─── Invito di attivazione, automatico ───
-  const { token } = await issueToken({
+  const { token, expiresAt } = await issueToken({
     userId: user.id,
     type: "ACTIVATION",
     createdById: actor.id,
   });
+
+  // L'utente appena creato ha activatedAt null per costruzione: il link va
+  // restituito a chi lo sta creando, che è l'unico modo per consegnarlo a mano
+  // se la mail non parte.
+  const activationUrl = `${getAppUrl()}/attiva/${token}`;
 
   const context = await prisma.propertyAssignment.findFirst({
     where: { userId: user.id },
@@ -333,7 +338,7 @@ export async function POST(request: NextRequest) {
     buildActivationEmail({
       name: user.name,
       email: user.email,
-      activationUrl: `${getAppUrl()}/attiva/${token}`,
+      activationUrl,
       propertyName: context?.property?.name ?? null,
       departmentName: context?.department?.name ?? null,
     })
@@ -343,11 +348,17 @@ export async function POST(request: NextRequest) {
     userId: user.id,
     actorId: actor.id,
     action: "INVITE_SENT",
-    meta: { adapter: emailResult.adapter, ok: emailResult.ok },
+    meta: {
+      adapter: emailResult.adapter,
+      ok: emailResult.ok,
+      ...(emailResult.reason ? { reason: emailResult.reason } : {}),
+    },
   });
 
   if (!emailResult.ok) {
-    console.error(`[users] invito non inviato userId=${user.id} — ${emailResult.error}`);
+    console.error(
+      `[users] invito non inviato userId=${user.id} motivo=${emailResult.reason ?? "-"}`
+    );
   }
 
   return NextResponse.json(
@@ -356,6 +367,8 @@ export async function POST(request: NextRequest) {
         id: user.id,
         inviteSent: emailResult.ok,
         email: user.email,
+        activationUrl,
+        activationExpiresAt: expiresAt.toISOString(),
       },
     },
     { status: 201 }

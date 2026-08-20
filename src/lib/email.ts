@@ -1,15 +1,22 @@
 /**
- * Servizio email — due adapter, nessun fallimento silenzioso.
+ * Servizio email.
  *
- * - RESEND_API_KEY presente  → invio reale via API Resend (chiamata fetch,
+ * - RESEND_API_KEY presente → invio reale via API Resend (chiamata fetch,
  *   nessuna dipendenza aggiuntiva).
- * - RESEND_API_KEY assente   → adapter console: l'email non parte ma viene
- *   loggata in modo strutturato, così in sviluppo si recupera il link.
+ * - RESEND_API_KEY assente  → nessun invio, e l'esito lo dice: `ok: false`
+ *   con `reason: "not-configured"`. Un ambiente che non può spedire deve
+ *   dichiararlo, altrimenti il difetto riemerge in produzione travestito da
+ *   successo.
  *
- * `sendEmail` non lancia mai: restituisce sempre un esito tracciato (e lo
- * logga). Chi chiama decide se l'esito è bloccante — ma non può ignorarlo
- * per distrazione, perché l'informazione è nel valore di ritorno.
+ * `sendEmail` non lancia mai: restituisce sempre un esito tracciato. Chi
+ * chiama decide se l'esito è bloccante, ma non può ignorarlo per distrazione
+ * perché l'informazione è nel valore di ritorno.
+ *
+ * Nei log finiscono solo destinatario e oggetto: mai il corpo del messaggio,
+ * che contiene il link con il token in chiaro.
  */
+
+import { TOKEN_TTL_MS, formatDuration } from "./token-ttl";
 
 const RESEND_ENDPOINT = "https://api.resend.com/emails";
 const DEFAULT_FROM = "ModusHO <onboarding@resend.dev>";
@@ -30,11 +37,21 @@ export interface EmailMessage {
   text: string;
 }
 
+/** Perché un invio non è andato a buon fine. Assente quando `ok` è true. */
+export type SendEmailFailureReason =
+  /** RESEND_API_KEY non configurata: non abbiamo nemmeno provato a spedire. */
+  | "not-configured"
+  /** Resend ha risposto con un codice di errore. */
+  | "http"
+  /** La chiamata non è arrivata a destinazione: timeout, DNS, rete. */
+  | "network";
+
 export interface SendEmailResult {
   ok: boolean;
   adapter: "resend" | "console";
   id?: string;
   error?: string;
+  reason?: SendEmailFailureReason;
 }
 
 /** URL pubblico dell'app, per costruire i link nelle email. */
@@ -56,12 +73,11 @@ export async function sendEmail(message: EmailMessage): Promise<SendEmailResult>
   const apiKey = process.env.RESEND_API_KEY;
 
   if (!apiKey) {
-    // Adapter console: log strutturato, così il link è recuperabile in sviluppo.
-    console.log(
-      "[email] adapter=console — invio NON effettuato (RESEND_API_KEY assente)",
-      JSON.stringify({ to: message.to, from: getFrom(), subject: message.subject, text: message.text })
+    // Nessun corpo nel log: conterrebbe il link con il token in chiaro.
+    console.error(
+      `[email] NON INVIATA to=${message.to} oggetto="${message.subject}" — RESEND_API_KEY assente in questo ambiente`
     );
-    return { ok: true, adapter: "console" };
+    return { ok: false, adapter: "console", reason: "not-configured" };
   }
 
   try {
@@ -83,7 +99,7 @@ export async function sendEmail(message: EmailMessage): Promise<SendEmailResult>
     if (!response.ok) {
       const detail = await response.text().catch(() => "");
       console.error(`[email] adapter=resend FALLITO to=${message.to} status=${response.status} — ${detail}`);
-      return { ok: false, adapter: "resend", error: `HTTP ${response.status}` };
+      return { ok: false, adapter: "resend", error: `HTTP ${response.status}`, reason: "http" };
     }
 
     const data = (await response.json().catch(() => ({}))) as { id?: string };
@@ -92,7 +108,7 @@ export async function sendEmail(message: EmailMessage): Promise<SendEmailResult>
   } catch (error) {
     const detail = error instanceof Error ? error.message : String(error);
     console.error(`[email] adapter=resend ERRORE to=${message.to} — ${detail}`);
-    return { ok: false, adapter: "resend", error: detail };
+    return { ok: false, adapter: "resend", error: detail, reason: "network" };
   }
 }
 
@@ -185,9 +201,10 @@ export interface ActivationEmailParams {
   departmentName?: string | null;
 }
 
-/** Email di attivazione — link valido 30 giorni. */
+/** Email di attivazione — la durata dichiarata è quella vera del token. */
 export function buildActivationEmail(params: ActivationEmailParams): EmailMessage {
   const { name, email, activationUrl, propertyName, departmentName } = params;
+  const validity = formatDuration(TOKEN_TTL_MS.ACTIVATION);
 
   const bodyHtml = [
     paragraph(buildContextSentence(propertyName, departmentName)),
@@ -195,7 +212,7 @@ export function buildActivationEmail(params: ActivationEmailParams): EmailMessag
   ].join("\n");
 
   const notesHtml = [
-    note("Questo link è personale ed è valido per <strong>30 giorni</strong>."),
+    note(`Questo link è personale ed è valido per <strong>${validity}</strong>.`),
     note(`Il tuo nome utente è questa email: <strong>${escapeHtml(email)}</strong>`),
     note("Dopo l'attivazione ti guidiamo noi a mettere ModusHO sul telefono: due tocchi."),
     note("Non ti aspettavi questo messaggio? Ignoralo."),
@@ -215,7 +232,7 @@ export function buildActivationEmail(params: ActivationEmailParams): EmailMessag
     "Attiva il tuo accesso a ModusHO da questo link:",
     activationUrl,
     "",
-    "Questo link è personale ed è valido per 30 giorni.",
+    `Questo link è personale ed è valido per ${validity}.`,
     `Il tuo nome utente è questa email: ${email}`,
     "Dopo l'attivazione ti guidiamo noi a mettere ModusHO sul telefono: due tocchi.",
     "Non ti aspettavi questo messaggio? Ignoralo.",
@@ -233,9 +250,10 @@ export interface ResetEmailParams {
   resetUrl: string;
 }
 
-/** Email di reset password — link valido 60 minuti. */
+/** Email di reset password — la durata dichiarata è quella vera del token. */
 export function buildResetEmail(params: ResetEmailParams): EmailMessage {
   const { name, email, resetUrl } = params;
+  const validity = formatDuration(TOKEN_TTL_MS.RESET);
 
   const bodyHtml = [
     paragraph("Hai chiesto di rifare la password di ModusHO. Da qui ne scegli una nuova: ci vuole un minuto."),
@@ -243,7 +261,7 @@ export function buildResetEmail(params: ResetEmailParams): EmailMessage {
   ].join("\n");
 
   const notesHtml = [
-    note("Questo link è personale ed è valido per <strong>60 minuti</strong>."),
+    note(`Questo link è personale ed è valido per <strong>${validity}</strong>.`),
     note(`Il tuo nome utente è questa email: <strong>${escapeHtml(email)}</strong>`),
     note("Non hai chiesto tu di cambiare la password? Ignora questo messaggio: nulla cambia."),
   ].join("\n");
@@ -262,7 +280,7 @@ export function buildResetEmail(params: ResetEmailParams): EmailMessage {
     "Crea la nuova password di ModusHO da questo link:",
     resetUrl,
     "",
-    "Questo link è personale ed è valido per 60 minuti.",
+    `Questo link è personale ed è valido per ${validity}.`,
     `Il tuo nome utente è questa email: ${email}`,
     "Non hai chiesto tu di cambiare la password? Ignora questo messaggio: nulla cambia.",
     "",

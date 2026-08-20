@@ -1,5 +1,6 @@
-import { describe, it, expect } from "vitest";
-import { buildActivationEmail, buildResetEmail } from "../email";
+import { describe, it, expect, vi, afterEach } from "vitest";
+import { buildActivationEmail, buildResetEmail, sendEmail } from "../email";
+import { TOKEN_TTL_MS, formatDuration } from "../token-ttl";
 
 const ATTIVAZIONE = buildActivationEmail({
   name: "Maria",
@@ -129,9 +130,9 @@ describe("template email — reset", () => {
     expect(RESET.html).toContain('href="https://modusho.test/reimposta/tok456"');
   });
 
-  it("dichiara la validità di 60 minuti", () => {
-    expect(RESET.html).toContain("60 minuti");
-    expect(RESET.text).toContain("60 minuti");
+  it("dichiara la validità di 4 ore", () => {
+    expect(RESET.html).toContain("4 ore");
+    expect(RESET.text).toContain("4 ore");
   });
 
   it("non promette 30 giorni come l'attivazione", () => {
@@ -145,5 +146,108 @@ describe("template email — reset", () => {
 
   it("rassicura chi non ha chiesto il cambio", () => {
     expect(RESET.html).toContain("Non hai chiesto tu di cambiare la password?");
+  });
+});
+
+// ─── Durate: una sola fonte, testo e comportamento non possono divergere ──
+
+describe("durate dichiarate nelle email", () => {
+  it("il token di attivazione dura 30 giorni", () => {
+    expect(TOKEN_TTL_MS.ACTIVATION).toBe(30 * 24 * 60 * 60 * 1000);
+  });
+
+  it("il token di reimpostazione dura 4 ore", () => {
+    expect(TOKEN_TTL_MS.RESET).toBe(4 * 60 * 60 * 1000);
+  });
+
+  it("formatDuration sceglie l'unità e la concorda in italiano", () => {
+    expect(formatDuration(30 * 24 * 60 * 60 * 1000)).toBe("30 giorni");
+    expect(formatDuration(24 * 60 * 60 * 1000)).toBe("1 giorno");
+    expect(formatDuration(4 * 60 * 60 * 1000)).toBe("4 ore");
+    expect(formatDuration(60 * 60 * 1000)).toBe("1 ora");
+    expect(formatDuration(90 * 60 * 1000)).toBe("90 minuti");
+    expect(formatDuration(60 * 1000)).toBe("1 minuto");
+  });
+
+  // Il punto di questi due: se qualcuno cambia la costante e non il testo, il
+  // test si accorge. Non asseriscono una stringa fissa, ma la derivazione.
+  it("il testo del reset dichiara esattamente la durata della costante", () => {
+    const atteso = formatDuration(TOKEN_TTL_MS.RESET);
+    expect(RESET.html).toContain(`valido per <strong>${atteso}</strong>`);
+    expect(RESET.text).toContain(`valido per ${atteso}`);
+  });
+
+  it("il testo dell'attivazione dichiara esattamente la durata della costante", () => {
+    const atteso = formatDuration(TOKEN_TTL_MS.ACTIVATION);
+    expect(ATTIVAZIONE.html).toContain(`valido per <strong>${atteso}</strong>`);
+    expect(ATTIVAZIONE.text).toContain(`valido per ${atteso}`);
+  });
+});
+
+// ─── sendEmail: senza chiave non mente, e non scrive il token nei log ─────
+
+describe("sendEmail — RESEND_API_KEY assente", () => {
+  const ORIGINALE = process.env.RESEND_API_KEY;
+
+  afterEach(() => {
+    if (ORIGINALE === undefined) delete process.env.RESEND_API_KEY;
+    else process.env.RESEND_API_KEY = ORIGINALE;
+    vi.restoreAllMocks();
+  });
+
+  it("dichiara il fallimento con il motivo, invece di fingere successo", async () => {
+    delete process.env.RESEND_API_KEY;
+    vi.spyOn(console, "error").mockImplementation(() => {});
+
+    const esito = await sendEmail(ATTIVAZIONE);
+
+    expect(esito.ok).toBe(false);
+    expect(esito.reason).toBe("not-configured");
+    expect(esito.adapter).toBe("console");
+  });
+
+  it("non lascia il token né l'URL di attivazione nei log", async () => {
+    delete process.env.RESEND_API_KEY;
+    const errorSpy = vi.spyOn(console, "error").mockImplementation(() => {});
+    const logSpy = vi.spyOn(console, "log").mockImplementation(() => {});
+
+    await sendEmail(ATTIVAZIONE);
+
+    const scritto = [...errorSpy.mock.calls, ...logSpy.mock.calls]
+      .flat()
+      .map((arg) => (typeof arg === "string" ? arg : JSON.stringify(arg)))
+      .join(" ");
+
+    expect(scritto).not.toContain("tok123");
+    expect(scritto).not.toContain("https://modusho.test/attiva/tok123");
+    expect(scritto).not.toContain("/attiva/");
+  });
+
+  it("non riversa nei log il corpo del messaggio, in nessuna forma", async () => {
+    delete process.env.RESEND_API_KEY;
+    const errorSpy = vi.spyOn(console, "error").mockImplementation(() => {});
+    const logSpy = vi.spyOn(console, "log").mockImplementation(() => {});
+
+    await sendEmail(RESET);
+
+    const scritto = [...errorSpy.mock.calls, ...logSpy.mock.calls]
+      .flat()
+      .map((arg) => (typeof arg === "string" ? arg : JSON.stringify(arg)))
+      .join(" ");
+
+    expect(scritto).not.toContain("tok456");
+    expect(scritto).not.toContain("/reimposta/");
+    expect(scritto).not.toContain(RESET.text);
+    expect(scritto).not.toContain(RESET.html);
+  });
+
+  it("non tenta nemmeno la chiamata di rete", async () => {
+    delete process.env.RESEND_API_KEY;
+    vi.spyOn(console, "error").mockImplementation(() => {});
+    const fetchSpy = vi.spyOn(globalThis, "fetch");
+
+    await sendEmail(ATTIVAZIONE);
+
+    expect(fetchSpy).not.toHaveBeenCalled();
   });
 });

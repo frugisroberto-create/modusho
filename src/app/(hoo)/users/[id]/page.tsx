@@ -4,6 +4,7 @@ import { useState, useEffect, useCallback } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { useSession } from "next-auth/react";
 import { UserForm } from "@/components/hoo/user-form";
+import { ActivationLinkBox } from "@/components/hoo/activation-link-box";
 import { HelpTip } from "@/components/auth/help-tip";
 import { getActivationStatus } from "@/lib/user-scope";
 import type { EditableField } from "@/lib/user-scope";
@@ -68,6 +69,7 @@ export default function UserDetailPage() {
   const [inviting, setInviting] = useState(false);
   const [togglingFlag, setTogglingFlag] = useState(false);
   const [feedback, setFeedback] = useState<{ text: string; ok: boolean } | null>(null);
+  const [inviteLink, setInviteLink] = useState<{ url: string; expiresAt: string } | null>(null);
 
   const fetchUser = useCallback(async (silent = false) => {
     if (!silent) setLoading(true);
@@ -106,6 +108,7 @@ export default function UserDetailPage() {
   const handleResendInvite = async () => {
     setInviting(true);
     setFeedback(null);
+    setInviteLink(null);
     try {
       const res = await fetch(`/api/users/${id}/send-activation`, { method: "POST" });
       const json = await res.json().catch(() => ({}));
@@ -114,6 +117,12 @@ export default function UserDetailPage() {
           ? { text: "Invito inviato.", ok: true }
           : { text: json?.error ?? "Invito non inviato", ok: false }
       );
+      // Il link arriva solo per chi non si è ancora attivato: l'API non lo
+      // restituisce per gli account attivi, quindi qui non può comparire.
+      const payload = res.ok ? json?.data : json;
+      if (payload?.activationUrl && payload?.activationExpiresAt) {
+        setInviteLink({ url: payload.activationUrl, expiresAt: payload.activationExpiresAt });
+      }
       if (res.ok) fetchUser(true);
     } finally { setInviting(false); }
   };
@@ -236,6 +245,14 @@ export default function UserDetailPage() {
             <p className={`mt-2 text-sm font-ui ${feedback.ok ? "text-sage" : "text-alert-red"}`}>
               {feedback.text}
             </p>
+          )}
+
+          {/* Il link compare solo per chi non si è ancora attivato: appena
+              l'utente attiva, activation.state diventa ACTIVATED e sparisce. */}
+          {inviteLink && activation.state !== "ACTIVATED" && (
+            <div className="mt-3 max-w-xl">
+              <ActivationLinkBox url={inviteLink.url} expiresAt={inviteLink.expiresAt} />
+            </div>
           )}
         </div>
         <div className="flex gap-2 shrink-0">

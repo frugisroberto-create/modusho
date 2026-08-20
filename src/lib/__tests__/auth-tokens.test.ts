@@ -84,9 +84,9 @@ describe("auth-tokens", () => {
       expect(TOKEN_TTL_MS.ACTIVATION).toBe(30 * 24 * 60 * 60 * 1000);
     });
 
-    it("RESET dura 60 minuti", () => {
-      expect(computeExpiry("RESET", now).toISOString()).toBe("2026-07-25T11:00:00.000Z");
-      expect(TOKEN_TTL_MS.RESET).toBe(60 * 60 * 1000);
+    it("RESET dura 4 ore", () => {
+      expect(computeExpiry("RESET", now).toISOString()).toBe("2026-07-25T14:00:00.000Z");
+      expect(TOKEN_TTL_MS.RESET).toBe(4 * 60 * 60 * 1000);
     });
   });
 
@@ -116,10 +116,16 @@ describe("auth-tokens", () => {
       expect(isTokenUsable(t, now)).toBe(false);
     });
 
-    it("un token RESET emesso 61 minuti fa è scaduto", () => {
-      const emesso = new Date("2026-07-25T08:59:00.000Z");
+    it("un token RESET emesso 4 ore e 1 minuto fa è scaduto", () => {
+      const emesso = new Date("2026-07-25T05:59:00.000Z");
       const t = { expiresAt: computeExpiry("RESET", emesso), usedAt: null };
       expect(isTokenUsable(t, now)).toBe(false);
+    });
+
+    it("un token RESET emesso 3 ore fa è ancora valido", () => {
+      const emesso = new Date("2026-07-25T07:00:00.000Z");
+      const t = { expiresAt: computeExpiry("RESET", emesso), usedAt: null };
+      expect(isTokenUsable(t, now)).toBe(true);
     });
 
     it("un token ACTIVATION emesso 29 giorni fa è ancora valido", () => {
