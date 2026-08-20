@@ -81,45 +81,50 @@ enum SopEventType {
 }
 
 model User {
-  id           String  @id @default(cuid())
-  email        String  @unique
-  name         String
-  passwordHash String
-  role         Role    @default(OPERATOR)
-  canView      Boolean @default(true)
-  canEdit      Boolean @default(false)
-  canApprove   Boolean @default(false)
-  canPublish   Boolean @default(false)
-  targetDepartmentIds String[] @default([])
-  viewDepartmentIds   String[] @default([])
-  isActive     Boolean @default(true)
-  lastLoginAt  DateTime?
-  createdAt    DateTime @default(now())
-  updatedAt    DateTime @updatedAt
+  id                  String    @id @default(cuid())
+  email               String    @unique
+  name                String
+  passwordHash        String
+  role                Role      @default(OPERATOR)
+  canView             Boolean   @default(true)
+  canEdit             Boolean   @default(false)
+  canApprove          Boolean   @default(false)
+  canPublish          Boolean   @default(false)
+  targetDepartmentIds String[]  @default([])
+  viewDepartmentIds   String[]  @default([])
+  isActive            Boolean   @default(true)
+  lastLoginAt         DateTime?
+  createdAt           DateTime  @default(now())
+  updatedAt           DateTime  @updatedAt
 
-  propertyAssignments  PropertyAssignment[]
-  contentPermissions   UserContentPermission[]
-  createdContents      Content[]              @relation("ContentCreatedBy")
-  updatedContents      Content[]              @relation("ContentUpdatedBy")
-  submittedContents    Content[]              @relation("ContentSubmittedBy")
-  deletedContents      Content[]              @relation("ContentDeletedBy")
-  featuredContents     Content[]              @relation("ContentFeaturedBy")
-  acknowledgments      ContentAcknowledgment[]
-  reviews              ContentReview[]
-  statusChanges        ContentStatusHistory[] @relation("StatusChangedBy")
-  contentRevisions     ContentRevision[]      @relation("ContentRevisedBy")
-  contentNotes         ContentNote[]          @relation("ContentNoteAuthor")
-  targetedContents     ContentTarget[]        @relation("ContentTargetUser")
-  attachments          Attachment[]           @relation("AttachmentUploadedBy")
+  propertyAssignments PropertyAssignment[]
+  contentPermissions  UserContentPermission[]
+  createdContents     Content[]               @relation("ContentCreatedBy")
+  updatedContents     Content[]               @relation("ContentUpdatedBy")
+  submittedContents   Content[]               @relation("ContentSubmittedBy")
+  deletedContents     Content[]               @relation("ContentDeletedBy")
+  featuredContents    Content[]               @relation("ContentFeaturedBy")
+  acknowledgments     ContentAcknowledgment[]
+  reviews             ContentReview[]
+  statusChanges       ContentStatusHistory[]  @relation("StatusChangedBy")
+  contentRevisions    ContentRevision[]       @relation("ContentRevisedBy")
+  contentNotes        ContentNote[]           @relation("ContentNoteAuthor")
+  targetedContents    ContentTarget[]         @relation("ContentTargetUser")
+  attachments         Attachment[]            @relation("AttachmentUploadedBy")
 
-  sopWorkflowsAsR      SopWorkflow[]          @relation("SopResponsible")
-  sopWorkflowsAsC      SopWorkflow[]          @relation("SopConsulted")
-  sopWorkflowsAsA      SopWorkflow[]          @relation("SopAccountable")
-  sopTextVersions      SopTextVersion[]       @relation("SopTextVersionSavedBy")
-  sopWorkflowEvents    SopWorkflowEvent[]     @relation("SopWorkflowEventActor")
-  sopViewRecords       SopViewRecord[]        @relation("SopViewRecordUser")
-  pushSubscriptions    PushSubscription[]     @relation("PushSubscriptionUser")
-  notifications        Notification[]
+  sopWorkflowsAsR   SopWorkflow[]      @relation("SopResponsible")
+  sopWorkflowsAsC   SopWorkflow[]      @relation("SopConsulted")
+  sopWorkflowsAsA   SopWorkflow[]      @relation("SopAccountable")
+  sopTextVersions   SopTextVersion[]   @relation("SopTextVersionSavedBy")
+  sopWorkflowEvents SopWorkflowEvent[] @relation("SopWorkflowEventActor")
+  sopViewRecords    SopViewRecord[]    @relation("SopViewRecordUser")
+  pushSubscriptions PushSubscription[] @relation("PushSubscriptionUser")
+  notifications     Notification[]
+
+  onboardingAssignments      OnboardingAssignment[] @relation("OnboardingAssignmentUser")
+  onboardingAssignedBy       OnboardingAssignment[] @relation("OnboardingAssignedBy")
+  onboardingTemplatesCreated OnboardingTemplate[]   @relation("OnboardingTemplateCreatedBy")
+  onboardingTemplatesUpdated OnboardingTemplate[]   @relation("OnboardingTemplateUpdatedBy")
 
   @@index([role])
   @@index([email])
@@ -149,11 +154,13 @@ model Property {
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
 
-  departments         Department[]
-  propertyAssignments PropertyAssignment[]
-  contents            Content[]
-  memos               Memo[]
-  staticDocuments     StaticDocument[]
+  departments           Department[]
+  propertyAssignments   PropertyAssignment[]
+  contents              Content[]
+  memos                 Memo[]
+  staticDocuments       StaticDocument[]
+  onboardingTemplates   OnboardingTemplate[]
+  onboardingAssignments OnboardingAssignment[]
 
   @@index([code])
 }
@@ -167,14 +174,15 @@ model Department {
 
   propertyAssignments PropertyAssignment[]
   contents            Content[]
-  contentTargets      ContentTarget[]       @relation("ContentTargetDepartment")
+  contentTargets      ContentTarget[]      @relation("ContentTargetDepartment")
+  onboardingTemplates OnboardingTemplate[]
 
   @@unique([propertyId, code])
   @@index([propertyId])
 }
 
 model PropertyAssignment {
-  id           String      @id @default(cuid())
+  id           String  @id @default(cuid())
   userId       String
   propertyId   String
   departmentId String?
@@ -190,29 +198,29 @@ model PropertyAssignment {
 }
 
 model Content {
-  id           String        @id @default(cuid())
-  code         String?       @unique
-  type         ContentType
-  title        String
-  body         String
-  fileUrl      String?
-  status       ContentStatus @default(DRAFT)
-  version      Int           @default(1)
-  propertyId   String
-  departmentId String?
-  createdById   String
-  updatedById   String
-  submittedById String?
-  isFeatured      Boolean       @default(false)
-  featuredAt      DateTime?
-  featuredById    String?
-  standardSource  String?       // "HO_BRAND" | "LQA" | null — solo per STANDARD_BOOK
-  isDeleted     Boolean       @default(false)
-  deletedAt     DateTime?
-  deletedById   String?
-  publishedAt   DateTime?
-  createdAt     DateTime      @default(now())
-  updatedAt     DateTime      @updatedAt
+  id             String        @id @default(cuid())
+  code           String?       @unique
+  type           ContentType
+  title          String
+  body           String
+  fileUrl        String?
+  status         ContentStatus @default(DRAFT)
+  version        Int           @default(1)
+  propertyId     String
+  departmentId   String?
+  createdById    String
+  updatedById    String
+  submittedById  String?
+  isFeatured     Boolean       @default(false)
+  featuredAt     DateTime?
+  featuredById   String?
+  standardSource String? // "HO_BRAND" | "LQA" | null — solo per STANDARD_BOOK
+  isDeleted      Boolean       @default(false)
+  deletedAt      DateTime?
+  deletedById    String?
+  publishedAt    DateTime?
+  createdAt      DateTime      @default(now())
+  updatedAt      DateTime      @updatedAt
 
   property    Property    @relation(fields: [propertyId], references: [id])
   department  Department? @relation(fields: [departmentId], references: [id])
@@ -222,16 +230,18 @@ model Content {
   featuredBy  User?       @relation("ContentFeaturedBy", fields: [featuredById], references: [id])
   deletedBy   User?       @relation("ContentDeletedBy", fields: [deletedById], references: [id])
 
-  acknowledgments  ContentAcknowledgment[]
-  reviews          ContentReview[]
-  statusHistory    ContentStatusHistory[]
-  targetAudience   ContentTarget[]
-  revisions        ContentRevision[]
-  notes            ContentNote[]
-  attachments      Attachment[]
-  memo             Memo?
-  sopWorkflow      SopWorkflow?
-  sopViewRecords   SopViewRecord[]        @relation("SopViewRecords")
+  acknowledgments            ContentAcknowledgment[]
+  reviews                    ContentReview[]
+  statusHistory              ContentStatusHistory[]
+  targetAudience             ContentTarget[]
+  revisions                  ContentRevision[]
+  notes                      ContentNote[]
+  attachments                Attachment[]
+  memo                       Memo?
+  sopWorkflow                SopWorkflow?
+  sopViewRecords             SopViewRecord[]             @relation("SopViewRecords")
+  onboardingSections         OnboardingSection[]         @relation("OnboardingSectionContent")
+  onboardingAssignedSections OnboardingAssignedSection[] @relation("OnboardingAssignedSectionContent")
 
   @@index([propertyId])
   @@index([departmentId])
@@ -292,16 +302,16 @@ model ContentStatusHistory {
 }
 
 model ContentRevision {
-  id             String        @id @default(cuid())
-  contentId      String
-  revisedById    String
-  previousTitle  String
-  previousBody   String        @db.Text
-  newTitle       String
-  newBody        String        @db.Text
-  note           String?
-  status         ContentStatus
-  createdAt      DateTime      @default(now())
+  id            String        @id @default(cuid())
+  contentId     String
+  revisedById   String
+  previousTitle String
+  previousBody  String        @db.Text
+  newTitle      String
+  newBody       String        @db.Text
+  note          String?
+  status        ContentStatus
+  createdAt     DateTime      @default(now())
 
   content   Content @relation(fields: [contentId], references: [id], onDelete: Cascade)
   revisedBy User    @relation("ContentRevisedBy", fields: [revisedById], references: [id])
@@ -324,13 +334,13 @@ model ContentNote {
 }
 
 model ContentTarget {
-  id                 String      @id @default(cuid())
+  id                 String     @id @default(cuid())
   contentId          String
   targetType         TargetType
   targetRole         Role?
   targetDepartmentId String?
   targetUserId       String?
-  createdAt          DateTime    @default(now())
+  createdAt          DateTime   @default(now())
 
   content          Content     @relation(fields: [contentId], references: [id], onDelete: Cascade)
   targetDepartment Department? @relation("ContentTargetDepartment", fields: [targetDepartmentId], references: [id])
@@ -340,11 +350,11 @@ model ContentTarget {
 }
 
 model Memo {
-  id        String    @id @default(cuid())
-  contentId String    @unique
+  id         String    @id @default(cuid())
+  contentId  String    @unique
   propertyId String
-  expiresAt DateTime?
-  isPinned  Boolean   @default(false)
+  expiresAt  DateTime?
+  isPinned   Boolean   @default(false)
 
   content  Content  @relation(fields: [contentId], references: [id], onDelete: Cascade)
   property Property @relation(fields: [propertyId], references: [id])
@@ -356,12 +366,12 @@ model Memo {
 model Attachment {
   id               String         @id @default(cuid())
   contentId        String
-  contentType      ContentType    // SOP, MEMO, DOCUMENT, etc. — denormalized for query perf
+  contentType      ContentType // SOP, MEMO, DOCUMENT, etc. — denormalized for query perf
   kind             AttachmentKind // IMAGE or DOCUMENT
   originalFileName String
   storedFileName   String
   mimeType         String
-  fileSize         Int            // bytes
+  fileSize         Int // bytes
   storageKey       String         @unique // full path in bucket
   storageBucket    String
   uploadedById     String
@@ -397,9 +407,9 @@ model StaticDocument {
 // ─── SOP RACI Workflow ───────────────────────────────────────────────
 
 model SopWorkflow {
-  id            String    @id @default(cuid())
-  contentId     String    @unique
-  sopStatus     SopStatus @default(IN_LAVORAZIONE)
+  id        String    @id @default(cuid())
+  contentId String    @unique
+  sopStatus SopStatus @default(IN_LAVORAZIONE)
 
   // RACI roles
   responsibleId String
@@ -426,9 +436,9 @@ model SopWorkflow {
   reviewDueMonths      Int       @default(12)
 
   // Concurrency / last save tracking
-  lastSavedAt   DateTime?
-  lastSavedById String?
-  textVersionCount Int @default(0)
+  lastSavedAt      DateTime?
+  lastSavedById    String?
+  textVersionCount Int       @default(0)
 
   // Visualizzazione version-aware: la versione pubblicata corrente richiede nuova conferma?
   requiresNewAcknowledgment Boolean @default(true)
@@ -485,12 +495,12 @@ model SopWorkflowEvent {
 // ─── Registro visualizzazioni SOP (version-aware) ────────────────────
 
 model SopViewRecord {
-  id              String    @id @default(cuid())
-  contentId       String
-  userId          String
-  contentVersion  Int       // Content.version al momento della visualizzazione
-  viewedAt        DateTime  @default(now())
-  acknowledgedAt  DateTime? // null = visto ma non confermato formalmente
+  id             String    @id @default(cuid())
+  contentId      String
+  userId         String
+  contentVersion Int // Content.version al momento della visualizzazione
+  viewedAt       DateTime  @default(now())
+  acknowledgedAt DateTime? // null = visto ma non confermato formalmente
 
   content Content @relation("SopViewRecords", fields: [contentId], references: [id], onDelete: Cascade)
   user    User    @relation("SopViewRecordUser", fields: [userId], references: [id], onDelete: Cascade)
@@ -524,6 +534,15 @@ enum NotificationType {
   NOTE_ADDED
   SUBMITTED
   ACK_REMINDER
+  ONBOARDING_ASSIGNED
+}
+
+enum OnboardingSectionType {
+  WELCOME
+  RULES
+  JOB_DESCRIPTION
+  DOCUMENT
+  SOP
 }
 
 model Notification {
@@ -546,9 +565,104 @@ model Notification {
 
 model LoginAttempt {
   id        String   @id @default(cuid())
-  key       String   // IP address o email (lowercase)
-  type      String   // "ip" o "email"
+  key       String // IP address o email (lowercase)
+  type      String // "ip" o "email"
   createdAt DateTime @default(now())
 
   @@index([key, type, createdAt])
+}
+
+// ─────────────────────────────────────────────────────────────
+// ONBOARDING — FEATURE NON ATTIVA.
+// Questi modelli esistono in schema.prisma unicamente per fedeltà
+// allo stato reale del database di produzione, dove le tabelle sono
+// state applicate a mano dal branch feat/onboarding (mai mergiato).
+// Nessun codice applicativo li usa e nessuna interfaccia li espone.
+// NON usarli. NON costruirci sopra. La feature va progettata e
+// ratificata prima di essere resa disponibile.
+// Rimuoverli da qui riarma un diff distruttivo di 17 istruzioni
+// sul database di produzione: vedi la diagnosi del 2026-08-19.
+// ─────────────────────────────────────────────────────────────
+
+model OnboardingTemplate {
+  id           String   @id @default(cuid())
+  propertyId   String
+  departmentId String?
+  isActive     Boolean  @default(true)
+  createdById  String
+  updatedById  String
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  property   Property    @relation(fields: [propertyId], references: [id])
+  department Department? @relation(fields: [departmentId], references: [id])
+  createdBy  User        @relation("OnboardingTemplateCreatedBy", fields: [createdById], references: [id])
+  updatedBy  User        @relation("OnboardingTemplateUpdatedBy", fields: [updatedById], references: [id])
+
+  sections OnboardingSection[]
+
+  @@unique([propertyId, departmentId])
+  @@index([propertyId])
+}
+
+model OnboardingSection {
+  id          String                @id @default(cuid())
+  templateId  String
+  type        OnboardingSectionType
+  title       String
+  body        String?               @db.Text
+  fileUrl     String?
+  contentId   String?
+  sortOrder   Int
+  requiresAck Boolean               @default(true)
+  createdAt   DateTime              @default(now())
+  updatedAt   DateTime              @updatedAt
+
+  template OnboardingTemplate @relation(fields: [templateId], references: [id], onDelete: Cascade)
+  content  Content?           @relation("OnboardingSectionContent", fields: [contentId], references: [id])
+
+  @@index([templateId, sortOrder])
+}
+
+model OnboardingAssignment {
+  id           String    @id @default(cuid())
+  userId       String
+  propertyId   String
+  assignedById String
+  dueDate      DateTime?
+  startedAt    DateTime?
+  completedAt  DateTime?
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+
+  user       User     @relation("OnboardingAssignmentUser", fields: [userId], references: [id], onDelete: Cascade)
+  property   Property @relation(fields: [propertyId], references: [id])
+  assignedBy User     @relation("OnboardingAssignedBy", fields: [assignedById], references: [id])
+
+  sections OnboardingAssignedSection[]
+
+  @@unique([userId, propertyId])
+  @@index([userId])
+  @@index([propertyId])
+  @@index([assignedById])
+}
+
+model OnboardingAssignedSection {
+  id             String                @id @default(cuid())
+  assignmentId   String
+  type           OnboardingSectionType
+  title          String
+  body           String?               @db.Text
+  fileUrl        String?
+  contentId      String?
+  sortOrder      Int
+  requiresAck    Boolean               @default(true)
+  viewedAt       DateTime?
+  acknowledgedAt DateTime?
+
+  assignment OnboardingAssignment @relation(fields: [assignmentId], references: [id], onDelete: Cascade)
+  content    Content?             @relation("OnboardingAssignedSectionContent", fields: [contentId], references: [id])
+
+  @@index([assignmentId, sortOrder])
+  @@index([contentId])
 }
