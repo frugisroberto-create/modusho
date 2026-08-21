@@ -2,6 +2,9 @@
 
 import { useState, useEffect, useCallback } from "react";
 import { useRouter } from "next/navigation";
+import { HelpTip } from "@/components/auth/help-tip";
+import { ActivationLinkBox } from "@/components/hoo/activation-link-box";
+import type { EditableField } from "@/lib/user-scope";
 
 type RoleOption = "OPERATOR" | "HOD" | "HOTEL_MANAGER" | "CORPORATE" | "ADMIN";
 type ContentTypeOption = "SOP" | "DOCUMENT" | "MEMO";
@@ -19,6 +22,22 @@ interface AssignmentEntry {
 interface UserFormProps {
   mode: "create" | "edit";
   userId?: string;
+  /** Ruolo di chi sta compilando: determina la veste del form. */
+  viewerRole: string;
+  /** Campi che il server accetterebbe (modalità modifica). */
+  editableFields?: EditableField[];
+  /** Ruoli assegnabili dall'attore su questo utente (modalità modifica). */
+  assignableRoles?: string[];
+  /** L'utente ha già completato l'invito (modalità modifica). */
+  isActivated?: boolean;
+  /**
+   * Il server autorizza questo attore a (ri)mandare l'invito su questo utente.
+   * Arriva da `canSendActivation`, la stessa funzione che governa la rotta:
+   * la visibilità del comando non si deduce dal ruolo lato client.
+   */
+  canSendActivation?: boolean;
+  /** Idem per il link di reimpostazione (`canSendReset`). */
+  canSendReset?: boolean;
   onSuccess?: () => void;
   initialData?: {
     name: string;
@@ -44,6 +63,12 @@ const ROLE_LABELS: Record<RoleOption, string> = {
   ADMIN: "HOO",
 };
 
+/** Etichette in parole povere, per HM e HOD. */
+const ROLE_LABELS_PLAIN: Record<string, string> = {
+  OPERATOR: "Operatore",
+  HOD: "Capo reparto",
+};
+
 const ROLE_PRESETS: Record<RoleOption, { canEdit: boolean; canApprove: boolean; canPublish: boolean; contentTypes: ContentTypeOption[] }> = {
   OPERATOR: { canEdit: false, canApprove: false, canPublish: false, contentTypes: [] },
   HOD: { canEdit: true, canApprove: false, canPublish: false, contentTypes: ["SOP", "DOCUMENT", "MEMO"] },
@@ -58,19 +83,62 @@ const CONTENT_TYPE_LABELS: Record<ContentTypeOption, string> = {
   DOCUMENT: "Documenti",
 };
 
-export function UserForm({ mode, userId, onSuccess, initialData }: UserFormProps) {
+/**
+ * Si mostra il comando di consegna di un accesso?
+ *
+ * Dipende SOLO da ciò che il server ha autorizzato su questo bersaglio: nessun
+ * elenco di ruoli, nessuna deduzione dalla veste. Su un utente attivato il
+ * comando è la reimpostazione, su uno non attivato è l'invito — sono due rotte
+ * diverse con due autorizzazioni diverse, e va letta quella giusta.
+ *
+ * Esportata per poter essere verificata: il difetto che ha reso invisibili
+ * questi comandi all'Hotel Manager viveva in una condizione inline che nessun
+ * test poteva raggiungere.
+ */
+export function showSendLinkCommand(params: {
+  isCreate: boolean;
+  isActivated: boolean;
+  canSendActivation: boolean;
+  canSendReset: boolean;
+}): boolean {
+  if (params.isCreate) return false;
+  return params.isActivated ? params.canSendReset : params.canSendActivation;
+}
+
+export function UserForm({
+  mode,
+  userId,
+  viewerRole,
+  editableFields = [],
+  assignableRoles = [],
+  isActivated = false,
+  canSendActivation = false,
+  canSendReset = false,
+  onSuccess,
+  initialData,
+}: UserFormProps) {
   const router = useRouter();
+
+  // ─── Veste del form: chi compila determina cosa vede ───
+  const veste: "hod" | "hm" | "admin" =
+    viewerRole === "HOD" ? "hod" : viewerRole === "HOTEL_MANAGER" ? "hm" : "admin";
+  const isCreate = mode === "create";
+  const can = (field: EditableField) => editableFields.includes(field);
+  // In creazione decide la veste; in modifica decide il server.
+  const canEditFlags = isCreate ? veste === "admin" : can("permissionFlags");
+  const canEditRole = isCreate ? veste !== "hod" : can("role");
+  const canEditEmail = isCreate ? true : can("email");
+  const canEditName = isCreate ? true : can("name");
 
   // Sezione 1 — Anagrafica
   const [name, setName] = useState(initialData?.name ?? "");
   const [email, setEmail] = useState(initialData?.email ?? "");
-  const [password, setPassword] = useState("");
-  const [passwordConfirm, setPasswordConfirm] = useState("");
-  const [showPassword, setShowPassword] = useState(false);
-  const [changePassword, setChangePassword] = useState(false);
+  const [emailError, setEmailError] = useState("");
 
   // Sezione 2 — Ruolo
-  const [role, setRole] = useState<RoleOption>(initialData?.role ?? "OPERATOR");
+  const [role, setRole] = useState<RoleOption>(
+    initialData?.role ?? (veste === "hod" ? "OPERATOR" : "OPERATOR")
+  );
 
   // Sezione 3 — Permessi
   const [canEdit, setCanEdit] = useState(initialData?.canEdit ?? false);
@@ -82,6 +150,9 @@ export function UserForm({ mode, userId, onSuccess, initialData }: UserFormProps
   // Sezione 4+5 — Strutture e reparti
   const [properties, setProperties] = useState<Property[]>([]);
   const [assignments, setAssignments] = useState<AssignmentEntry[]>(initialData?.assignments ?? []);
+  /** Veste HM/HOD: property e reparto scelti da tendina, non da checkbox. */
+  const [simplePropertyId, setSimplePropertyId] = useState("");
+  const [simpleDepartmentId, setSimpleDepartmentId] = useState("");
 
   // Sezione 6 — Tipi contenuto
   const [contentTypes, setContentTypes] = useState<ContentTypeOption[]>(initialData?.contentTypes ?? []);
@@ -90,8 +161,27 @@ export function UserForm({ mode, userId, onSuccess, initialData }: UserFormProps
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   const [warnings, setWarnings] = useState<string[]>([]);
-  const [createdUserId, setCreatedUserId] = useState<string | null>(null);
-  const [createdPassword, setCreatedPassword] = useState<string | null>(null);
+  const [duplicateWarning, setDuplicateWarning] = useState<string | null>(null);
+  const [createdUser, setCreatedUser] = useState<{
+    id: string;
+    email: string;
+    inviteSent: boolean;
+    activationUrl?: string;
+    activationExpiresAt?: string;
+  } | null>(null);
+
+  // Retrocessione: motivazione obbligatoria
+  const [showDemotionModal, setShowDemotionModal] = useState(false);
+  const [demotionNote, setDemotionNote] = useState("");
+
+  // Invio link password (modalità modifica)
+  const [sendingLink, setSendingLink] = useState(false);
+  const [linkFeedback, setLinkFeedback] = useState<{ text: string; ok: boolean } | null>(null);
+  const [resentLink, setResentLink] = useState<
+    { url: string; expiresAt: string; targetWasActive: boolean } | null
+  >(null);
+
+  const isSimpleVeste = veste !== "admin";
 
   // Fetch properties
   useEffect(() => {
@@ -105,7 +195,21 @@ export function UserForm({ mode, userId, onSuccess, initialData }: UserFormProps
     fetchProps();
   }, []);
 
-  // Preset on role change
+  // Veste semplificata in creazione: preseleziona l'unica struttura disponibile.
+  useEffect(() => {
+    if (!isSimpleVeste || !isCreate || properties.length === 0) return;
+    if (!simplePropertyId) setSimplePropertyId(properties[0]!.id);
+  }, [isSimpleVeste, isCreate, properties, simplePropertyId]);
+
+  // Veste HOD: reparto fisso, è il suo.
+  useEffect(() => {
+    if (veste !== "hod" || !isCreate) return;
+    const prop = properties.find((p) => p.id === simplePropertyId);
+    if (prop && prop.departments.length > 0 && !simpleDepartmentId) {
+      setSimpleDepartmentId(prop.departments[0]!.id);
+    }
+  }, [veste, isCreate, properties, simplePropertyId, simpleDepartmentId]);
+
   const applyRolePreset = useCallback((newRole: RoleOption) => {
     const preset = ROLE_PRESETS[newRole];
     setCanEdit(preset.canEdit);
@@ -117,7 +221,6 @@ export function UserForm({ mode, userId, onSuccess, initialData }: UserFormProps
   const handleRoleChange = (newRole: RoleOption) => {
     setRole(newRole);
     applyRolePreset(newRole);
-    // If switching to a role that requires specific depts, convert any null departmentIds to pending
     if (newRole === "OPERATOR" || newRole === "HOD" || newRole === "CORPORATE") {
       setAssignments(prev => prev.map(a =>
         a.departmentId === null ? { ...a, departmentId: "__pending__" as string } : a
@@ -125,8 +228,9 @@ export function UserForm({ mode, userId, onSuccess, initialData }: UserFormProps
     }
   };
 
-  // Validate warnings
+  // Avvisi di coerenza: solo dove i flag sono visibili.
   useEffect(() => {
+    if (!canEditFlags) { setWarnings([]); return; }
     const w: string[] = [];
     if (role === "OPERATOR" && (canEdit || canApprove)) {
       w.push("Un Operatore non dovrebbe avere permessi di modifica o approvazione");
@@ -141,33 +245,23 @@ export function UserForm({ mode, userId, onSuccess, initialData }: UserFormProps
       w.push("Questo utente entrerà nel workflow di revisione/approvazione");
     }
     setWarnings(w);
-  }, [role, canEdit, canApprove]);
+  }, [role, canEdit, canApprove, canEditFlags]);
 
-  // When canEdit is turned off, clear content types
   useEffect(() => {
     if (!canEdit) setContentTypes([]);
   }, [canEdit]);
 
-  // Selected property IDs
   const selectedPropertyIds = [...new Set(assignments.map(a => a.propertyId))];
-
   const roleRequiresSpecificDepts = role === "OPERATOR" || role === "HOD" || role === "CORPORATE";
+  const currentProperty = properties.find((p) => p.id === simplePropertyId);
 
   const toggleProperty = (propId: string) => {
     if (selectedPropertyIds.includes(propId)) {
-      // Remove property and all its assignments
       setAssignments(prev => prev.filter(a => a.propertyId !== propId));
     } else {
       if (roleRequiresSpecificDepts) {
-        // OPERATOR / HOD: add property placeholder without any dept — user must pick specific depts
-        // We use a temporary marker: propertyId present but no assignment yet
-        // Just add nothing — the property will show as selected via the next dept toggle
-        // Actually we need at least one entry to mark the property as selected,
-        // so we add a "pending" entry that won't be submitted (departmentId = undefined placeholder)
-        // Better approach: for these roles, just show the property expanded, user must pick depts
         setAssignments(prev => [...prev, { propertyId: propId, departmentId: "__pending__" as string }]);
       } else {
-        // HM / ADMIN: default to all depts (departmentId = null)
         setAssignments(prev => [...prev, { propertyId: propId, departmentId: null }]);
       }
     }
@@ -176,7 +270,6 @@ export function UserForm({ mode, userId, onSuccess, initialData }: UserFormProps
   const toggleDepartment = (propId: string, deptId: string) => {
     const exists = assignments.some(a => a.propertyId === propId && a.departmentId === deptId);
     if (exists) {
-      // Remove this dept; if it was the last specific dept, add pending marker to keep property selected
       const remaining = assignments.filter(a => !(a.propertyId === propId && a.departmentId === deptId));
       const hasOtherForProp = remaining.some(a => a.propertyId === propId && a.departmentId !== "__pending__");
       if (!hasOtherForProp) {
@@ -185,7 +278,6 @@ export function UserForm({ mode, userId, onSuccess, initialData }: UserFormProps
         setAssignments(remaining);
       }
     } else {
-      // Remove "all depts" (null) and pending marker for this property, add specific dept
       setAssignments(prev => {
         const filtered = prev.filter(a => !(a.propertyId === propId && (a.departmentId === null || a.departmentId === "__pending__")));
         return [...filtered, { propertyId: propId, departmentId: deptId }];
@@ -194,18 +286,14 @@ export function UserForm({ mode, userId, onSuccess, initialData }: UserFormProps
   };
 
   const toggleAllDepts = (propId: string) => {
-    // Only HM/ADMIN can toggle "all departments"
     if (roleRequiresSpecificDepts) return;
-
     const hasAll = assignments.some(a => a.propertyId === propId && a.departmentId === null);
     if (hasAll) {
-      // Deselect "all depts" — remove all assignments for this property, keep property selected with pending marker
       setAssignments(prev => {
         const filtered = prev.filter(a => a.propertyId !== propId);
         return [...filtered, { propertyId: propId, departmentId: "__pending__" as string }];
       });
     } else {
-      // Set to all depts (replace all specific depts with null)
       setAssignments(prev => {
         const filtered = prev.filter(a => a.propertyId !== propId);
         return [...filtered, { propertyId: propId, departmentId: null }];
@@ -219,56 +307,79 @@ export function UserForm({ mode, userId, onSuccess, initialData }: UserFormProps
     );
   };
 
-  const handleSubmit = async () => {
+  /** Invia link di reimpostazione o rimanda l'invito, secondo lo stato. */
+  const handleSendLink = async () => {
+    if (!userId) return;
+    setSendingLink(true);
+    setLinkFeedback(null);
+    setResentLink(null);
+    const endpoint = isActivated ? "send-reset" : "send-activation";
+    try {
+      const res = await fetch(`/api/users/${userId}/${endpoint}`, { method: "POST" });
+      const json = await res.json().catch(() => ({}));
+      const payload = res.ok ? json?.data : json;
+
+      setLinkFeedback(
+        res.ok
+          ? {
+              // Dentro la finestra anti-abuso l'email non riparte: il `notice`
+              // dell'API lo dice, ed è più utile di una conferma inesatta.
+              text:
+                payload?.notice ??
+                (isActivated ? "Link di reimpostazione inviato." : "Invito inviato."),
+              ok: true,
+            }
+          : { text: json?.error ?? "Invio non riuscito", ok: false }
+      );
+
+      // Il link esce SEMPRE — attivato o no, riuscito o fallito: è la via di
+      // riserva quando l'email non arriva.
+      if (payload?.activationUrl && payload?.activationExpiresAt) {
+        setResentLink({
+          url: payload.activationUrl,
+          expiresAt: payload.activationExpiresAt,
+          targetWasActive: Boolean(payload.targetWasActive),
+        });
+      }
+    } finally { setSendingLink(false); }
+  };
+
+  const submit = async (options: { confirmDuplicateName?: boolean; note?: string } = {}) => {
     setError("");
+    setEmailError("");
 
     if (!name.trim() || !email.trim()) {
       setError("Nome e email sono obbligatori");
       return;
     }
-    if (mode === "create") {
-      if (password.length < 10 || !/[A-Z]/.test(password) || !/[0-9]/.test(password)) {
-        setError("La password deve avere almeno 10 caratteri, una maiuscola e un numero");
-        return;
-      }
-      if (password !== passwordConfirm) {
-        setError("Le password non coincidono");
-        return;
-      }
-    }
-    if (mode === "edit" && changePassword) {
-      if (password.length < 6) {
-        setError("La nuova password deve avere almeno 6 caratteri");
-        return;
-      }
-      if (password !== passwordConfirm) {
-        setError("Le password non coincidono");
-        return;
-      }
-    }
 
-    // Filter out pending markers — only keep real assignments
-    const realAssignments = assignments.filter(a => a.departmentId !== "__pending__");
-
-    if (realAssignments.length === 0) {
-      setError("Seleziona almeno una struttura con reparti assegnati");
-      return;
-    }
-
-    // Validate role-department coherence
-    if (roleRequiresSpecificDepts) {
-      const hasNullDept = realAssignments.some(a => a.departmentId === null);
-      if (hasNullDept) {
-        setError(`Un ${ROLE_LABELS[role]} deve avere reparti specifici, non "Tutti i reparti"`);
+    // Assegnazioni: nella veste semplificata vengono dalle tendine.
+    let realAssignments: AssignmentEntry[];
+    if (isSimpleVeste && isCreate) {
+      if (!simplePropertyId || !simpleDepartmentId) {
+        setError("Scegli la struttura e il reparto");
         return;
       }
-      // Check every selected property has at least one specific dept
-      const propsWithoutDepts = selectedPropertyIds.filter(propId =>
-        !realAssignments.some(a => a.propertyId === propId)
-      );
-      if (propsWithoutDepts.length > 0) {
-        setError("Ogni struttura selezionata deve avere almeno un reparto assegnato");
+      realAssignments = [{ propertyId: simplePropertyId, departmentId: simpleDepartmentId }];
+    } else {
+      realAssignments = assignments.filter(a => a.departmentId !== "__pending__");
+      if (realAssignments.length === 0) {
+        setError("Seleziona almeno una struttura con reparti assegnati");
         return;
+      }
+      if (roleRequiresSpecificDepts) {
+        const hasNullDept = realAssignments.some(a => a.departmentId === null);
+        if (hasNullDept) {
+          setError(`Un ${ROLE_LABELS[role]} deve avere reparti specifici, non "Tutti i reparti"`);
+          return;
+        }
+        const propsWithoutDepts = selectedPropertyIds.filter(propId =>
+          !realAssignments.some(a => a.propertyId === propId)
+        );
+        if (propsWithoutDepts.length > 0) {
+          setError("Ogni struttura selezionata deve avere almeno un reparto assegnato");
+          return;
+        }
       }
     }
 
@@ -276,25 +387,30 @@ export function UserForm({ mode, userId, onSuccess, initialData }: UserFormProps
     try {
       const payload: Record<string, unknown> = {
         name, email, role,
-        canView: true, canEdit, canApprove, canPublish,
         targetDepartmentIds: role === "CORPORATE" ? targetDepartmentIds : [],
         viewDepartmentIds,
         propertyAssignments: realAssignments,
         contentTypes,
       };
 
-      if (mode === "create") {
-        payload.password = password;
-      }
-      if (mode === "edit") {
-        payload.isActive = isActive;
-        if (changePassword && password) {
-          payload.password = password;
-        }
+      // I flag di potere viaggiano solo se chi compila può toccarli.
+      if (canEditFlags) {
+        payload.canView = true;
+        payload.canEdit = canEdit;
+        payload.canApprove = canApprove;
+        payload.canPublish = canPublish;
       }
 
-      const url = mode === "create" ? "/api/users" : `/api/users/${userId}`;
-      const method = mode === "create" ? "POST" : "PUT";
+      if (isCreate && options.confirmDuplicateName) {
+        payload.confirmDuplicateName = true;
+      }
+      if (!isCreate) {
+        payload.isActive = isActive;
+        if (options.note) payload.note = options.note;
+      }
+
+      const url = isCreate ? "/api/users" : `/api/users/${userId}`;
+      const method = isCreate ? "POST" : "PUT";
 
       const res = await fetch(url, {
         method,
@@ -303,57 +419,91 @@ export function UserForm({ mode, userId, onSuccess, initialData }: UserFormProps
       });
 
       if (res.ok) {
-        if (mode === "create") {
+        if (isCreate) {
           const json = await res.json();
-          setCreatedUserId(json.data.id);
-          setCreatedPassword(password);
-          return; // Show password dialog before navigating
-        } else if (onSuccess) {
-          onSuccess();
-          return; // evita setLoading(false) dopo che il parent ha smontato il form
-        } else {
-          router.push(`/users/${userId}`);
+          setCreatedUser({
+            id: json.data.id,
+            email: json.data.email,
+            inviteSent: json.data.inviteSent,
+            activationUrl: json.data.activationUrl,
+            activationExpiresAt: json.data.activationExpiresAt,
+          });
+          return;
         }
+        if (onSuccess) { onSuccess(); return; }
+        router.push(`/users/${userId}`);
         router.refresh();
-      } else {
-        const json = await res.json();
-        setError(json.error || "Errore nel salvataggio");
+        return;
       }
+
+      const json = await res.json().catch(() => ({}));
+
+      // Nome simile: avviso giallo, non blocca.
+      if (json?.warning?.code === "DUPLICATE_NAME") {
+        setDuplicateWarning(json.warning.message);
+        return;
+      }
+      // Email già registrata: errore sotto il campo.
+      if (res.status === 409) {
+        setEmailError(json?.error ?? "Questa email è già registrata.");
+        return;
+      }
+      setError(json?.error || "Errore nel salvataggio");
     } finally {
       setLoading(false);
     }
   };
 
-  // Dialog post-creazione: mostra password in chiaro
-  if (createdUserId && createdPassword) {
+  const handleSubmit = () => {
+    // Retrocessione capo reparto → operatore: serve la motivazione.
+    if (!isCreate && initialData?.role === "HOD" && role === "OPERATOR") {
+      setShowDemotionModal(true);
+      return;
+    }
+    submit();
+  };
+
+  // ─── Esito creazione ───
+  if (createdUser) {
+    // Mail partita → conferma verde. Mail non partita → avviso arancione: è la
+    // stessa veste che il progetto usa ovunque per gli stati di attenzione.
+    const boxCls = createdUser.inviteSent
+      ? "bg-[#E8F5E9] border border-[#2E7D32]/20"
+      : "bg-[#FFF3E0] border border-[#E65100]/30";
+    const titleCls = createdUser.inviteSent ? "text-[#2E7D32]" : "text-[#E65100]";
+
     return (
       <div className="max-w-md mx-auto mt-8 space-y-6">
-        <div className="bg-[#E8F5E9] border border-[#2E7D32]/20 p-6 space-y-4">
-          <h2 className="text-base font-heading font-semibold text-[#2E7D32]">Utente creato con successo</h2>
-          <div className="space-y-3">
-            <div>
-              <label className="block text-[11px] font-ui uppercase tracking-wider text-charcoal/45 mb-1">Nome</label>
-              <p className="text-sm font-ui font-medium text-charcoal-dark">{name}</p>
-            </div>
-            <div>
-              <label className="block text-[11px] font-ui uppercase tracking-wider text-charcoal/45 mb-1">Email</label>
-              <p className="text-sm font-ui font-medium text-charcoal-dark">{email}</p>
-            </div>
-            <div>
-              <label className="block text-[11px] font-ui uppercase tracking-wider text-charcoal/45 mb-1">Password</label>
-              <div className="flex items-center gap-2 bg-white border border-ivory-dark px-3 py-2">
-                <code className="text-sm font-mono text-terracotta flex-1 select-all">{createdPassword}</code>
-                <button type="button"
-                  onClick={() => { navigator.clipboard.writeText(createdPassword); }}
-                  className="text-[11px] font-ui font-semibold uppercase tracking-wider text-charcoal/50 hover:text-terracotta transition-colors shrink-0">
-                  Copia
-                </button>
-              </div>
-              <p className="text-[11px] font-ui text-charcoal/40 mt-1">Comunica queste credenziali all&apos;utente. La password non sarà più visibile.</p>
-            </div>
-          </div>
+        <div className={`${boxCls} p-6 space-y-4`}>
+          <h2 className={`text-base font-heading font-semibold ${titleCls}`}>Utente creato</h2>
+          <p className="text-sm font-ui text-charcoal">
+            {createdUser.inviteSent ? (
+              <>
+                Abbiamo mandato l&apos;invito a <strong>{createdUser.email}</strong>. Se non
+                dovesse arrivargli, qui sotto trovi il suo link personale da fargli avere in un
+                altro modo.
+              </>
+            ) : (
+              <>
+                L&apos;utente è stato creato, ma l&apos;email a <strong>{createdUser.email}</strong> non
+                è partita. Usa il link qui sotto per fargliela avere.
+              </>
+            )}
+          </p>
+
+          {createdUser.activationUrl && createdUser.activationExpiresAt && (
+            <ActivationLinkBox
+              url={createdUser.activationUrl}
+              expiresAt={createdUser.activationExpiresAt}
+            />
+          )}
+
+          <p className="text-xs font-ui text-charcoal/60">
+            Finché non si attiva lo vedrai <strong>In attesa</strong> nell&apos;elenco e potrai
+            rimandargli l&apos;invito.
+          </p>
         </div>
-        <button onClick={() => { router.push(`/users/${createdUserId}`); router.refresh(); }}
+        <button onClick={() => { router.push(`/users/${createdUser.id}`); router.refresh(); }}
           className="btn-primary w-full">
           Vai al profilo utente
         </button>
@@ -365,235 +515,327 @@ export function UserForm({ mode, userId, onSuccess, initialData }: UserFormProps
     <div className="max-w-3xl space-y-6">
       {/* SEZIONE 1 — Anagrafica */}
       <section className="bg-ivory-medium border border-ivory-dark  p-6 space-y-4">
-        <h2 className="text-base font-heading font-semibold text-charcoal-dark">Anagrafica</h2>
+        <h2 className="text-base font-heading font-semibold text-charcoal-dark">
+          {isSimpleVeste ? "Chi stai aggiungendo" : "Anagrafica"}
+        </h2>
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
           <div>
-            <label className="block text-sm font-ui font-medium text-charcoal mb-1.5">Nome</label>
+            <label className="block text-sm font-ui font-medium text-charcoal mb-1.5">Nome e cognome</label>
             <input type="text" value={name} onChange={(e) => setName(e.target.value)}
-              className="w-full" placeholder="Nome e cognome" />
+              disabled={!canEditName}
+              className="w-full disabled:opacity-60" placeholder="Nome e cognome" />
           </div>
           <div>
             <label className="block text-sm font-ui font-medium text-charcoal mb-1.5">Email</label>
-            <input type="email" value={email} onChange={(e) => setEmail(e.target.value)}
-              className="w-full" placeholder="email@hotel.com" />
-          </div>
-        </div>
-        {mode === "create" && (
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-            <div>
-              <label className="block text-sm font-ui font-medium text-charcoal mb-1.5">Password</label>
-              <div className="relative">
-                <input type={showPassword ? "text" : "password"} value={password} onChange={(e) => setPassword(e.target.value)}
-                  className="w-full pr-10" placeholder="Min. 10 caratteri, 1 maiuscola, 1 numero" />
-                <button type="button" onClick={() => setShowPassword(!showPassword)}
-                  className="absolute right-3 top-1/2 -translate-y-1/2 text-charcoal/40 hover:text-charcoal transition-colors"
-                  tabIndex={-1}>
-                  {showPassword ? <EyeOffIcon /> : <EyeIcon />}
-                </button>
-              </div>
-            </div>
-            <div>
-              <label className="block text-sm font-ui font-medium text-charcoal mb-1.5">Conferma password</label>
-              <div className="relative">
-                <input type={showPassword ? "text" : "password"} value={passwordConfirm} onChange={(e) => setPasswordConfirm(e.target.value)}
-                  className={`w-full pr-10 ${passwordConfirm && password !== passwordConfirm ? "!border-alert-red" : ""}`}
-                  placeholder="Ripeti la password" />
-                <button type="button" onClick={() => setShowPassword(!showPassword)}
-                  className="absolute right-3 top-1/2 -translate-y-1/2 text-charcoal/40 hover:text-charcoal transition-colors"
-                  tabIndex={-1}>
-                  {showPassword ? <EyeOffIcon /> : <EyeIcon />}
-                </button>
-              </div>
-              {passwordConfirm && password !== passwordConfirm && (
-                <p className="text-xs font-ui text-alert-red mt-1">Le password non coincidono</p>
-              )}
-            </div>
-          </div>
-        )}
-        {mode === "edit" && (
-          <div className="space-y-3">
-            <label className="flex items-center gap-2 text-sm font-ui text-charcoal cursor-pointer">
-              <input type="checkbox" checked={changePassword} onChange={(e) => { setChangePassword(e.target.checked); if (!e.target.checked) { setPassword(""); setPasswordConfirm(""); } }}
-                className="w-4 h-4 rounded border-ivory-dark text-terracotta focus:ring-terracotta" />
-              Cambia password
-            </label>
-            {changePassword && (
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-sm font-ui font-medium text-charcoal mb-1.5">Nuova password</label>
-                  <div className="relative">
-                    <input type={showPassword ? "text" : "password"} value={password} onChange={(e) => setPassword(e.target.value)}
-                      className="w-full pr-10" placeholder="Min. 10 caratteri, 1 maiuscola, 1 numero" />
-                    <button type="button" onClick={() => setShowPassword(!showPassword)}
-                      className="absolute right-3 top-1/2 -translate-y-1/2 text-charcoal/40 hover:text-charcoal transition-colors"
-                      tabIndex={-1}>
-                      {showPassword ? <EyeOffIcon /> : <EyeIcon />}
-                    </button>
-                  </div>
-                </div>
-                <div>
-                  <label className="block text-sm font-ui font-medium text-charcoal mb-1.5">Conferma nuova password</label>
-                  <div className="relative">
-                    <input type={showPassword ? "text" : "password"} value={passwordConfirm} onChange={(e) => setPasswordConfirm(e.target.value)}
-                      className={`w-full pr-10 ${passwordConfirm && password !== passwordConfirm ? "!border-alert-red" : ""}`}
-                      placeholder="Ripeti la password" />
-                    <button type="button" onClick={() => setShowPassword(!showPassword)}
-                      className="absolute right-3 top-1/2 -translate-y-1/2 text-charcoal/40 hover:text-charcoal transition-colors"
-                      tabIndex={-1}>
-                      {showPassword ? <EyeOffIcon /> : <EyeIcon />}
-                    </button>
-                  </div>
-                  {passwordConfirm && password !== passwordConfirm && (
-                    <p className="text-xs font-ui text-alert-red mt-1">Le password non coincidono</p>
-                  )}
-                </div>
-              </div>
+            <input type="email" value={email} onChange={(e) => { setEmail(e.target.value); setEmailError(""); }}
+              disabled={!canEditEmail}
+              className={`w-full disabled:opacity-60 ${emailError ? "!border-alert-red" : ""}`}
+              placeholder="email@hotel.com" />
+            {emailError && <p className="text-xs font-ui text-alert-red mt-1">{emailError}</p>}
+            {!canEditEmail && (
+              <p className="text-xs font-ui text-sage-light mt-1">
+                Modificabile solo prima dell&apos;attivazione.
+              </p>
+            )}
+            {isSimpleVeste && canEditEmail && (
+              <p className="text-xs font-ui text-sage-light mt-1">
+                È l&apos;indirizzo dove riceverà l&apos;invito: sarà anche il suo nome utente.
+              </p>
             )}
           </div>
-        )}
-        {mode === "edit" && (
+        </div>
+
+        {!isCreate && can("isActive") && (
           <label className="flex items-center gap-2 text-sm font-ui text-charcoal">
             <input type="checkbox" checked={isActive} onChange={(e) => setIsActive(e.target.checked)}
               className="w-4 h-4 rounded border-ivory-dark text-terracotta focus:ring-terracotta" />
             Utente attivo
           </label>
         )}
-      </section>
 
-      {/* SEZIONE 2 — Ruolo */}
-      <section className="bg-ivory-medium border border-ivory-dark  p-6 space-y-4">
-        <h2 className="text-base font-heading font-semibold text-charcoal-dark">Ruolo</h2>
-        <div className="grid grid-cols-2 sm:grid-cols-5 gap-2">
-          {(["OPERATOR", "HOD", "HOTEL_MANAGER", "CORPORATE", "ADMIN"] as RoleOption[]).map((r) => (
-            <button key={r} type="button" onClick={() => handleRoleChange(r)}
-              className={`px-3 py-2.5 text-sm font-ui font-medium  border transition-colors ${
-                role === r
-                  ? "bg-terracotta text-white border-terracotta"
-                  : "bg-ivory text-charcoal border-ivory-dark hover:border-terracotta/40"
-              }`}>
-              {ROLE_LABELS[r]}
+        {/* Password: non si imposta più da qui, si manda un link.
+            La visibilità segue ciò che il SERVER autorizza su questo bersaglio,
+            non il ruolo di chi compila: la condizione precedente era legata al
+            permesso di modificare l'email — un campo diverso, che si spegne
+            quando l'utente si attiva — e nascondeva così l'invio della
+            reimpostazione a chi il server lo concede. */}
+        {showSendLinkCommand({ isCreate, isActivated, canSendActivation, canSendReset }) && (
+          <div className="pt-2 border-t border-ivory-dark/60">
+            <button type="button" onClick={handleSendLink} disabled={sendingLink}
+              className="px-4 py-2 text-[11px] font-ui font-semibold uppercase tracking-wider text-terracotta border border-terracotta/30 hover:bg-terracotta hover:text-white transition-colors disabled:opacity-50">
+              {sendingLink ? "..." : isActivated ? "Invia link di reimpostazione" : "Rimanda invito"}
             </button>
-          ))}
-        </div>
-      </section>
-
-      {/* SEZIONE 3 — Permessi base */}
-      <section className="bg-ivory-medium border border-ivory-dark  p-6 space-y-4">
-        <h2 className="text-base font-heading font-semibold text-charcoal-dark">Permessi</h2>
-        <div className="space-y-3">
-          <label className="flex items-center justify-between py-2">
-            <div>
-              <span className="text-sm font-ui font-medium text-charcoal">Può vedere</span>
-              <p className="text-xs font-ui text-sage-light">Accesso in lettura ai contenuti</p>
-            </div>
-            <div className="w-10 h-6 bg-sage rounded-full relative cursor-not-allowed opacity-75">
-              <div className="absolute right-0.5 top-0.5 w-5 h-5 bg-white rounded-full" />
-            </div>
-          </label>
-
-          <label className="flex items-center justify-between py-2 cursor-pointer" onClick={() => setCanEdit(!canEdit)}>
-            <div>
-              <span className="text-sm font-ui font-medium text-charcoal">Può modificare</span>
-              <p className="text-xs font-ui text-sage-light">Creazione e modifica contenuti</p>
-            </div>
-            <div className={`w-10 h-6 rounded-full relative transition-colors ${canEdit ? "bg-sage" : "bg-ivory-dark"}`}>
-              <div className={`absolute top-0.5 w-5 h-5 bg-white rounded-full transition-transform ${canEdit ? "right-0.5" : "left-0.5"}`} />
-            </div>
-          </label>
-
-          <label className="flex items-center justify-between py-2 cursor-pointer" onClick={() => setCanApprove(!canApprove)}>
-            <div>
-              <span className="text-sm font-ui font-medium text-charcoal">Può approvare</span>
-              <p className="text-xs font-ui text-sage-light">Approvazione formale nel workflow (ruolo A)</p>
-            </div>
-            <div className={`w-10 h-6 rounded-full relative transition-colors ${canApprove ? "bg-sage" : "bg-ivory-dark"}`}>
-              <div className={`absolute top-0.5 w-5 h-5 bg-white rounded-full transition-transform ${canApprove ? "right-0.5" : "left-0.5"}`} />
-            </div>
-          </label>
-
-          <label className="flex items-center justify-between py-2 cursor-pointer" onClick={() => setCanPublish(!canPublish)}>
-            <div>
-              <span className="text-sm font-ui font-medium text-charcoal">Può pubblicare</span>
-              <p className="text-xs font-ui text-sage-light">Pubblicazione diretta senza passare dal workflow</p>
-            </div>
-            <div className={`w-10 h-6 rounded-full relative transition-colors ${canPublish ? "bg-sage" : "bg-ivory-dark"}`}>
-              <div className={`absolute top-0.5 w-5 h-5 bg-white rounded-full transition-transform ${canPublish ? "right-0.5" : "left-0.5"}`} />
-            </div>
-          </label>
-        </div>
-
-        {warnings.length > 0 && (
-          <div className="space-y-1 pt-2">
-            {warnings.map((w, i) => (
-              <p key={i} className="text-xs font-ui text-alert-yellow flex items-start gap-1.5">
-                <svg className="w-3.5 h-3.5 shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L4.082 16.5c-.77.833.192 2.5 1.732 2.5z" />
-                </svg>
-                {w}
+            {/* L'effetto collaterale si dice PRIMA che il pulsante venga premuto. */}
+            <p className="text-xs font-ui text-sage-light mt-2">
+              Genera un link nuovo e <strong>invalida il precedente</strong>: se una
+              mail era già arrivata, quel link smette di funzionare.
+            </p>
+            {linkFeedback && (
+              <p className={`text-xs font-ui mt-2 ${linkFeedback.ok ? "text-sage" : "text-alert-red"}`}>
+                {linkFeedback.text}
               </p>
-            ))}
+            )}
+            {resentLink && (
+              <div className="mt-3">
+                <ActivationLinkBox
+                  url={resentLink.url}
+                  expiresAt={resentLink.expiresAt}
+                  targetWasActive={resentLink.targetWasActive}
+                />
+              </div>
+            )}
+            <p className="text-xs font-ui text-sage-light mt-2">
+              La password la sceglie l&apos;utente: nessuno può vederla o impostarla al posto suo.
+            </p>
           </div>
         )}
       </section>
 
-      {/* SEZIONE 4+5 — Strutture e Reparti */}
-      <section className="bg-ivory-medium border border-ivory-dark  p-6 space-y-4">
-        <h2 className="text-base font-heading font-semibold text-charcoal-dark">Strutture e reparti</h2>
-        <div className="space-y-3">
-          {properties.map((prop) => {
-            const isSelected = selectedPropertyIds.includes(prop.id);
-            const propAssignments = assignments.filter(a => a.propertyId === prop.id);
-            const hasAllDepts = propAssignments.some(a => a.departmentId === null);
+      {/* SEZIONE 2 — Ruolo */}
+      {canEditRole && (
+        <section className="bg-ivory-medium border border-ivory-dark  p-6 space-y-4">
+          <h2 className="text-base font-heading font-semibold text-charcoal-dark">Ruolo</h2>
+          {isSimpleVeste ? (
+            <select value={role} onChange={(e) => handleRoleChange(e.target.value as RoleOption)}
+              className="w-full sm:max-w-xs text-sm font-ui border border-ivory-dark px-3 py-2.5 bg-white">
+              {(isCreate ? ["OPERATOR", "HOD"] : assignableRoles).map((r) => (
+                <option key={r} value={r}>{ROLE_LABELS_PLAIN[r] ?? ROLE_LABELS[r as RoleOption]}</option>
+              ))}
+            </select>
+          ) : (
+            <div className="grid grid-cols-2 sm:grid-cols-5 gap-2">
+              {(isCreate
+                ? (["OPERATOR", "HOD", "HOTEL_MANAGER", "CORPORATE", "ADMIN"] as RoleOption[])
+                : (assignableRoles as RoleOption[])
+              ).map((r) => (
+                <button key={r} type="button" onClick={() => handleRoleChange(r)}
+                  className={`px-3 py-2.5 text-sm font-ui font-medium  border transition-colors ${
+                    role === r
+                      ? "bg-terracotta text-white border-terracotta"
+                      : "bg-ivory text-charcoal border-ivory-dark hover:border-terracotta/40"
+                  }`}>
+                  {ROLE_LABELS[r]}
+                </button>
+              ))}
+            </div>
+          )}
+        </section>
+      )}
 
-            return (
-              <div key={prop.id} className={`border  overflow-hidden transition-colors ${isSelected ? "border-terracotta/40 bg-ivory" : "border-ivory-dark"}`}>
-                <label className="flex items-center gap-3 px-4 py-3 cursor-pointer">
-                  <input type="checkbox" checked={isSelected} onChange={() => toggleProperty(prop.id)}
-                    className="w-4 h-4 rounded border-ivory-dark text-terracotta focus:ring-terracotta" />
-                  <div>
-                    <span className="text-sm font-ui font-medium text-charcoal-dark">{prop.name}</span>
-                    {prop.city && <span className="text-xs font-ui text-sage-light ml-2">{prop.city}</span>}
-                  </div>
-                </label>
+      {/* Veste HOD in creazione: ruolo implicito, struttura e reparto fissi */}
+      {veste === "hod" && isCreate && (
+        <section className="bg-ivory-medium border border-ivory-dark p-6 space-y-3">
+          <h2 className="text-base font-heading font-semibold text-charcoal-dark">Dove lavorerà</h2>
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 text-sm font-ui">
+            <div>
+              <span className="block text-[11px] uppercase tracking-wider text-charcoal/45 mb-1">Struttura</span>
+              <span className="text-charcoal-dark font-medium">{currentProperty?.name ?? "—"}</span>
+            </div>
+            <div>
+              <span className="block text-[11px] uppercase tracking-wider text-charcoal/45 mb-1">Reparto</span>
+              <span className="text-charcoal-dark font-medium">
+                {currentProperty?.departments.find(d => d.id === simpleDepartmentId)?.name ?? "—"}
+              </span>
+            </div>
+          </div>
+          <p className="text-xs font-ui text-sage-light">
+            Sarà un <strong>Operatore</strong> del tuo reparto: legge le procedure e conferma la presa visione.
+          </p>
+        </section>
+      )}
 
-                {isSelected && (
-                  <div className="px-4 pb-3 pt-1 border-t border-ivory-dark/50">
-                    {!roleRequiresSpecificDepts && (
-                      <label className="flex items-center gap-2 py-1.5 cursor-pointer">
-                        <input type="checkbox" checked={hasAllDepts}
-                          onChange={() => toggleAllDepts(prop.id)}
-                          className="w-3.5 h-3.5 rounded border-ivory-dark text-terracotta focus:ring-terracotta" />
-                        <span className="text-xs font-ui text-sage-light italic">Tutti i reparti</span>
-                      </label>
-                    )}
-                    {roleRequiresSpecificDepts && (
-                      <p className="text-xs font-ui text-sage-light py-1.5">Seleziona uno o più reparti:</p>
-                    )}
-                    {(roleRequiresSpecificDepts || !hasAllDepts) && (
-                      <div className="grid grid-cols-2 sm:grid-cols-3 gap-1 mt-1">
-                        {prop.departments.map((dept) => {
-                          const isDeptSelected = propAssignments.some(a => a.departmentId === dept.id);
-                          return (
-                            <label key={dept.id} className="flex items-center gap-2 py-1 cursor-pointer">
-                              <input type="checkbox" checked={isDeptSelected}
-                                onChange={() => toggleDepartment(prop.id, dept.id)}
-                                className="w-3.5 h-3.5 rounded border-ivory-dark text-terracotta focus:ring-terracotta" />
-                              <span className="text-xs font-ui text-charcoal">{dept.name}</span>
-                            </label>
-                          );
-                        })}
-                      </div>
-                    )}
-                  </div>
-                )}
+      {/* Veste HM in creazione: struttura e reparto da tendina */}
+      {veste === "hm" && isCreate && (
+        <section className="bg-ivory-medium border border-ivory-dark p-6 space-y-4">
+          <h2 className="text-base font-heading font-semibold text-charcoal-dark">Dove lavorerà</h2>
+          {properties.length > 1 && (
+            <div>
+              <label className="block text-sm font-ui font-medium text-charcoal mb-1.5">Struttura</label>
+              <select value={simplePropertyId}
+                onChange={(e) => { setSimplePropertyId(e.target.value); setSimpleDepartmentId(""); }}
+                className="w-full sm:max-w-xs text-sm font-ui border border-ivory-dark px-3 py-2.5 bg-white">
+                {properties.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
+              </select>
+            </div>
+          )}
+          <div>
+            <label className="block text-sm font-ui font-medium text-charcoal mb-1.5">Reparto</label>
+            <select value={simpleDepartmentId} onChange={(e) => setSimpleDepartmentId(e.target.value)}
+              className="w-full sm:max-w-xs text-sm font-ui border border-ivory-dark px-3 py-2.5 bg-white">
+              <option value="">Scegli il reparto</option>
+              {currentProperty?.departments.map(d => <option key={d.id} value={d.id}>{d.name}</option>)}
+            </select>
+          </div>
+        </section>
+      )}
+
+      {/* Abilitazioni nei binari — veste HM: niente flag di potere */}
+      {veste === "hm" && isCreate && role === "HOD" && (
+        <section className="bg-ivory-medium border border-ivory-dark p-6 space-y-4">
+          <h2 className="text-base font-heading font-semibold text-charcoal-dark">Cosa potrà scrivere</h2>
+          <p className="text-xs font-ui text-sage-light">
+            Un capo reparto crea contenuti per il suo reparto. Scegli di che tipo.
+          </p>
+          <div className="space-y-2">
+            {(["MEMO", "SOP", "DOCUMENT"] as ContentTypeOption[]).map((ct) => (
+              <label key={ct} className="flex items-center gap-3 py-1.5 cursor-pointer">
+                <input type="checkbox" checked={contentTypes.includes(ct)}
+                  onChange={() => toggleContentType(ct)}
+                  className="w-4 h-4 rounded border-ivory-dark text-terracotta focus:ring-terracotta" />
+                <span className="text-sm font-ui text-charcoal">{CONTENT_TYPE_LABELS[ct]}</span>
+              </label>
+            ))}
+          </div>
+          <HelpTip
+            question="E i permessi di approvazione?"
+            answer="Non si danno da qui. Approvazione e pubblicazione le governa l'Head of Operations: se servono, chiedile a lui."
+          />
+        </section>
+      )}
+
+      {/* Box informativo veste semplificata */}
+      {isSimpleVeste && isCreate && (
+        <section className="bg-white border-l-4 border-terracotta border-y border-r border-ivory-dark p-5">
+          <h3 className="text-sm font-ui font-semibold text-charcoal-dark mb-2">Cosa succede dopo</h3>
+          <ul className="text-sm font-ui text-charcoal/75 space-y-1.5 list-disc list-inside">
+            <li>Riceverà un&apos;email con il suo link personale per attivarsi e scegliere la password.</li>
+            <li>Finché non si attiva lo vedrai <strong>In attesa</strong> nell&apos;elenco.</li>
+            <li>Se non gli arriva nulla, potrai rimandargli l&apos;invito.</li>
+          </ul>
+        </section>
+      )}
+
+      {/* SEZIONE 3 — Permessi base (solo veste admin o chi può toccarli) */}
+      {canEditFlags && (
+        <section className="bg-ivory-medium border border-ivory-dark  p-6 space-y-4">
+          <h2 className="text-base font-heading font-semibold text-charcoal-dark">Permessi</h2>
+          <div className="space-y-3">
+            <label className="flex items-center justify-between py-2">
+              <div>
+                <span className="text-sm font-ui font-medium text-charcoal">Può vedere</span>
+                <p className="text-xs font-ui text-sage-light">Accesso in lettura ai contenuti</p>
               </div>
-            );
-          })}
-        </div>
-      </section>
+              <div className="w-10 h-6 bg-sage rounded-full relative cursor-not-allowed opacity-75">
+                <div className="absolute right-0.5 top-0.5 w-5 h-5 bg-white rounded-full" />
+              </div>
+            </label>
+
+            <label className="flex items-center justify-between py-2 cursor-pointer" onClick={() => setCanEdit(!canEdit)}>
+              <div>
+                <span className="text-sm font-ui font-medium text-charcoal">Può modificare</span>
+                <p className="text-xs font-ui text-sage-light">Creazione e modifica contenuti</p>
+              </div>
+              <div className={`w-10 h-6 rounded-full relative transition-colors ${canEdit ? "bg-sage" : "bg-ivory-dark"}`}>
+                <div className={`absolute top-0.5 w-5 h-5 bg-white rounded-full transition-transform ${canEdit ? "right-0.5" : "left-0.5"}`} />
+              </div>
+            </label>
+
+            <label className="flex items-center justify-between py-2 cursor-pointer" onClick={() => setCanApprove(!canApprove)}>
+              <div>
+                <span className="text-sm font-ui font-medium text-charcoal">Può approvare</span>
+                <p className="text-xs font-ui text-sage-light">Approvazione formale nel workflow (ruolo A)</p>
+              </div>
+              <div className={`w-10 h-6 rounded-full relative transition-colors ${canApprove ? "bg-sage" : "bg-ivory-dark"}`}>
+                <div className={`absolute top-0.5 w-5 h-5 bg-white rounded-full transition-transform ${canApprove ? "right-0.5" : "left-0.5"}`} />
+              </div>
+            </label>
+
+            <label className="flex items-center justify-between py-2 cursor-pointer" onClick={() => setCanPublish(!canPublish)}>
+              <div>
+                <span className="text-sm font-ui font-medium text-charcoal">Può pubblicare</span>
+                <p className="text-xs font-ui text-sage-light">Pubblicazione diretta senza passare dal workflow</p>
+              </div>
+              <div className={`w-10 h-6 rounded-full relative transition-colors ${canPublish ? "bg-sage" : "bg-ivory-dark"}`}>
+                <div className={`absolute top-0.5 w-5 h-5 bg-white rounded-full transition-transform ${canPublish ? "right-0.5" : "left-0.5"}`} />
+              </div>
+            </label>
+          </div>
+
+          {warnings.length > 0 && (
+            <div className="space-y-1 pt-2">
+              {warnings.map((w, i) => (
+                <p key={i} className="text-xs font-ui text-alert-yellow flex items-start gap-1.5">
+                  <svg className="w-3.5 h-3.5 shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L4.082 16.5c-.77.833.192 2.5 1.732 2.5z" />
+                  </svg>
+                  {w}
+                </p>
+              ))}
+            </div>
+          )}
+        </section>
+      )}
+
+      {/* Permessi in sola lettura per chi non li governa (modalità modifica) */}
+      {!isCreate && !canEditFlags && (
+        <section className="bg-ivory-medium border border-ivory-dark p-6">
+          <h2 className="text-base font-heading font-semibold text-charcoal-dark mb-1">Permessi</h2>
+          <p className="text-xs font-ui text-sage-light">
+            (li governa l&apos;Head of Operations)
+          </p>
+        </section>
+      )}
+
+      {/* SEZIONE 4+5 — Strutture e Reparti (veste admin, o modifica) */}
+      {(!isSimpleVeste || !isCreate) && can2ShowAssignments(isSimpleVeste, isCreate, can) && (
+        <section className="bg-ivory-medium border border-ivory-dark  p-6 space-y-4">
+          <h2 className="text-base font-heading font-semibold text-charcoal-dark">Strutture e reparti</h2>
+          <div className="space-y-3">
+            {properties.map((prop) => {
+              const isSelected = selectedPropertyIds.includes(prop.id);
+              const propAssignments = assignments.filter(a => a.propertyId === prop.id);
+              const hasAllDepts = propAssignments.some(a => a.departmentId === null);
+
+              return (
+                <div key={prop.id} className={`border  overflow-hidden transition-colors ${isSelected ? "border-terracotta/40 bg-ivory" : "border-ivory-dark"}`}>
+                  <label className="flex items-center gap-3 px-4 py-3 cursor-pointer">
+                    <input type="checkbox" checked={isSelected} onChange={() => toggleProperty(prop.id)}
+                      className="w-4 h-4 rounded border-ivory-dark text-terracotta focus:ring-terracotta" />
+                    <div>
+                      <span className="text-sm font-ui font-medium text-charcoal-dark">{prop.name}</span>
+                      {prop.city && <span className="text-xs font-ui text-sage-light ml-2">{prop.city}</span>}
+                    </div>
+                  </label>
+
+                  {isSelected && (
+                    <div className="px-4 pb-3 pt-1 border-t border-ivory-dark/50">
+                      {!roleRequiresSpecificDepts && (
+                        <label className="flex items-center gap-2 py-1.5 cursor-pointer">
+                          <input type="checkbox" checked={hasAllDepts}
+                            onChange={() => toggleAllDepts(prop.id)}
+                            className="w-3.5 h-3.5 rounded border-ivory-dark text-terracotta focus:ring-terracotta" />
+                          <span className="text-xs font-ui text-sage-light italic">Tutti i reparti</span>
+                        </label>
+                      )}
+                      {roleRequiresSpecificDepts && (
+                        <p className="text-xs font-ui text-sage-light py-1.5">Seleziona uno o più reparti:</p>
+                      )}
+                      {(roleRequiresSpecificDepts || !hasAllDepts) && (
+                        <div className="grid grid-cols-2 sm:grid-cols-3 gap-1 mt-1">
+                          {prop.departments.map((dept) => {
+                            const isDeptSelected = propAssignments.some(a => a.departmentId === dept.id);
+                            return (
+                              <label key={dept.id} className="flex items-center gap-2 py-1 cursor-pointer">
+                                <input type="checkbox" checked={isDeptSelected}
+                                  onChange={() => toggleDepartment(prop.id, dept.id)}
+                                  className="w-3.5 h-3.5 rounded border-ivory-dark text-terracotta focus:ring-terracotta" />
+                                <span className="text-xs font-ui text-charcoal">{dept.name}</span>
+                              </label>
+                            );
+                          })}
+                        </div>
+                      )}
+                    </div>
+                  )}
+                </div>
+              );
+            })}
+          </div>
+        </section>
+      )}
 
       {/* SEZIONE 5b — Reparti destinabili (solo CORPORATE) */}
-      {role === "CORPORATE" && canEdit && selectedPropertyIds.length > 0 && (
+      {canEditFlags && role === "CORPORATE" && canEdit && selectedPropertyIds.length > 0 && (
         <section className="bg-ivory-medium border border-ivory-dark p-6 space-y-4">
           <h2 className="text-base font-heading font-semibold text-charcoal-dark">Reparti destinabili</h2>
           <p className="text-xs font-ui text-sage-light">
@@ -631,7 +873,7 @@ export function UserForm({ mode, userId, onSuccess, initialData }: UserFormProps
       )}
 
       {/* SEZIONE 5c — Reparti visibili (HOD e CORPORATE) */}
-      {(role === "HOD" || role === "CORPORATE") && selectedPropertyIds.length > 0 && (
+      {(role === "HOD" || role === "CORPORATE") && (can("viewDepartmentIds") || isCreate) && selectedPropertyIds.length > 0 && (
         <section className="bg-ivory-medium border border-ivory-dark p-6 space-y-4">
           <h2 className="text-base font-heading font-semibold text-charcoal-dark">Reparti visibili</h2>
           <p className="text-xs font-ui text-sage-light">
@@ -641,7 +883,6 @@ export function UserForm({ mode, userId, onSuccess, initialData }: UserFormProps
             {selectedPropertyIds.map((propId) => {
               const prop = properties.find(p => p.id === propId);
               if (!prop) return null;
-              // Escludi i reparti già assegnati come operativi
               const operativeDeptIds = assignments.filter(a => a.propertyId === propId && a.departmentId && a.departmentId !== "__pending__").map(a => a.departmentId!);
               const availableDepts = prop.departments.filter(d => !operativeDeptIds.includes(d.id));
               if (availableDepts.length === 0) return null;
@@ -672,26 +913,46 @@ export function UserForm({ mode, userId, onSuccess, initialData }: UserFormProps
         </section>
       )}
 
-      {/* SEZIONE 6 — Tipi di contenuto gestibili */}
-      <section className="bg-ivory-medium border border-ivory-dark  p-6 space-y-4">
-        <h2 className="text-base font-heading font-semibold text-charcoal-dark">Tipi di contenuto gestibili</h2>
-        {canEdit ? (
-          <div className="space-y-2">
-            {(["MEMO", "SOP", "DOCUMENT"] as ContentTypeOption[]).map((ct) => (
-              <label key={ct} className="flex items-center gap-3 py-1.5 cursor-pointer">
-                <input type="checkbox" checked={contentTypes.includes(ct)}
-                  onChange={() => toggleContentType(ct)}
-                  className="w-4 h-4 rounded border-ivory-dark text-terracotta focus:ring-terracotta" />
-                <span className="text-sm font-ui text-charcoal">{CONTENT_TYPE_LABELS[ct]}</span>
-              </label>
-            ))}
+      {/* SEZIONE 6 — Tipi di contenuto gestibili (veste admin) */}
+      {canEditFlags && (
+        <section className="bg-ivory-medium border border-ivory-dark  p-6 space-y-4">
+          <h2 className="text-base font-heading font-semibold text-charcoal-dark">Tipi di contenuto gestibili</h2>
+          {canEdit ? (
+            <div className="space-y-2">
+              {(["MEMO", "SOP", "DOCUMENT"] as ContentTypeOption[]).map((ct) => (
+                <label key={ct} className="flex items-center gap-3 py-1.5 cursor-pointer">
+                  <input type="checkbox" checked={contentTypes.includes(ct)}
+                    onChange={() => toggleContentType(ct)}
+                    className="w-4 h-4 rounded border-ivory-dark text-terracotta focus:ring-terracotta" />
+                  <span className="text-sm font-ui text-charcoal">{CONTENT_TYPE_LABELS[ct]}</span>
+                </label>
+              ))}
+            </div>
+          ) : (
+            <p className="text-sm font-ui text-sage-light">
+              L&apos;utente non ha permessi di modifica — i tipi di contenuto non sono applicabili.
+            </p>
+          )}
+        </section>
+      )}
+
+      {/* Avviso nomi simili — non bloccante */}
+      {duplicateWarning && (
+        <div className="bg-[#FFF8E1] border-l-4 border-alert-yellow border-y border-r border-ivory-dark p-4">
+          <p className="text-sm font-ui text-charcoal">{duplicateWarning}</p>
+          <div className="flex gap-3 mt-3">
+            <button type="button" disabled={loading}
+              onClick={() => { setDuplicateWarning(null); submit({ confirmDuplicateName: true }); }}
+              className="px-4 py-2 text-[11px] font-ui font-semibold uppercase tracking-wider text-white bg-alert-yellow hover:opacity-90 transition-opacity disabled:opacity-50">
+              Crea comunque
+            </button>
+            <button type="button" onClick={() => setDuplicateWarning(null)}
+              className="text-[12px] font-ui text-charcoal/60 hover:text-charcoal transition-colors">
+              Rivedo i dati
+            </button>
           </div>
-        ) : (
-          <p className="text-sm font-ui text-sage-light">
-            L&apos;utente non ha permessi di modifica — i tipi di contenuto non sono applicabili.
-          </p>
-        )}
-      </section>
+        </div>
+      )}
 
       {/* Errore + azioni */}
       {error && (
@@ -701,31 +962,64 @@ export function UserForm({ mode, userId, onSuccess, initialData }: UserFormProps
       <div className="flex gap-3 pt-2">
         <button onClick={handleSubmit} disabled={loading}
           className="px-6 py-3 text-sm font-ui font-semibold text-white bg-terracotta hover:bg-terracotta-light  disabled:opacity-50 transition-colors">
-          {loading ? "Salvataggio..." : mode === "create" ? "Crea utente" : "Salva modifiche"}
+          {loading
+            ? "Salvataggio..."
+            : isCreate
+              ? "Crea e invia l'invito"
+              : "Salva modifiche"}
         </button>
         <button onClick={() => router.back()} className="btn-outline">
           Annulla
         </button>
       </div>
+
+      {/* Modale retrocessione: la motivazione è obbligatoria */}
+      {showDemotionModal && (
+        <div className="fixed inset-0 bg-charcoal-dark/60 flex items-center justify-center z-50 p-4">
+          <div className="bg-ivory w-full max-w-md p-6 border border-ivory-dark">
+            <h3 className="text-lg font-heading font-semibold text-charcoal-dark mb-3">
+              Retrocedi {initialData?.name} a Operatore
+            </h3>
+            <p className="text-sm font-ui text-charcoal/75 mb-4">
+              Perderà la possibilità di creare e modificare contenuti. Le SOP di cui è autore
+              restano intatte. La motivazione resta a registro, visibile all&apos;Head of Operations.
+            </p>
+            <label className="block text-sm font-ui font-medium text-charcoal mb-1.5">
+              Motivazione (obbligatoria)
+            </label>
+            <textarea value={demotionNote} onChange={(e) => setDemotionNote(e.target.value)}
+              rows={3} className="w-full text-sm font-ui border border-ivory-dark px-3 py-2 bg-white"
+              placeholder="Perché questa persona torna a fare l'operatore?" />
+            <div className="flex justify-end gap-2 mt-4">
+              <button onClick={() => { setShowDemotionModal(false); setDemotionNote(""); }}
+                className="px-4 py-2 text-sm font-ui text-charcoal hover:bg-ivory-dark">
+                Annulla
+              </button>
+              <button
+                disabled={!demotionNote.trim() || loading}
+                onClick={() => { setShowDemotionModal(false); submit({ note: demotionNote }); }}
+                className="px-4 py-2 text-sm font-ui font-medium text-white bg-terracotta hover:bg-terracotta-light disabled:opacity-50 transition-colors">
+                {loading ? "..." : "Conferma retrocessione"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
 
-// ─── Icons ───────────────────────────────────────────────────────────
-
-function EyeIcon() {
-  return (
-    <svg className="w-4.5 h-4.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
-      <path strokeLinecap="round" strokeLinejoin="round" d="M2.036 12.322a1.012 1.012 0 010-.639C3.423 7.51 7.36 4.5 12 4.5c4.638 0 8.573 3.007 9.963 7.178.07.207.07.431 0 .639C20.577 16.49 16.64 19.5 12 19.5c-4.638 0-8.573-3.007-9.963-7.178z" />
-      <path strokeLinecap="round" strokeLinejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
-    </svg>
-  );
-}
-
-function EyeOffIcon() {
-  return (
-    <svg className="w-4.5 h-4.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
-      <path strokeLinecap="round" strokeLinejoin="round" d="M3.98 8.223A10.477 10.477 0 001.934 12c1.292 4.338 5.31 7.5 10.066 7.5.993 0 1.953-.138 2.863-.395M6.228 6.228A10.45 10.45 0 0112 4.5c4.756 0 8.773 3.162 10.065 7.498a10.523 10.523 0 01-4.293 5.774M6.228 6.228L3 3m3.228 3.228l3.65 3.65m7.894 7.894L21 21m-3.228-3.228l-3.65-3.65m0 0a3 3 0 10-4.243-4.243m4.242 4.242L9.88 9.88" />
-    </svg>
-  );
+/**
+ * Il pannello checkbox di strutture/reparti si mostra a chi governa le
+ * assegnazioni: la veste admin sempre, HM e HOD solo in modifica e solo se il
+ * server dichiara il campo modificabile.
+ */
+function can2ShowAssignments(
+  isSimpleVeste: boolean,
+  isCreate: boolean,
+  can: (f: EditableField) => boolean
+): boolean {
+  if (!isSimpleVeste) return true;
+  if (isCreate) return false;
+  return can("departments");
 }

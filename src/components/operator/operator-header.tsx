@@ -152,6 +152,14 @@ export function OperatorHeader({
                           Dashboard
                         </Link>
                       )}
+                      <Link href="/cambia-password" onClick={() => setUserMenuOpen(false)}
+                        className="block px-4 py-2 text-sm font-ui text-charcoal hover:bg-ivory transition-colors">
+                        Cambia password
+                      </Link>
+                      <Link href="/benvenuto" onClick={() => setUserMenuOpen(false)}
+                        className="block px-4 py-2 text-sm font-ui text-charcoal hover:bg-ivory transition-colors">
+                        Installa l&apos;app sul telefono
+                      </Link>
                       <button onClick={() => signOut({ redirect: false }).then(() => { window.location.href = "/login"; })}
                         className="w-full text-left px-4 py-2 text-sm font-ui text-charcoal/60 hover:bg-ivory hover:text-charcoal transition-colors">
                         Esci

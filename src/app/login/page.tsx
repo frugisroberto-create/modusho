@@ -1,13 +1,22 @@
 "use client";
 
 import { Suspense, useState } from "react";
+import Link from "next/link";
 import { signIn } from "next-auth/react";
 import { useSearchParams } from "next/navigation";
+import {
+  SESSION_EXPIRED_PARAM,
+  SESSION_EXPIRED_VALUE,
+  SESSION_EXPIRED_MESSAGE,
+} from "@/lib/session-expiry";
 
 function LoginForm() {
   const searchParams = useSearchParams();
   const callbackUrl = searchParams.get("callbackUrl") || "/";
   const authError = searchParams.get("error");
+  // Chi arriva qui per una sessione decaduta merita il motivo, non un modulo muto.
+  const sessioneScaduta =
+    searchParams.get(SESSION_EXPIRED_PARAM) === SESSION_EXPIRED_VALUE;
 
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -35,6 +44,14 @@ function LoginForm() {
 
   return (
     <div className="w-full max-w-[400px] bg-ivory-medium border border-ivory-dark p-8 sm:p-10">
+      {sessioneScaduta && (
+        <p
+          role="status"
+          className="mb-5 text-sm font-ui leading-relaxed text-[#E65100] bg-[#FFF3E0] border-l-2 border-[#E65100] px-3 py-2.5"
+        >
+          {SESSION_EXPIRED_MESSAGE}
+        </p>
+      )}
       <form onSubmit={handleSubmit} className="space-y-5">
         <div>
           <label htmlFor="email" className="block text-sm font-ui font-medium text-charcoal mb-1.5">
@@ -75,6 +92,15 @@ function LoginForm() {
           {loading ? "Accesso in corso..." : "Accedi"}
         </button>
       </form>
+
+      <div className="mt-5 text-center">
+        <Link
+          href="/password-dimenticata"
+          className="text-[12px] font-ui text-terracotta hover:text-terracotta-light transition-colors"
+        >
+          Password dimenticata?
+        </Link>
+      </div>
     </div>
   );
 }

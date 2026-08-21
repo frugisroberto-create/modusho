@@ -21,7 +21,10 @@ const SUB_NAV_ITEMS: { href: string; label: string; minRole?: string; excludeRol
   { href: "/dashboard", label: "Overview", minRole: "HOTEL_MANAGER", excludeRoles: ["CORPORATE"] },
   { href: "/approvals", label: "Approvazioni", minRole: "HOD", requiresCanEdit: true },
   { href: "/compliance", label: "Presa visione", minRole: "HOD" },
-  { href: "/users", label: "Gestione utenti", minRole: "ADMIN" },
+  // Gestione utenti: da HOD in su. L'HOD senza canCreateUsers vede comunque la
+  // lista del proprio reparto in sola lettura (serve a sollecitare chi non si è
+  // ancora attivato); le azioni le governa il flag, non la voce di menu.
+  { href: "/users", label: "Gestione utenti", minRole: "HOD", excludeRoles: ["CORPORATE"] },
   { href: "/properties", label: "Strutture", minRole: "ADMIN" },
   { href: "/reports", label: "Report", minRole: "HOTEL_MANAGER", excludeRoles: ["CORPORATE"] },
 ];

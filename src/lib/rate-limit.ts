@@ -59,6 +59,16 @@ async function checkLimit(
 }
 
 /**
+ * Estrae l'IP del chiamante da una Request (route handler).
+ * Stessa logica già usata nel provider credentials di NextAuth.
+ */
+export function getClientIp(request: Request): string {
+  const forwarded = request.headers.get("x-forwarded-for");
+  if (forwarded) return forwarded.split(",")[0]!.trim();
+  return request.headers.get("x-real-ip")?.trim() || "unknown";
+}
+
+/**
  * Controlla rate limit per IP.
  */
 export async function checkRateLimit(ip: string): Promise<RateLimitResult> {

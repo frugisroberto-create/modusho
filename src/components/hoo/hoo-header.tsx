@@ -124,6 +124,14 @@ export function HooHeader({ userName, userRole }: HooHeaderProps) {
                     className="block px-4 py-2 text-sm font-ui text-charcoal hover:bg-ivory transition-colors">
                     Vista Hotel
                   </Link>
+                  <Link href="/cambia-password" onClick={() => setMenuOpen(false)}
+                    className="block px-4 py-2 text-sm font-ui text-charcoal hover:bg-ivory transition-colors">
+                    Cambia password
+                  </Link>
+                  <Link href="/benvenuto" onClick={() => setMenuOpen(false)}
+                    className="block px-4 py-2 text-sm font-ui text-charcoal hover:bg-ivory transition-colors">
+                    Installa l&apos;app sul telefono
+                  </Link>
                   <button onClick={() => signOut({ redirect: false }).then(() => { window.location.href = "/login"; })}
                     className="w-full text-left px-4 py-2 text-sm font-ui text-charcoal/60 hover:bg-ivory hover:text-charcoal transition-colors">
                     Esci

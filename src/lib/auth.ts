@@ -3,6 +3,8 @@ import CredentialsProvider from "next-auth/providers/credentials";
 import bcrypt from "bcryptjs";
 import { prisma } from "./prisma";
 import { checkRateLimit, checkEmailRateLimit, recordFailedAttempt, resetAttempts } from "./rate-limit";
+import { isSessionStale } from "./session-validity";
+import { hasUsablePassword } from "./login-guard";
 import "@/types";
 
 export const authOptions: NextAuthOptions = {
@@ -49,6 +51,14 @@ export const authOptions: NextAuthOptions = {
           return null;
         }
 
+        // Account creato ma non ancora attivato (hash vuoto): fallisce qui,
+        // senza passare a bcrypt un hash malformato.
+        if (!hasUsablePassword(user.passwordHash)) {
+          await recordFailedAttempt(ip, credentials.email);
+          console.warn(`[auth] FAILED ip=${ip} email=${credentials.email} — account non ancora attivato`);
+          return null;
+        }
+
         const isPasswordValid = await bcrypt.compare(
           credentials.password,
           user.passwordHash
@@ -73,6 +83,8 @@ export const authOptions: NextAuthOptions = {
           canEdit: user.canEdit,
           canApprove: user.canApprove,
           canPublish: user.canPublish,
+          mustChangePassword: user.mustChangePassword,
+          canCreateUsers: user.canCreateUsers,
         };
       },
     }),
@@ -93,6 +105,9 @@ export const authOptions: NextAuthOptions = {
         token.canEdit = user.canEdit;
         token.canApprove = user.canApprove;
         token.canPublish = user.canPublish;
+        token.mustChangePassword = user.mustChangePassword;
+        token.canCreateUsers = user.canCreateUsers;
+        token.invalidated = false;
         prisma.user.update({
           where: { id: user.id },
           data: { lastLoginAt: new Date() },
@@ -102,10 +117,20 @@ export const authOptions: NextAuthOptions = {
         try {
           const dbUser = await prisma.user.findUnique({
             where: { id: token.id as string },
-            select: { role: true, canView: true, canEdit: true, canApprove: true, canPublish: true, isActive: true, name: true },
+            select: { role: true, canView: true, canEdit: true, canApprove: true, canPublish: true, isActive: true, name: true, mustChangePassword: true, passwordChangedAt: true, canCreateUsers: true },
           });
           if (!dbUser || !dbUser.isActive) {
             token.role = "OPERATOR";
+            token.canView = false;
+            token.canEdit = false;
+            token.canApprove = false;
+            token.canPublish = false;
+            return token;
+          }
+          // Password cambiata dopo l'emissione di questo token: la sessione
+          // non vale più (è un'altra sessione, rimasta aperta altrove).
+          if (isSessionStale(token.iat as number | undefined, dbUser.passwordChangedAt)) {
+            token.invalidated = true;
             token.canView = false;
             token.canEdit = false;
             token.canApprove = false;
@@ -118,6 +143,8 @@ export const authOptions: NextAuthOptions = {
           token.canEdit = dbUser.canEdit;
           token.canApprove = dbUser.canApprove;
           token.canPublish = dbUser.canPublish;
+          token.mustChangePassword = dbUser.mustChangePassword;
+          token.canCreateUsers = dbUser.canCreateUsers;
         } catch {
           // Errore DB: mantieni i dati esistenti nel token
         }
@@ -125,6 +152,10 @@ export const authOptions: NextAuthOptions = {
       return token;
     },
     async session({ session, token }) {
+      // Sessione decaduta: nessun utente, chi legge la sessione tratta come non autenticato.
+      if (token.invalidated) {
+        return { ...session, user: undefined } as unknown as typeof session;
+      }
       session.user = {
         id: token.id,
         email: token.email,
@@ -134,6 +165,8 @@ export const authOptions: NextAuthOptions = {
         canEdit: token.canEdit,
         canApprove: token.canApprove,
         canPublish: token.canPublish,
+        mustChangePassword: token.mustChangePassword,
+        canCreateUsers: token.canCreateUsers,
       };
       return session;
     },

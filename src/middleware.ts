@@ -11,6 +11,9 @@ const ROLE_HIERARCHY: Record<Role, number> = {
   SUPER_ADMIN: 4,
 };
 
+/** Rotta di cambio password obbligatorio e sua API: sempre raggiungibili. */
+const FORCED_PASSWORD_ALLOWLIST = ["/cambia-password-obbligatorio", "/api/me/password"];
+
 export default withAuth(
   function middleware(req) {
     const { pathname } = req.nextUrl;
@@ -18,6 +21,32 @@ export default withAuth(
 
     if (!token || !token.role) {
       return NextResponse.redirect(new URL("/login", req.url));
+    }
+
+    // Sessione decaduta (password cambiata dopo l'emissione del token).
+    if (token.invalidated === true) {
+      if (pathname.startsWith("/api/")) {
+        return NextResponse.json({ error: "Sessione scaduta" }, { status: 401 });
+      }
+      return NextResponse.redirect(new URL("/login", req.url));
+    }
+
+    // Cambio password forzato: blocca TUTTO tranne la pagina di cambio e la sua API.
+    // Il logout e gli asset sono già fuori dal matcher.
+    if (token.mustChangePassword === true) {
+      const allowed = FORCED_PASSWORD_ALLOWLIST.some((p) => pathname.startsWith(p));
+      if (!allowed) {
+        if (pathname.startsWith("/api/")) {
+          return NextResponse.json(
+            { error: "Devi prima cambiare la password." },
+            { status: 403 }
+          );
+        }
+        const target = new URL("/cambia-password-obbligatorio", req.url);
+        // Conserva la destinazione: dopo il salvataggio si prosegue di lì.
+        if (pathname !== "/") target.searchParams.set("next", pathname);
+        return NextResponse.redirect(target);
+      }
     }
 
     const userRole = token.role as Role;
@@ -44,9 +73,19 @@ export default withAuth(
       }
     }
 
-    // 3. Utenti e Strutture: solo ADMIN+
-    if (pathname.startsWith("/users") || pathname.startsWith("/properties")) {
+    // 3. Strutture: solo ADMIN+
+    if (pathname.startsWith("/properties")) {
       if (ROLE_HIERARCHY[userRole] < ROLE_HIERARCHY.ADMIN) {
+        return NextResponse.redirect(new URL("/unauthorized", req.url));
+      }
+    }
+
+    // 3b. Gestione utenti: da HOD in su, MAI CORPORATE.
+    //     L'HOD entra anche senza canCreateUsers: vede la lista del proprio
+    //     reparto in sola lettura per sollecitare chi non si è attivato.
+    //     Il perimetro fine (chi vede chi, chi tocca cosa) lo impongono le API.
+    if (pathname.startsWith("/users")) {
+      if (userRole === "CORPORATE" || ROLE_HIERARCHY[userRole] < ROLE_HIERARCHY.HOD) {
         return NextResponse.redirect(new URL("/unauthorized", req.url));
       }
     }
@@ -122,6 +161,8 @@ export default withAuth(
 
 export const config = {
   matcher: [
-    "/((?!login|api/auth|api/health|api/cron|_next/static|_next/image|favicon.ico|images|manifest.json|sw.js|icons).*)",
+    // attiva/reimposta/password-dimenticata sono pubbliche: ci si arriva dal
+    // link nell'email, quando ancora non esiste una sessione.
+    "/((?!login|attiva|reimposta|password-dimenticata|api/auth|api/health|api/cron|_next/static|_next/image|favicon.ico|images|manifest.json|sw.js|icons).*)",
   ],
 };

@@ -97,6 +97,13 @@ model User {
   createdAt           DateTime  @default(now())
   updatedAt           DateTime  @updatedAt
 
+  // ─── Credenziali: attivazione self-service e gestione password ───────
+  mustChangePassword Boolean   @default(false)
+  activatedAt        DateTime? // null = invito mai completato
+  passwordChangedAt  DateTime? // fa decadere le sessioni emesse prima
+  canCreateUsers     Boolean   @default(false)
+  createdById        String?
+
   propertyAssignments PropertyAssignment[]
   contentPermissions  UserContentPermission[]
   createdContents     Content[]               @relation("ContentCreatedBy")
@@ -125,6 +132,12 @@ model User {
   onboardingAssignedBy       OnboardingAssignment[] @relation("OnboardingAssignedBy")
   onboardingTemplatesCreated OnboardingTemplate[]   @relation("OnboardingTemplateCreatedBy")
   onboardingTemplatesUpdated OnboardingTemplate[]   @relation("OnboardingTemplateUpdatedBy")
+
+  authTokens   AuthToken[]
+  createdBy    User?            @relation("UserCreatedBy", fields: [createdById], references: [id])
+  usersCreated User[]           @relation("UserCreatedBy")
+  auditEvents  UserAuditEvent[] @relation("UserAuditTarget")
+  auditActions UserAuditEvent[] @relation("UserAuditActor")
 
   @@index([role])
   @@index([email])
@@ -570,6 +583,56 @@ model LoginAttempt {
   createdAt DateTime @default(now())
 
   @@index([key, type, createdAt])
+}
+
+// ─── Credenziali: token di attivazione e reset password ──────────────
+
+enum AuthTokenType {
+  ACTIVATION
+  RESET
+}
+
+/// Registro-utenti della governance: ogni azione su un account lascia traccia.
+enum UserAuditAction {
+  CREATED
+  ROLE_CHANGED
+  FLAG_CHANGED
+  EMAIL_CHANGED
+  DEACTIVATED
+  REACTIVATED
+  INVITE_SENT
+  RESET_SENT
+}
+
+model UserAuditEvent {
+  id        String          @id @default(cuid())
+  userId    String // utente su cui è avvenuta l'azione
+  actorId   String? // chi l'ha compiuta (null = sistema)
+  action    UserAuditAction
+  note      String?
+  meta      Json?
+  createdAt DateTime        @default(now())
+
+  user  User  @relation("UserAuditTarget", fields: [userId], references: [id], onDelete: Cascade)
+  actor User? @relation("UserAuditActor", fields: [actorId], references: [id])
+
+  @@index([userId])
+  @@index([actorId])
+}
+
+model AuthToken {
+  id          String        @id @default(cuid())
+  userId      String
+  type        AuthTokenType
+  tokenHash   String        @unique // SHA-256 del token: il valore in chiaro non è mai persistito
+  expiresAt   DateTime
+  usedAt      DateTime?
+  createdById String? // chi ha generato il token (null = richiesta dall'utente stesso)
+  createdAt   DateTime      @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, type])
 }
 
 // ─────────────────────────────────────────────────────────────

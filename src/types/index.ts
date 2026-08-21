@@ -13,6 +13,8 @@ declare module "next-auth" {
       canEdit: boolean;
       canApprove: boolean;
       canPublish: boolean;
+      mustChangePassword: boolean;
+      canCreateUsers: boolean;
     };
   }
 
@@ -25,6 +27,8 @@ declare module "next-auth" {
     canEdit: boolean;
     canApprove: boolean;
     canPublish: boolean;
+    mustChangePassword: boolean;
+    canCreateUsers: boolean;
   }
 }
 
@@ -38,5 +42,9 @@ declare module "next-auth/jwt" {
     canEdit: boolean;
     canApprove: boolean;
     canPublish: boolean;
+    mustChangePassword: boolean;
+    canCreateUsers: boolean;
+    /** true = sessione decaduta (password cambiata dopo l'emissione del token) */
+    invalidated?: boolean;
   }
 }
