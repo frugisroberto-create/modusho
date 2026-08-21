@@ -30,6 +30,14 @@ interface UserFormProps {
   assignableRoles?: string[];
   /** L'utente ha già completato l'invito (modalità modifica). */
   isActivated?: boolean;
+  /**
+   * Il server autorizza questo attore a (ri)mandare l'invito su questo utente.
+   * Arriva da `canSendActivation`, la stessa funzione che governa la rotta:
+   * la visibilità del comando non si deduce dal ruolo lato client.
+   */
+  canSendActivation?: boolean;
+  /** Idem per il link di reimpostazione (`canSendReset`). */
+  canSendReset?: boolean;
   onSuccess?: () => void;
   initialData?: {
     name: string;
@@ -75,6 +83,28 @@ const CONTENT_TYPE_LABELS: Record<ContentTypeOption, string> = {
   DOCUMENT: "Documenti",
 };
 
+/**
+ * Si mostra il comando di consegna di un accesso?
+ *
+ * Dipende SOLO da ciò che il server ha autorizzato su questo bersaglio: nessun
+ * elenco di ruoli, nessuna deduzione dalla veste. Su un utente attivato il
+ * comando è la reimpostazione, su uno non attivato è l'invito — sono due rotte
+ * diverse con due autorizzazioni diverse, e va letta quella giusta.
+ *
+ * Esportata per poter essere verificata: il difetto che ha reso invisibili
+ * questi comandi all'Hotel Manager viveva in una condizione inline che nessun
+ * test poteva raggiungere.
+ */
+export function showSendLinkCommand(params: {
+  isCreate: boolean;
+  isActivated: boolean;
+  canSendActivation: boolean;
+  canSendReset: boolean;
+}): boolean {
+  if (params.isCreate) return false;
+  return params.isActivated ? params.canSendReset : params.canSendActivation;
+}
+
 export function UserForm({
   mode,
   userId,
@@ -82,6 +112,8 @@ export function UserForm({
   editableFields = [],
   assignableRoles = [],
   isActivated = false,
+  canSendActivation = false,
+  canSendReset = false,
   onSuccess,
   initialData,
 }: UserFormProps) {
@@ -521,8 +553,13 @@ export function UserForm({
           </label>
         )}
 
-        {/* Password: non si imposta più da qui, si manda un link */}
-        {!isCreate && (can("email") || veste === "admin") && (
+        {/* Password: non si imposta più da qui, si manda un link.
+            La visibilità segue ciò che il SERVER autorizza su questo bersaglio,
+            non il ruolo di chi compila: la condizione precedente era legata al
+            permesso di modificare l'email — un campo diverso, che si spegne
+            quando l'utente si attiva — e nascondeva così l'invio della
+            reimpostazione a chi il server lo concede. */}
+        {showSendLinkCommand({ isCreate, isActivated, canSendActivation, canSendReset }) && (
           <div className="pt-2 border-t border-ivory-dark/60">
             <button type="button" onClick={handleSendLink} disabled={sendingLink}
               className="px-4 py-2 text-[11px] font-ui font-semibold uppercase tracking-wider text-terracotta border border-terracotta/30 hover:bg-terracotta hover:text-white transition-colors disabled:opacity-50">

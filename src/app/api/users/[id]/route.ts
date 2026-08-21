@@ -13,6 +13,8 @@ import {
   canChangeRole,
   canToggleCreateFlag,
   canDeactivateUser,
+  canSendActivation,
+  canSendReset,
   getEditableFields,
   getAssignableRoles,
   getRolePresets,
@@ -69,9 +71,16 @@ export async function GET(
 
   // La UI si accende in base a questo: i comandi che il server non accetterebbe
   // non devono nemmeno comparire.
+  //
+  // I due flag di invio sono calcolati dalle STESSE funzioni che autorizzano le
+  // rotte `send-activation` e `send-reset`. Il client non deve dedurli da un
+  // elenco di ruoli proprio: una regola scritta in due posti diverge, ed è
+  // esattamente così che l'Hotel Manager si era ritrovato senza quei comandi.
   const permissions = {
     editableFields: getEditableFields(actor, target),
     assignableRoles: getAssignableRoles(actor, target),
+    canSendActivation: canSendActivation(actor, target).allowed,
+    canSendReset: canSendReset(actor, target).allowed,
   };
 
   return NextResponse.json({

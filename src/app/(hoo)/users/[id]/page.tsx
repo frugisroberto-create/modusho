@@ -29,6 +29,9 @@ interface UserDetail {
 interface DetailPermissions {
   editableFields: EditableField[];
   assignableRoles: string[];
+  /** Calcolati dal server con le stesse funzioni che autorizzano le rotte. */
+  canSendActivation: boolean;
+  canSendReset: boolean;
 }
 
 const ROLE_BADGE: Record<string, { label: string; cls: string }> = {
@@ -188,6 +191,8 @@ export default function UserDetailPage() {
           editableFields={permissions?.editableFields ?? []}
           assignableRoles={permissions?.assignableRoles ?? []}
           isActivated={user.activatedAt !== null}
+          canSendActivation={permissions?.canSendActivation ?? false}
+          canSendReset={permissions?.canSendReset ?? false}
           onSuccess={() => { setEditing(false); fetchUser(true); }}
           initialData={{
             name: user.name,
@@ -247,16 +252,22 @@ export default function UserDetailPage() {
                   ? `In attesa di attivazione · ${activation.daysWaiting} ${activation.daysWaiting === 1 ? "giorno" : "giorni"}`
                   : "Invito mai inviato"}
               </span>
-              <button onClick={handleResendInvite} disabled={inviting}
-                className="px-2.5 py-1 text-[11px] font-ui font-semibold uppercase tracking-wider text-[#E65100] border border-[#E65100]/30 hover:bg-[#E65100] hover:text-white transition-colors disabled:opacity-50">
-                {inviting ? "..." : "Rimanda invito"}
-              </button>
+              {/* Il comando compare solo a chi il server lo concede davvero:
+                  prima era mostrato a chiunque vedesse la scheda, e chi non
+                  era autorizzato scopriva il diniego solo premendolo. */}
+              {permissions?.canSendActivation && (
+                <button onClick={handleResendInvite} disabled={inviting}
+                  className="px-2.5 py-1 text-[11px] font-ui font-semibold uppercase tracking-wider text-[#E65100] border border-[#E65100]/30 hover:bg-[#E65100] hover:text-white transition-colors disabled:opacity-50">
+                  {inviting ? "..." : "Rimanda invito"}
+                </button>
+              )}
             </div>
           )}
 
           {/* L'effetto collaterale si dice PRIMA che il pulsante venga premuto:
-              dopo sarebbe una scusa, non un avviso. */}
-          {activation.state !== "ACTIVATED" && (
+              dopo sarebbe una scusa, non un avviso. Segue la stessa condizione
+              del pulsante: avvisare di un'azione che non si può fare confonde. */}
+          {activation.state !== "ACTIVATED" && permissions?.canSendActivation && (
             <p className="mt-1.5 text-xs font-ui text-sage-light max-w-xl">
               Rimandare l&apos;invito genera un link nuovo e <strong>invalida il
               precedente</strong>: se una mail era già arrivata, quel link smette di
