@@ -1,10 +1,12 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useRouter } from "next/navigation";
 import { TargetAudienceSelector, type TargetAudienceState, type TargetRole } from "@/components/shared/target-audience-selector";
 import { AttachmentUploader } from "@/components/shared/attachment-uploader";
 import { SopEditor } from "@/components/shared/sop-editor";
+import { useUnsavedChangesGuard } from "@/hooks/use-unsaved-changes-guard";
+import { UnsavedChangesModal } from "@/components/shared/unsaved-changes-modal";
 
 interface Property {
   id: string; name: string; code: string;
@@ -39,6 +41,17 @@ export function SopForm({ mode, contentId, initialData, userRole, userDepartment
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   const [batchProgress, setBatchProgress] = useState<{ done: number; total: number; errors: string[] } | null>(null);
+
+  // ─── Modifiche non salvate: si perdono uscendo senza premere il bottone.
+  // Marcato solo da un cambio esplicito dell'utente, mai dal precaricamento
+  // dei dati (initialData, auto-selezione struttura/reparto, targetAudience
+  // caricata in modifica) — altrimenti l'avviso scatterebbe subito ad ogni
+  // apertura della pagina, senza che l'utente abbia scritto nulla.
+  const [dirty, setDirty] = useState(false);
+  // L'id creato dal salvataggio innescato dal bottone principale: il modal
+  // di uscita, invece, dopo aver salvato prosegue verso la destinazione che
+  // l'utente aveva già scelto (il link su cui aveva cliccato), non qui.
+  const createdWorkflowIdRef = useRef<string | null>(null);
 
   const isAllProperties = propertyId === "__ALL__";
   const canSelectAllProperties = mode === "create" && (effectiveRole === "ADMIN" || effectiveRole === "SUPER_ADMIN");
@@ -160,34 +173,111 @@ export function SopForm({ mode, contentId, initialData, userRole, userDepartment
     targetAudience.roles.length +
     targetAudience.userIds.length;
 
-  const handleSubmit = async () => {
-    setError("");
-    setBatchProgress(null);
+  const validateFields = (): boolean => {
     if (!title.trim() || !body.trim() || !propertyId) {
       setError("Titolo, contenuto e struttura sono obbligatori");
-      return;
+      return false;
     }
     if (!departmentId) {
       setError("Seleziona il reparto della SOP");
-      return;
+      return false;
     }
     if (!isAllProperties && totalTargets === 0) {
       setError("Seleziona almeno un destinatario");
-      return;
+      return false;
     }
     if (involveHod && !hodUserId) {
       setError("Seleziona l'HOD da coinvolgere");
-      return;
+      return false;
     }
+    return true;
+  };
+
+  /**
+   * Salva la SOP singola SENZA navigare: la destinazione la decide chi
+   * chiama. Il bottone principale va sempre alla stessa pagina; il modal di
+   * uscita, invece, dopo aver salvato prosegue verso il link su cui l'utente
+   * aveva già cliccato — non qui.
+   *
+   * La creazione multipla ("Tutte le strutture") resta fuori apposta: ha un
+   * proprio avanzamento a video ed è un'azione deliberata, non qualcosa da
+   * salvare in automatico nel tentativo di uscire dalla pagina.
+   */
+  const save = async (): Promise<boolean> => {
+    if (isAllProperties) {
+      setError("La creazione su più strutture non si salva da sola: completa o annulla prima di uscire.");
+      return false;
+    }
+    if (!validateFields()) return false;
 
     setLoading(true);
     try {
-      if (mode === "create" && isAllProperties) {
-        // Batch: crea una SOP per ogni property
+      if (mode === "create") {
+        const payload = {
+          title, body, propertyId, departmentId,
+          involveHod,
+          ...(involveHod && hodUserId ? { hodUserId } : {}),
+          targetAllDepartments: targetAudience.allDepartments,
+          targetDepartmentIds: targetAudience.departmentIds,
+          targetRoles: targetAudience.roles,
+          targetUserIds: targetAudience.userIds,
+        };
+        const res = await fetch("/api/sop-workflow", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(payload),
+        });
+        if (res.ok) {
+          const json = await res.json();
+          createdWorkflowIdRef.current = json.data.id;
+          setDirty(false);
+          return true;
+        }
+        const json = await res.json();
+        setError(json.error || "Errore nella creazione");
+        return false;
+      } else {
+        const payload = {
+          title, body,
+          departmentId: departmentId || null,
+          targetAllDepartments: targetAudience.allDepartments,
+          targetDepartmentIds: targetAudience.departmentIds,
+          targetRoles: targetAudience.roles,
+          targetUserIds: targetAudience.userIds,
+        };
+        const res = await fetch(`/api/content/${contentId}`, {
+          method: "PUT",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(payload),
+        });
+        if (res.ok) {
+          setDirty(false);
+          return true;
+        }
+        const json = await res.json();
+        setError(json.error || "Errore nel salvataggio");
+        return false;
+      }
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const guard = useUnsavedChangesGuard(dirty, save);
+
+  const handleSubmit = async () => {
+    setError("");
+    setBatchProgress(null);
+    if (!validateFields()) return;
+
+    if (mode === "create" && isAllProperties) {
+      // Batch: crea una SOP per ogni property. Resta qui, fuori da `save()`:
+      // non è il salvataggio singolo che il modal di uscita può innescare.
+      setLoading(true);
+      try {
         const selectedDeptCode = allDepartments.find(d => d.id === departmentId)?.code;
         if (!selectedDeptCode) {
           setError("Reparto non trovato");
-          setLoading(false);
           return;
         }
 
@@ -229,6 +319,7 @@ export function SopForm({ mode, contentId, initialData, userRole, userDepartment
         }
 
         if (errors.length === 0) {
+          setDirty(false);
           router.push("/approvals");
           router.refresh();
         } else if (errors.length < properties.length) {
@@ -236,55 +327,20 @@ export function SopForm({ mode, contentId, initialData, userRole, userDepartment
         } else {
           setError(`Nessuna SOP creata. Errori: ${errors.join("; ")}`);
         }
-
-      } else if (mode === "create") {
-        // Singola property: workflow RACI
-        const payload = {
-          title, body, propertyId, departmentId,
-          involveHod,
-          ...(involveHod && hodUserId ? { hodUserId } : {}),
-          targetAllDepartments: targetAudience.allDepartments,
-          targetDepartmentIds: targetAudience.departmentIds,
-          targetRoles: targetAudience.roles,
-          targetUserIds: targetAudience.userIds,
-        };
-        const res = await fetch("/api/sop-workflow", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify(payload),
-        });
-        if (res.ok) {
-          const json = await res.json();
-          router.push(`/sop-workflow/${json.data.id}`);
-          router.refresh();
-        } else {
-          const json = await res.json();
-          setError(json.error || "Errore nella creazione");
-        }
-      } else {
-        // Edit mode: aggiorna via content API esistente
-        const payload = {
-          title, body,
-          departmentId: departmentId || null,
-          targetAllDepartments: targetAudience.allDepartments,
-          targetDepartmentIds: targetAudience.departmentIds,
-          targetRoles: targetAudience.roles,
-          targetUserIds: targetAudience.userIds,
-        };
-        const res = await fetch(`/api/content/${contentId}`, {
-          method: "PUT",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify(payload),
-        });
-        if (res.ok) {
-          router.push("/hoo-sop");
-          router.refresh();
-        } else {
-          const json = await res.json();
-          setError(json.error || "Errore nel salvataggio");
-        }
+      } finally {
+        setLoading(false);
       }
-    } finally { setLoading(false); }
+      return;
+    }
+
+    const ok = await save();
+    if (!ok) return;
+    if (mode === "create") {
+      router.push(`/sop-workflow/${createdWorkflowIdRef.current}`);
+    } else {
+      router.push("/hoo-sop");
+    }
+    router.refresh();
   };
 
   const isValid = title.trim() && body.trim() && propertyId && departmentId && (isAllProperties || totalTargets > 0);
@@ -295,7 +351,7 @@ export function SopForm({ mode, contentId, initialData, userRole, userDepartment
         {/* Titolo */}
         <div>
           <label className="block text-sm font-ui font-medium text-charcoal mb-1.5">Titolo</label>
-          <input type="text" value={title} onChange={(e) => setTitle(e.target.value)}
+          <input type="text" value={title} onChange={(e) => { setTitle(e.target.value); setDirty(true); }}
             className="w-full" placeholder="Titolo della SOP" />
         </div>
 
@@ -305,6 +361,7 @@ export function SopForm({ mode, contentId, initialData, userRole, userDepartment
           <select value={propertyId}
             onChange={(e) => {
               const newPropId = e.target.value;
+              setDirty(true);
               setPropertyId(newPropId);
               setTargetAudience({ allDepartments: false, departmentIds: [], roles: [], userIds: [] });
               setInvolveHod(false);
@@ -342,7 +399,7 @@ export function SopForm({ mode, contentId, initialData, userRole, userDepartment
               Il reparto che redige e mantiene la SOP. Serve per la generazione del codice (es. PPL-FO-001) e per la tracciabilità —
               <strong className="text-charcoal/60"> non determina la visibilità</strong>, che è governata dai destinatari sotto.
             </p>
-            <select value={departmentId} onChange={(e) => setDepartmentId(e.target.value)}
+            <select value={departmentId} onChange={(e) => { setDepartmentId(e.target.value); setDirty(true); }}
               className="w-full">
               <option value="">Seleziona reparto proprietario</option>
               {creatableDepartments.map(d => <option key={d.id} value={d.id}>{d.name} ({d.code})</option>)}
@@ -356,7 +413,7 @@ export function SopForm({ mode, contentId, initialData, userRole, userDepartment
             <label className="flex items-center gap-2 cursor-pointer">
               <input type="checkbox" checked={involveHod}
                 disabled={hodUsers.length === 0 && !hodLoading}
-                onChange={(e) => { setInvolveHod(e.target.checked); if (!e.target.checked) setHodUserId(""); }}
+                onChange={(e) => { setInvolveHod(e.target.checked); if (!e.target.checked) setHodUserId(""); setDirty(true); }}
                 className="w-4 h-4 rounded border-ivory-dark text-terracotta focus:ring-terracotta disabled:opacity-40" />
               <span className="text-sm font-ui font-medium text-charcoal">Coinvolgi HOD nella redazione</span>
             </label>
@@ -375,7 +432,7 @@ export function SopForm({ mode, contentId, initialData, userRole, userDepartment
               </p>
             )}
             {involveHod && hodUsers.length > 0 && (
-              <select value={hodUserId} onChange={(e) => setHodUserId(e.target.value)} className="w-full">
+              <select value={hodUserId} onChange={(e) => { setHodUserId(e.target.value); setDirty(true); }} className="w-full">
                 <option value="">Seleziona HOD</option>
                 {hodUsers.map(u => <option key={u.id} value={u.id}>{u.name}</option>)}
               </select>
@@ -392,7 +449,7 @@ export function SopForm({ mode, contentId, initialData, userRole, userDepartment
           userDepartmentId={userDepartmentId}
           allowedDepartmentIds={effectiveRole === "CORPORATE" && userTargetDepartmentIds?.length ? userTargetDepartmentIds : undefined}
           value={targetAudience}
-          onChange={setTargetAudience}
+          onChange={(next) => { setTargetAudience(next); setDirty(true); }}
         />
       )}
 
@@ -401,7 +458,7 @@ export function SopForm({ mode, contentId, initialData, userRole, userDepartment
         <label className="block text-sm font-ui font-medium text-charcoal mb-1.5">Contenuto</label>
         <SopEditor
           content={body}
-          onChange={setBody}
+          onChange={(html) => { setBody(html); setDirty(true); }}
           placeholder="Scrivi il contenuto della procedura..."
         />
       </div>
@@ -460,10 +517,15 @@ export function SopForm({ mode, contentId, initialData, userRole, userDepartment
           className="btn-primary disabled:opacity-50">
           {loading ? (isAllProperties ? "Creazione in corso..." : "Salvataggio...") : mode === "create" ? (isAllProperties ? `Crea bozza su ${properties.length} strutture` : "Crea bozza") : "Salva modifiche"}
         </button>
-        <button onClick={() => router.back()} className="btn-outline">
+        <button
+          onClick={() => guard.requestNavigation(() => router.back())}
+          className="btn-outline"
+        >
           Annulla
         </button>
       </div>
+
+      <UnsavedChangesModal guard={guard} />
     </div>
   );
 }

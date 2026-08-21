@@ -5,7 +5,9 @@ import { useRouter } from "next/navigation";
 import { AttachmentUploader } from "@/components/shared/attachment-uploader";
 import { SopEditor } from "@/components/shared/sop-editor";
 import { SopViewRegistry } from "@/components/shared/sop-view-registry";
+import { UnsavedChangesModal } from "@/components/shared/unsaved-changes-modal";
 import { sanitizeHtml } from "@/lib/sanitize";
+import { useUnsavedChangesGuard } from "@/hooks/use-unsaved-changes-guard";
 
 // ─── Types ───────────────────────────────────────────────────────────
 
@@ -99,56 +101,8 @@ export function SopWorkflowEditor({ workflowId, currentUserId, currentUserRole, 
   const [dirty, setDirty] = useState(false);
   const initializedRef = useRef(false);
 
-  // Avviso modifiche non salvate
-  const dirtyRef = useRef(false);
-  const currentUrlRef = useRef("");
-  useEffect(() => { dirtyRef.current = dirty; }, [dirty]);
-  useEffect(() => { currentUrlRef.current = window.location.href; }, []);
-
-  useEffect(() => {
-    // 1. beforeunload: chiusura/ricarica pagina
-    const handleBeforeUnload = (e: BeforeUnloadEvent) => {
-      if (dirtyRef.current) {
-        e.preventDefault();
-      }
-    };
-    window.addEventListener("beforeunload", handleBeforeUnload);
-
-    // 2. Intercetta navigazione interna Next.js
-    const originalPushState = history.pushState.bind(history);
-
-    history.pushState = function (...args) {
-      if (dirtyRef.current) {
-        const confirmed = confirm("Hai modifiche non salvate. Vuoi uscire senza salvare?");
-        if (!confirmed) {
-          // Blocca: non chiamare pushState e ripristina URL
-          window.history.replaceState(null, "", currentUrlRef.current);
-          return;
-        }
-        // Utente ha confermato l'uscita: resetta dirty per evitare loop
-        dirtyRef.current = false;
-      }
-      return originalPushState(...args);
-    };
-
-    // 3. back/forward del browser
-    const handlePopState = () => {
-      if (dirtyRef.current) {
-        if (!confirm("Hai modifiche non salvate. Vuoi uscire senza salvare?")) {
-          history.pushState(null, "", currentUrlRef.current);
-          return;
-        }
-        dirtyRef.current = false;
-      }
-    };
-    window.addEventListener("popstate", handlePopState);
-
-    return () => {
-      window.removeEventListener("beforeunload", handleBeforeUnload);
-      window.removeEventListener("popstate", handlePopState);
-      history.pushState = originalPushState;
-    };
-  }, []);
+  // Avviso modifiche non salvate: la logica di blocco/modal vive nell'hook
+  // condiviso (vedi `guard`, sotto handleSave) — qui resta solo lo stato.
 
   // Tab state
   const [activeTab, setActiveTab] = useState<"note" | "versioni" | "allegati" | "eventi">("note");
@@ -202,8 +156,13 @@ export function SopWorkflowEditor({ workflowId, currentUserId, currentUserRole, 
 
   // ─── Action Handlers ────────────────────────────────────────────────
 
-  const handleSave = async () => {
-    if (!wf) return;
+  /**
+   * Restituisce true/false: è anche l'`onSave` del modal "modifiche non
+   * salvate" (vedi `guard` sotto), che deve sapere se procedere con la
+   * navigazione o restare in pagina mostrando l'errore.
+   */
+  const handleSave = async (): Promise<boolean> => {
+    if (!wf) return false;
     setSaving(true);
     setActionMessage(null);
     try {
@@ -218,12 +177,16 @@ export function SopWorkflowEditor({ workflowId, currentUserId, currentUserRole, 
       }
       setActionMessage({ type: "success", text: "Bozza salvata" });
       await fetchWorkflow();
+      return true;
     } catch (e) {
       setActionMessage({ type: "error", text: e instanceof Error ? e.message : "Errore" });
+      return false;
     } finally {
       setSaving(false);
     }
   };
+
+  const guard = useUnsavedChangesGuard(dirty, handleSave);
 
   const handleSubmit = async (target: "C" | "A" | "C_AND_A") => {
     setActionLoading(true);
@@ -732,6 +695,8 @@ export function SopWorkflowEditor({ workflowId, currentUserId, currentUserRole, 
           </div>
         </div>
       )}
+
+      <UnsavedChangesModal guard={guard} />
     </div>
   );
 }
