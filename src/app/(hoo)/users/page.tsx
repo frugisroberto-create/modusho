@@ -9,6 +9,7 @@ import {
   canCreateUsers as roleCanCreateUsers,
   type ActivationStatus,
 } from "@/lib/user-scope";
+import { performRead } from "@/lib/read-outcome";
 
 interface UserItem {
   id: string; email: string; name: string; role: string; isActive: boolean;
@@ -106,6 +107,9 @@ export default function UsersPage() {
   const [feedback, setFeedback] = useState<{ id: string; text: string; ok: boolean } | null>(null);
   const [searchInput, setSearchInput] = useState("");
   const [search, setSearch] = useState("");
+  // Distinti dallo "zero risultati": un fallimento non è un elenco vuoto.
+  const [loadError, setLoadError] = useState<string | null>(null);
+  const [propsError, setPropsError] = useState<string | null>(null);
   const pageSize = 20;
 
   // Il filtro ruoli mostra solo ciò che il ruolo corrente può vedere.
@@ -113,16 +117,23 @@ export default function UsersPage() {
     ? getVisibleRoles({ role: role as Parameters<typeof getVisibleRoles>[0]["role"] })
     : [];
 
+  // Il filtro strutture è accessorio: se non si carica lo si dice accanto alla
+  // tendina, senza bloccare la pagina.
   useEffect(() => {
     async function fetchProps() {
-      const res = await fetch("/api/properties");
-      if (res.ok) { const json = await res.json(); setProperties(json.data); }
+      setPropsError(null);
+      const esito = await performRead<{ data: Property[] }>("/api/properties", "le strutture");
+      // Il 401 lo gestisce SessionGuard: qui tacere è corretto.
+      if (esito.kind === "session-expired") return;
+      if (esito.kind === "error") { setPropsError(esito.message); return; }
+      setProperties(esito.data.data);
     }
     fetchProps();
   }, []);
 
   const fetchUsers = useCallback(async () => {
     setLoading(true);
+    setLoadError(null);
     const params = new URLSearchParams({ page: page.toString(), pageSize: pageSize.toString() });
     if (roleFilter) params.set("role", roleFilter);
     if (propertyFilter) params.set("propertyId", propertyFilter);
@@ -131,8 +142,16 @@ export default function UsersPage() {
     if (activationFilter) params.set("activation", activationFilter);
     if (search) params.set("search", search);
     try {
-      const res = await fetch(`/api/users?${params}`);
-      if (res.ok) { const json = await res.json(); setUsers(json.data); setTotal(json.meta.total); }
+      const esito = await performRead<{ data: UserItem[]; meta: { total: number } }>(
+        `/api/users?${params}`,
+        "l'elenco"
+      );
+      // Sessione decaduta: l'espulsione è già in corso, non si sovrappone un
+      // messaggio che parlerebbe di connessione.
+      if (esito.kind === "session-expired") return;
+      if (esito.kind === "error") { setLoadError(esito.message); return; }
+      setUsers(esito.data.data);
+      setTotal(esito.data.meta.total);
     } finally { setLoading(false); }
   }, [page, roleFilter, propertyFilter, activeFilter, activationFilter, search]);
 
@@ -224,9 +243,23 @@ export default function UsersPage() {
         </select>
       </div>
 
-      {/* Tabella */}
+      {/* Il filtro strutture non ha potuto caricarsi: la tendina resta vuota,
+          ma l'utente sa perché invece di credere che non ci siano strutture. */}
+      {propsError && (
+        <p role="alert" className="text-xs font-ui text-[#E65100]">{propsError}</p>
+      )}
+
+      {/* Tabella — tre stati distinti: caricamento, fallimento, esito vero */}
       {loading ? (
         <div className="space-y-2">{[1,2,3].map(i => <div key={i} className="h-14 skeleton" />)}</div>
+      ) : loadError ? (
+        <div role="alert" className="bg-[#FFF3E0] border-l-4 border-[#E65100] px-4 py-4 text-center">
+          <p className="text-sm font-ui text-[#E65100]">{loadError}</p>
+          <button onClick={() => fetchUsers()}
+            className="mt-3 px-4 py-2 text-[11px] font-ui font-semibold uppercase tracking-wider text-[#E65100] border border-[#E65100]/40 hover:bg-[#E65100] hover:text-white transition-colors">
+            Riprova
+          </button>
+        </div>
       ) : users.length === 0 ? (
         <p className="text-sage-light font-ui text-sm text-center py-10">Nessun utente trovato</p>
       ) : (

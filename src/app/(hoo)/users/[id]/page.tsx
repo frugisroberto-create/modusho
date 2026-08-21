@@ -8,6 +8,7 @@ import { ActivationLinkBox } from "@/components/hoo/activation-link-box";
 import { HelpTip } from "@/components/auth/help-tip";
 import { getActivationStatus } from "@/lib/user-scope";
 import type { EditableField } from "@/lib/user-scope";
+import { performRead } from "@/lib/read-outcome";
 
 interface UserDetail {
   id: string; email: string; name: string; role: string;
@@ -75,16 +76,27 @@ export default function UserDetailPage() {
   const [inviteLink, setInviteLink] = useState<
     { url: string; expiresAt: string; targetWasActive: boolean } | null
   >(null);
+  // Distinto da "utente non trovato": non sapere non è sapere che non c'è.
+  const [loadError, setLoadError] = useState<string | null>(null);
 
   const fetchUser = useCallback(async (silent = false) => {
     if (!silent) setLoading(true);
+    setLoadError(null);
     try {
-      const res = await fetch(`/api/users/${id}`);
-      if (res.ok) {
-        const json = await res.json();
-        setUser(json.data);
-        setPermissions(json.permissions ?? null);
+      const esito = await performRead<{ data: UserDetail; permissions?: DetailPermissions }>(
+        `/api/users/${id}`,
+        "la scheda"
+      );
+      // Sessione decaduta: se ne occupa SessionGuard.
+      if (esito.kind === "session-expired") return;
+      if (esito.kind === "error") {
+        // Distinto da "utente non trovato": lì il dato non c'è, qui non lo
+        // sappiamo. Confonderli manda l'utente a cercare la persona sbagliata.
+        setLoadError(esito.message);
+        return;
       }
+      setUser(esito.data.data);
+      setPermissions(esito.data.permissions ?? null);
     } finally { if (!silent) setLoading(false); }
   }, [id]);
 
@@ -162,6 +174,17 @@ export default function UserDetailPage() {
   };
 
   if (loading) return <div className="h-40 skeleton" />;
+  if (loadError) {
+    return (
+      <div role="alert" className="max-w-xl bg-[#FFF3E0] border-l-4 border-[#E65100] px-4 py-4">
+        <p className="text-sm font-ui text-[#E65100]">{loadError}</p>
+        <button onClick={() => fetchUser()}
+          className="mt-3 px-4 py-2 text-[11px] font-ui font-semibold uppercase tracking-wider text-[#E65100] border border-[#E65100]/40 hover:bg-[#E65100] hover:text-white transition-colors">
+          Riprova
+        </button>
+      </div>
+    );
+  }
   if (!user) return <p className="text-sage-light font-ui">Utente non trovato</p>;
 
   const activation = getActivationStatus(
