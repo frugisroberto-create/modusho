@@ -147,6 +147,64 @@ export function canCreateUsers(actor: Pick<ScopeActor, "role" | "canCreateUsers"
   return getCreatableRoles(actor).length > 0;
 }
 
+/** Messaggi personalizzabili per `canAssignDepartment`: ogni chiamante parla nel proprio contesto. */
+export interface AssignmentScopeMessages {
+  outsideProperty?: string;
+  outsideDepartment?: string;
+}
+
+/**
+ * Un'assegnazione (struttura, reparto) è ammessa per l'attore?
+ *
+ * NON verifica che il reparto appartenga davvero alla struttura indicata
+ * nella stessa richiesta: quel controllo richiede una lettura dal database
+ * (il modello non lo garantisce) e vive in `user-scope-db.ts`, dentro
+ * `validateAssignments`, che chiama questa funzione e poi verifica anche
+ * quello.
+ *
+ * Regola ratificata:
+ *   - SUPER_ADMIN: sempre.
+ *   - ADMIN, HOTEL_MANAGER: la struttura dev'essere nel perimetro; qualunque
+ *     reparto DI QUELLA STRUTTURA è ammesso — l'HM sposta le persone fra i
+ *     reparti del proprio albergo senza passare da HOO.
+ *   - HOD: la struttura dev'essere nel perimetro E il reparto dev'essere fra
+ *     i suoi.
+ *   - CORPORATE, OPERATOR: nessuna assegnazione è mai ammessa.
+ *
+ * Riutilizzata sia dalla creazione (`canCreateUser`) sia dalla modifica
+ * (PUT /api/users/[id]) sia dalla validazione di viewDepartmentIds e
+ * targetDepartmentIds: è l'unica fonte di verità sul perimetro di
+ * un'assegnazione.
+ */
+export function canAssignDepartment(
+  actor: ScopeActor,
+  request: { propertyId: string; departmentId?: string | null },
+  messages: AssignmentScopeMessages = {}
+): ScopeResult {
+  const outsideProperty = messages.outsideProperty ?? "Struttura fuori dal tuo perimetro.";
+  const outsideDepartment = messages.outsideDepartment ?? "Reparto fuori dal tuo perimetro.";
+
+  if (actor.role === "SUPER_ADMIN") return ALLOW;
+
+  // CORPORATE e OPERATOR non assegnano mai nessuno a nessun reparto.
+  if (actor.role !== "ADMIN" && actor.role !== "HOTEL_MANAGER" && actor.role !== "HOD") {
+    return deny(outsideProperty);
+  }
+
+  if (!actor.propertyIds.includes(request.propertyId)) {
+    return deny(outsideProperty);
+  }
+
+  // Solo l'HOD ha un vincolo di reparto: ADMIN e HM valgono per l'intera struttura.
+  if (actor.role === "HOD") {
+    if (!request.departmentId || !actor.departmentIds.includes(request.departmentId)) {
+      return deny(outsideDepartment);
+    }
+  }
+
+  return ALLOW;
+}
+
 /** Verifica completa della creazione: ruolo richiesto + struttura + reparto. */
 export function canCreateUser(
   actor: ScopeActor,
@@ -160,19 +218,12 @@ export function canCreateUser(
     return deny("Non puoi creare utenti con questo ruolo.");
   }
 
-  // SUPER_ADMIN non ha vincolo di property.
-  if (actor.role !== "SUPER_ADMIN" && !actor.propertyIds.includes(request.propertyId)) {
-    return deny("Non puoi creare utenti in questa struttura.");
-  }
-
-  // L'HOD crea solo dentro il proprio reparto.
-  if (actor.role === "HOD") {
-    if (!request.departmentId || !actor.departmentIds.includes(request.departmentId)) {
-      return deny("Puoi creare operatori solo nel tuo reparto.");
-    }
-  }
-
-  return ALLOW;
+  // Messaggi invariati rispetto al comportamento storico: i test esistenti
+  // asseriscono questo testo esatto.
+  return canAssignDepartment(actor, request, {
+    outsideProperty: "Non puoi creare utenti in questa struttura.",
+    outsideDepartment: "Puoi creare operatori solo nel tuo reparto.",
+  });
 }
 
 // ─── Modifica ────────────────────────────────────────────────────────

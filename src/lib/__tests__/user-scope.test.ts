@@ -7,6 +7,7 @@ import {
   getCreatableRoles,
   canCreateUsers,
   canCreateUser,
+  canAssignDepartment,
   getEditableFields,
   canEditUser,
   canEditField,
@@ -183,6 +184,56 @@ describe("user-scope — chi crea chi", () => {
   it("CORPORATE e OPERATOR non creano nessuno", () => {
     expect(canCreateUser(actor("CORPORATE"), { role: "OPERATOR", propertyId: P1, departmentId: D1 }).allowed).toBe(false);
     expect(canCreateUser(actor("OPERATOR"), { role: "OPERATOR", propertyId: P1, departmentId: D1 }).allowed).toBe(false);
+  });
+});
+
+describe("user-scope — canAssignDepartment (perimetro di un'assegnazione, riusato da creazione e modifica)", () => {
+  it("un HOTEL_MANAGER PUÒ assegnare QUALUNQUE reparto della propria struttura — decisione ratificata", () => {
+    const hm = actor("HOTEL_MANAGER", { propertyIds: [P1], departmentIds: [] });
+    expect(canAssignDepartment(hm, { propertyId: P1, departmentId: D1 }).allowed).toBe(true);
+    expect(canAssignDepartment(hm, { propertyId: P1, departmentId: D2 }).allowed).toBe(true);
+    // Anche senza reparto specifico (accesso a tutta la struttura).
+    expect(canAssignDepartment(hm, { propertyId: P1, departmentId: null }).allowed).toBe(true);
+  });
+
+  it("un HOTEL_MANAGER NON PUÒ assegnare una struttura diversa dalla propria", () => {
+    const hm = actor("HOTEL_MANAGER", { propertyIds: [P1] });
+    const verdetto = canAssignDepartment(hm, { propertyId: P2, departmentId: D1 });
+    expect(verdetto.allowed).toBe(false);
+  });
+
+  it("un ADMIN può assegnare qualunque reparto delle proprie strutture, non le altrui", () => {
+    const admin = actor("ADMIN", { propertyIds: [P1] });
+    expect(canAssignDepartment(admin, { propertyId: P1, departmentId: D2 }).allowed).toBe(true);
+    expect(canAssignDepartment(admin, { propertyId: P2, departmentId: D1 }).allowed).toBe(false);
+  });
+
+  it("un HOD NON PUÒ assegnare un reparto che non è il suo", () => {
+    const hod = actor("HOD", { propertyIds: [P1], departmentIds: [D1] });
+    expect(canAssignDepartment(hod, { propertyId: P1, departmentId: D1 }).allowed).toBe(true);
+    expect(canAssignDepartment(hod, { propertyId: P1, departmentId: D2 }).allowed).toBe(false);
+    expect(canAssignDepartment(hod, { propertyId: P1, departmentId: null }).allowed).toBe(false);
+  });
+
+  it("CORPORATE e OPERATOR non possono assegnare nessuno a nessun reparto", () => {
+    expect(canAssignDepartment(actor("CORPORATE"), { propertyId: P1, departmentId: D1 }).allowed).toBe(false);
+    expect(canAssignDepartment(actor("OPERATOR"), { propertyId: P1, departmentId: D1 }).allowed).toBe(false);
+  });
+
+  it("SUPER_ADMIN non ha alcun vincolo", () => {
+    const sa = actor("SUPER_ADMIN", { propertyIds: [], departmentIds: [] });
+    expect(canAssignDepartment(sa, { propertyId: P2, departmentId: "qualunque" }).allowed).toBe(true);
+  });
+
+  it("accetta messaggi di diniego personalizzati per contesto", () => {
+    const hod = actor("HOD", { propertyIds: [P1], departmentIds: [D1] });
+    const verdetto = canAssignDepartment(
+      hod,
+      { propertyId: P1, departmentId: D2 },
+      { outsideDepartment: "Messaggio su misura." }
+    );
+    expect(verdetto.allowed).toBe(false);
+    if (!verdetto.allowed) expect(verdetto.reason).toBe("Messaggio su misura.");
   });
 });
 

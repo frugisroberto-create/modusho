@@ -6,7 +6,7 @@ import { z } from "zod/v4";
 import { issueToken } from "@/lib/auth-tokens";
 import { buildActivationEmail, sendEmail, getAppUrl } from "@/lib/email";
 import { recordUserAudit } from "@/lib/user-audit";
-import { loadActor, buildVisibilityWhere } from "@/lib/user-scope-db";
+import { loadActor, buildVisibilityWhere, validateAssignments, validateDepartmentIds } from "@/lib/user-scope-db";
 import {
   canAccessUserManagement,
   canCreateUser,
@@ -182,6 +182,32 @@ export async function POST(request: NextRequest) {
     if (!verdict.allowed) {
       return NextResponse.json({ error: verdict.reason }, { status: 403 });
     }
+  }
+
+  // ─── Integrità: il reparto di ogni assegnazione appartiene davvero alla
+  // struttura indicata. Il controllo sopra verifica solo il perimetro
+  // dell'attore; questo verifica il dato in sé, per qualunque ruolo.
+  const integrityVerdict = await validateAssignments(actor, propertyAssignments);
+  if (!integrityVerdict.allowed) {
+    return NextResponse.json({ error: integrityVerdict.reason }, { status: 403 });
+  }
+
+  // ─── viewDepartmentIds e targetDepartmentIds: nessuno concede un accesso
+  // che non ha lui stesso ───
+  const viewDeptVerdict = await validateDepartmentIds(actor, viewDepartmentIds, {
+    outsideProperty: "Non puoi assegnare visibilità su una struttura fuori dal tuo perimetro.",
+    outsideDepartment: "Non puoi assegnare visibilità su un reparto fuori dal tuo perimetro.",
+  });
+  if (!viewDeptVerdict.allowed) {
+    return NextResponse.json({ error: viewDeptVerdict.reason }, { status: 403 });
+  }
+
+  const targetDeptVerdict = await validateDepartmentIds(actor, targetDepartmentIds, {
+    outsideProperty: "Non puoi assegnare un reparto destinatario di una struttura fuori dal tuo perimetro.",
+    outsideDepartment: "Non puoi assegnare un reparto destinatario fuori dal tuo perimetro.",
+  });
+  if (!targetDeptVerdict.allowed) {
+    return NextResponse.json({ error: targetDeptVerdict.reason }, { status: 403 });
   }
 
   const isAdminActor = actor.role === "ADMIN" || actor.role === "SUPER_ADMIN";

@@ -6,7 +6,7 @@ import { z } from "zod/v4";
 import { issueToken } from "@/lib/auth-tokens";
 import { buildActivationEmail, sendEmail, getAppUrl } from "@/lib/email";
 import { recordUserAudit } from "@/lib/user-audit";
-import { loadActor, loadTarget } from "@/lib/user-scope-db";
+import { loadActor, loadTarget, validateAssignments, validateDepartmentIds } from "@/lib/user-scope-db";
 import {
   canViewUser,
   canEditField,
@@ -158,6 +158,40 @@ export async function PUT(
     }
   }
 
+  // ─── Perimetro sui VALORI: chi può toccare "departments" può comunque
+  // scriverci solo dentro il proprio perimetro. La cancellazione e ricrea-
+  // zione delle assegnazioni più sotto non deve mai partire da un valore
+  // fuori raggio: qui si nega PRIMA di qualunque scrittura ───
+  if (propertyAssignments !== undefined) {
+    const assignmentVerdict = await validateAssignments(actor, propertyAssignments, {
+      outsideProperty: "Non puoi assegnare questo utente a una struttura fuori dal tuo perimetro.",
+      outsideDepartment: "Non puoi assegnare questo utente a un reparto fuori dal tuo perimetro.",
+    });
+    if (!assignmentVerdict.allowed) {
+      return NextResponse.json({ error: assignmentVerdict.reason }, { status: 403 });
+    }
+  }
+
+  if (viewDepartmentIds !== undefined) {
+    const viewDeptVerdict = await validateDepartmentIds(actor, viewDepartmentIds, {
+      outsideProperty: "Non puoi assegnare visibilità su una struttura fuori dal tuo perimetro.",
+      outsideDepartment: "Non puoi assegnare visibilità su un reparto fuori dal tuo perimetro.",
+    });
+    if (!viewDeptVerdict.allowed) {
+      return NextResponse.json({ error: viewDeptVerdict.reason }, { status: 403 });
+    }
+  }
+
+  if (targetDepartmentIds !== undefined) {
+    const targetDeptVerdict = await validateDepartmentIds(actor, targetDepartmentIds, {
+      outsideProperty: "Non puoi assegnare un reparto destinatario di una struttura fuori dal tuo perimetro.",
+      outsideDepartment: "Non puoi assegnare un reparto destinatario fuori dal tuo perimetro.",
+    });
+    if (!targetDeptVerdict.allowed) {
+      return NextResponse.json({ error: targetDeptVerdict.reason }, { status: 403 });
+    }
+  }
+
   // ─── Cambio ruolo ───
   if (role !== undefined && role !== current.role) {
     const verdict = canChangeRole(actor, target, role, note);
@@ -250,12 +284,17 @@ export async function PUT(
   await prisma.user.update({ where: { id }, data: updateData });
 
   if (propertyAssignments !== undefined) {
-    await prisma.propertyAssignment.deleteMany({ where: { userId: id } });
-    for (const a of propertyAssignments) {
-      await prisma.propertyAssignment.create({
-        data: { userId: id, propertyId: a.propertyId, departmentId: a.departmentId || null },
-      });
-    }
+    // Cancellazione e ricreazione in una transazione: senza, una create che
+    // fallisce a metà lascerebbe l'utente senza alcuna assegnazione — le
+    // righe già cancellate non tornerebbero indietro da sole.
+    await prisma.$transaction(async (tx) => {
+      await tx.propertyAssignment.deleteMany({ where: { userId: id } });
+      for (const a of propertyAssignments) {
+        await tx.propertyAssignment.create({
+          data: { userId: id, propertyId: a.propertyId, departmentId: a.departmentId || null },
+        });
+      }
+    });
   }
 
   // I tipi di contenuto seguono il ruolo quando il ruolo cambia.
