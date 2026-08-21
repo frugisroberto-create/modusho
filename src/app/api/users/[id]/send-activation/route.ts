@@ -95,6 +95,22 @@ export async function POST(
   const assignment = recipient.propertyAssignments[0];
   const activationUrl = `${getAppUrl()}/attiva/${token}`;
 
+  /**
+   * Il link esce SOLO per chi non si è ancora attivato — regola invariata.
+   *
+   * Il controllo è sulla falsità del campo, non su `=== null`: se un domani
+   * `activatedAt` smettesse di essere selezionato dalla query che alimenta
+   * `target`, arriverebbe `undefined` e un confronto stretto lo tratterebbe
+   * come "già attivato", facendo sparire il link senza errori e senza log.
+   * Un utente con l'indirizzo sbagliato diventerebbe irrecuperabile, in
+   * silenzio. La direzione dell'errore conta: qui si sbaglia mostrando il
+   * link a chi non serve, mai nascondendolo a chi ne ha bisogno.
+   */
+  const linkPayload =
+    !target.activatedAt
+      ? { activationUrl, activationExpiresAt: expiresAt.toISOString() }
+      : {};
+
   const result = await sendEmail(
     buildActivationEmail({
       name: recipient.name,
@@ -126,7 +142,7 @@ export async function POST(
         error: "Non siamo riusciti a inviare l'email. Riprova tra poco.",
         // Anche quando la mail non parte il link serve, purché il destinatario
         // non si sia già attivato: è il solo modo di consegnare l'invito a mano.
-        ...(target.activatedAt === null ? { activationUrl, activationExpiresAt: expiresAt.toISOString() } : {}),
+        ...linkPayload,
       },
       { status: 502 }
     );
@@ -141,11 +157,9 @@ export async function POST(
       sent: true,
       adapter: result.adapter,
       expiresAt,
-      // Il link esce SOLO per chi non si è ancora attivato. Su un account già
-      // attivo l'unica via è la reimpostazione, che arriva alla sua casella.
-      ...(target.activatedAt === null
-        ? { activationUrl, activationExpiresAt: expiresAt.toISOString() }
-        : {}),
+      // Su un account già attivo l'unica via resta la reimpostazione, che
+      // arriva alla sua casella: qui il link non compare mai.
+      ...linkPayload,
     },
   });
 }
