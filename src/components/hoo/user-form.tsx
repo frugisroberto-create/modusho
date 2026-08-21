@@ -145,7 +145,9 @@ export function UserForm({
   // Invio link password (modalità modifica)
   const [sendingLink, setSendingLink] = useState(false);
   const [linkFeedback, setLinkFeedback] = useState<{ text: string; ok: boolean } | null>(null);
-  const [resentLink, setResentLink] = useState<{ url: string; expiresAt: string } | null>(null);
+  const [resentLink, setResentLink] = useState<
+    { url: string; expiresAt: string; targetWasActive: boolean } | null
+  >(null);
 
   const isSimpleVeste = veste !== "admin";
 
@@ -283,18 +285,29 @@ export function UserForm({
     try {
       const res = await fetch(`/api/users/${userId}/${endpoint}`, { method: "POST" });
       const json = await res.json().catch(() => ({}));
+      const payload = res.ok ? json?.data : json;
+
       setLinkFeedback(
         res.ok
-          ? { text: isActivated ? "Link di reimpostazione inviato." : "Invito inviato.", ok: true }
+          ? {
+              // Dentro la finestra anti-abuso l'email non riparte: il `notice`
+              // dell'API lo dice, ed è più utile di una conferma inesatta.
+              text:
+                payload?.notice ??
+                (isActivated ? "Link di reimpostazione inviato." : "Invito inviato."),
+              ok: true,
+            }
           : { text: json?.error ?? "Invio non riuscito", ok: false }
       );
-      // Il link esiste solo per chi non si è ancora attivato: su un account
-      // attivo l'API non lo restituisce, e qui non lo cerchiamo nemmeno.
-      if (!isActivated) {
-        const payload = res.ok ? json?.data : json;
-        if (payload?.activationUrl && payload?.activationExpiresAt) {
-          setResentLink({ url: payload.activationUrl, expiresAt: payload.activationExpiresAt });
-        }
+
+      // Il link esce SEMPRE — attivato o no, riuscito o fallito: è la via di
+      // riserva quando l'email non arriva.
+      if (payload?.activationUrl && payload?.activationExpiresAt) {
+        setResentLink({
+          url: payload.activationUrl,
+          expiresAt: payload.activationExpiresAt,
+          targetWasActive: Boolean(payload.targetWasActive),
+        });
       }
     } finally { setSendingLink(false); }
   };
@@ -515,6 +528,11 @@ export function UserForm({
               className="px-4 py-2 text-[11px] font-ui font-semibold uppercase tracking-wider text-terracotta border border-terracotta/30 hover:bg-terracotta hover:text-white transition-colors disabled:opacity-50">
               {sendingLink ? "..." : isActivated ? "Invia link di reimpostazione" : "Rimanda invito"}
             </button>
+            {/* L'effetto collaterale si dice PRIMA che il pulsante venga premuto. */}
+            <p className="text-xs font-ui text-sage-light mt-2">
+              Genera un link nuovo e <strong>invalida il precedente</strong>: se una
+              mail era già arrivata, quel link smette di funzionare.
+            </p>
             {linkFeedback && (
               <p className={`text-xs font-ui mt-2 ${linkFeedback.ok ? "text-sage" : "text-alert-red"}`}>
                 {linkFeedback.text}
@@ -522,7 +540,11 @@ export function UserForm({
             )}
             {resentLink && (
               <div className="mt-3">
-                <ActivationLinkBox url={resentLink.url} expiresAt={resentLink.expiresAt} />
+                <ActivationLinkBox
+                  url={resentLink.url}
+                  expiresAt={resentLink.expiresAt}
+                  targetWasActive={resentLink.targetWasActive}
+                />
               </div>
             )}
             <p className="text-xs font-ui text-sage-light mt-2">

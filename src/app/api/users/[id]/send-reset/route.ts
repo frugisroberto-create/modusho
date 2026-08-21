@@ -7,7 +7,16 @@
  * Perimetro: ADMIN e HM nel proprio raggio. Chi non si è ancora attivato non
  * riceve un reset ma un invito (rotta diversa): il messaggio lo dice.
  *
- * Guard anti-abuso: massimo un invio al minuto per utente destinatario.
+ * Il link viene SEMPRE generato e restituito a chi lo richiede: quando l'email
+ * non arriva è l'unica via. Chi lo riceve può impostare una nuova password e
+ * quindi entrare come l'interessato — l'avviso all'operatore sta nell'interfaccia,
+ * la traccia in UserAuditEvent.
+ *
+ * Guard anti-abuso: massimo un INVIO di email al minuto per destinatario. Dentro
+ * quella finestra la richiesta riesce comunque e il link esce, ma l'email non
+ * viene rispedita: il campo `emailSent` lo dichiara e `notice` lo spiega.
+ *
+ * Il valore del token non finisce mai né nel registro né nei log.
  */
 
 import { NextRequest, NextResponse } from "next/server";
@@ -62,6 +71,8 @@ export async function POST(
     );
   }
 
+  // Il cooldown sopprime il solo INVIO dell'email, non la generazione del link:
+  // vedi la nota gemella in send-activation.
   const recent = await prisma.authToken.findFirst({
     where: {
       userId: recipient.id,
@@ -70,13 +81,7 @@ export async function POST(
     },
     select: { createdAt: true },
   });
-
-  if (recent) {
-    return NextResponse.json(
-      { error: "Link già inviato poco fa. Riprova tra un minuto." },
-      { status: 429 }
-    );
-  }
+  const emailSuppressed = Boolean(recent);
 
   const { token, expiresAt } = await issueToken({
     userId: recipient.id,
@@ -84,34 +89,72 @@ export async function POST(
     createdById: actor.id,
   });
 
-  const result = await sendEmail(
-    buildResetEmail({
-      name: recipient.name,
-      email: recipient.email,
-      resetUrl: `${getAppUrl()}/reimposta/${token}`,
-    })
-  );
+  const resetUrl = `${getAppUrl()}/reimposta/${token}`;
 
+  // Questa rotta agisce per definizione su utenti già attivati (canSendReset lo
+  // impone), quindi il link consente sempre di entrare come l'interessato.
+  const targetWasActive = Boolean(target.activatedAt);
+
+  const result = emailSuppressed
+    ? null
+    : await sendEmail(
+        buildResetEmail({
+          name: recipient.name,
+          email: recipient.email,
+          resetUrl,
+        })
+      );
+
+  // Il token in chiaro non entra MAI qui: si registra l'evento, non la credenziale.
   await recordUserAudit({
     userId: recipient.id,
     actorId: actor.id,
     action: "RESET_SENT",
-    meta: { adapter: result.adapter, ok: result.ok },
+    meta: {
+      emailSent: result?.ok ?? false,
+      emailSuppressed,
+      targetWasActive,
+      ...(result ? { adapter: result.adapter, ok: result.ok } : {}),
+      ...(result?.reason ? { failure: result.reason } : {}),
+    },
   });
 
-  if (!result.ok) {
-    console.error(`[auth] RESET invio fallito userId=${recipient.id} — ${result.error}`);
+  const linkPayload = {
+    activationUrl: resetUrl,
+    activationExpiresAt: expiresAt.toISOString(),
+    targetWasActive,
+  };
+
+  if (result && !result.ok) {
+    console.error(`[auth] RESET invio fallito userId=${recipient.id} motivo=${result.reason ?? "-"}`);
     return NextResponse.json(
-      { error: "Non siamo riusciti a inviare l'email. Riprova tra poco." },
+      {
+        error: "Non siamo riusciti a inviare l'email. Riprova tra poco.",
+        ...linkPayload,
+      },
       { status: 502 }
     );
   }
 
   console.log(
-    `[auth] RESET inviato userId=${recipient.id} da=${actor.id} adapter=${result.adapter}`
+    emailSuppressed
+      ? `[auth] RESET link rigenerato senza invio userId=${recipient.id} da=${actor.id}`
+      : `[auth] RESET inviato userId=${recipient.id} da=${actor.id} adapter=${result?.adapter}`
   );
 
   return NextResponse.json({
-    data: { sent: true, adapter: result.adapter, expiresAt },
+    data: {
+      sent: !emailSuppressed,
+      emailSent: !emailSuppressed,
+      adapter: result?.adapter ?? null,
+      expiresAt,
+      ...(emailSuppressed
+        ? {
+            notice:
+              "L'email non è stata rispedita: ne è già partita una meno di un minuto fa. Usa il link qui sotto per consegnare l'accesso a mano.",
+          }
+        : {}),
+      ...linkPayload,
+    },
   });
 }

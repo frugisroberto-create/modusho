@@ -69,7 +69,9 @@ export default function UserDetailPage() {
   const [inviting, setInviting] = useState(false);
   const [togglingFlag, setTogglingFlag] = useState(false);
   const [feedback, setFeedback] = useState<{ text: string; ok: boolean } | null>(null);
-  const [inviteLink, setInviteLink] = useState<{ url: string; expiresAt: string } | null>(null);
+  const [inviteLink, setInviteLink] = useState<
+    { url: string; expiresAt: string; targetWasActive: boolean } | null
+  >(null);
 
   const fetchUser = useCallback(async (silent = false) => {
     if (!silent) setLoading(true);
@@ -112,16 +114,27 @@ export default function UserDetailPage() {
     try {
       const res = await fetch(`/api/users/${id}/send-activation`, { method: "POST" });
       const json = await res.json().catch(() => ({}));
+      const payload = res.ok ? json?.data : json;
+
       setFeedback(
         res.ok
-          ? { text: "Invito inviato.", ok: true }
+          ? {
+              // Dentro la finestra anti-abuso l'email non riparte: dirlo è più
+              // utile che un "Invito inviato." che non corrisponde ai fatti.
+              text: payload?.notice ?? "Invito inviato.",
+              ok: true,
+            }
           : { text: json?.error ?? "Invito non inviato", ok: false }
       );
-      // Il link arriva solo per chi non si è ancora attivato: l'API non lo
-      // restituisce per gli account attivi, quindi qui non può comparire.
-      const payload = res.ok ? json?.data : json;
+
+      // Il link esce SEMPRE, anche su errore e anche per un utente già attivo:
+      // è la via di riserva quando l'email non arriva.
       if (payload?.activationUrl && payload?.activationExpiresAt) {
-        setInviteLink({ url: payload.activationUrl, expiresAt: payload.activationExpiresAt });
+        setInviteLink({
+          url: payload.activationUrl,
+          expiresAt: payload.activationExpiresAt,
+          targetWasActive: Boolean(payload.targetWasActive),
+        });
       }
       if (res.ok) fetchUser(true);
     } finally { setInviting(false); }
@@ -241,17 +254,31 @@ export default function UserDetailPage() {
             </div>
           )}
 
+          {/* L'effetto collaterale si dice PRIMA che il pulsante venga premuto:
+              dopo sarebbe una scusa, non un avviso. */}
+          {activation.state !== "ACTIVATED" && (
+            <p className="mt-1.5 text-xs font-ui text-sage-light max-w-xl">
+              Rimandare l&apos;invito genera un link nuovo e <strong>invalida il
+              precedente</strong>: se una mail era già arrivata, quel link smette di
+              funzionare.
+            </p>
+          )}
+
           {feedback && (
             <p className={`mt-2 text-sm font-ui ${feedback.ok ? "text-sage" : "text-alert-red"}`}>
               {feedback.text}
             </p>
           )}
 
-          {/* Il link compare solo per chi non si è ancora attivato: appena
-              l'utente attiva, activation.state diventa ACTIVATED e sparisce. */}
-          {inviteLink && activation.state !== "ACTIVATED" && (
+          {/* Il link compare SEMPRE: attivato o no. Su un utente già attivo
+              ActivationLinkBox aggiunge da sé l'avviso sul potere del link. */}
+          {inviteLink && (
             <div className="mt-3 max-w-xl">
-              <ActivationLinkBox url={inviteLink.url} expiresAt={inviteLink.expiresAt} />
+              <ActivationLinkBox
+                url={inviteLink.url}
+                expiresAt={inviteLink.expiresAt}
+                targetWasActive={inviteLink.targetWasActive}
+              />
             </div>
           )}
         </div>

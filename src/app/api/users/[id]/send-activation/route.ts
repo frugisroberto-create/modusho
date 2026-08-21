@@ -5,7 +5,18 @@
  * ADMIN e HM nel proprio raggio, HOD col flag solo sugli utenti che ha creato
  * lui e che non si sono ancora attivati.
  *
- * Guard anti-abuso: massimo un invio al minuto per utente destinatario.
+ * Il link viene SEMPRE generato e restituito a chi lo richiede — attivato o no,
+ * prima o millesima volta. Quando l'email non arriva, il link consegnato a mano
+ * è l'unica via, e un utente con l'indirizzo sbagliato sarebbe altrimenti
+ * irrecuperabile dall'interno dell'applicazione.
+ *
+ * Guard anti-abuso: massimo un INVIO di email al minuto per destinatario. Dentro
+ * quella finestra la richiesta riesce comunque e il link esce, ma l'email non
+ * viene rispedita: il campo `emailSent` lo dichiara e `notice` lo spiega.
+ *
+ * Ogni generazione lascia un evento in UserAuditEvent — chi, per chi, quando —
+ * con `targetWasActive` a marcare i casi in cui il link permette di entrare come
+ * l'interessato. Il valore del token non finisce mai né nel registro né nei log.
  */
 
 import { NextRequest, NextResponse } from "next/server";
@@ -70,6 +81,10 @@ export async function POST(
     );
   }
 
+  // Il cooldown non blocca più la richiesta: sopprime il solo INVIO dell'email.
+  // Il link viene generato e restituito comunque — è la via di riserva, e negarla
+  // proprio nel minuto in cui ci si accorge che l'indirizzo è sbagliato la
+  // renderebbe inutile.
   const recent = await prisma.authToken.findFirst({
     where: {
       userId: recipient.id,
@@ -78,13 +93,7 @@ export async function POST(
     },
     select: { createdAt: true },
   });
-
-  if (recent) {
-    return NextResponse.json(
-      { error: "Invito già inviato poco fa. Riprova tra un minuto." },
-      { status: 429 }
-    );
-  }
+  const emailSuppressed = Boolean(recent);
 
   const { token, expiresAt } = await issueToken({
     userId: recipient.id,
@@ -95,53 +104,54 @@ export async function POST(
   const assignment = recipient.propertyAssignments[0];
   const activationUrl = `${getAppUrl()}/attiva/${token}`;
 
-  /**
-   * Il link esce SOLO per chi non si è ancora attivato — regola invariata.
-   *
-   * Il controllo è sulla falsità del campo, non su `=== null`: se un domani
-   * `activatedAt` smettesse di essere selezionato dalla query che alimenta
-   * `target`, arriverebbe `undefined` e un confronto stretto lo tratterebbe
-   * come "già attivato", facendo sparire il link senza errori e senza log.
-   * Un utente con l'indirizzo sbagliato diventerebbe irrecuperabile, in
-   * silenzio. La direzione dell'errore conta: qui si sbaglia mostrando il
-   * link a chi non serve, mai nascondendolo a chi ne ha bisogno.
-   */
-  const linkPayload =
-    !target.activatedAt
-      ? { activationUrl, activationExpiresAt: expiresAt.toISOString() }
-      : {};
+  // Decisione ratificata: il link si mostra SEMPRE a chi lo genera, attivato o
+  // no. Chi ha già attivato riceve, accanto al link, l'avviso che consente di
+  // entrare come lui — vedi l'interfaccia. Qui si registra soltanto il fatto.
+  const targetWasActive = Boolean(target.activatedAt);
 
-  const result = await sendEmail(
-    buildActivationEmail({
-      name: recipient.name,
-      email: recipient.email,
-      activationUrl,
-      propertyName: assignment?.property?.name ?? null,
-      departmentName: assignment?.department?.name ?? null,
-    })
-  );
+  const result = emailSuppressed
+    ? null
+    : await sendEmail(
+        buildActivationEmail({
+          name: recipient.name,
+          email: recipient.email,
+          activationUrl,
+          propertyName: assignment?.property?.name ?? null,
+          departmentName: assignment?.department?.name ?? null,
+        })
+      );
 
+  // Il token in chiaro non entra MAI qui: si registra l'evento, non la credenziale.
   await recordUserAudit({
     userId: recipient.id,
     actorId: actor.id,
     action: "INVITE_SENT",
     meta: {
-      adapter: result.adapter,
-      ok: result.ok,
       reason: "resend",
-      ...(result.reason ? { failure: result.reason } : {}),
+      emailSent: result?.ok ?? false,
+      emailSuppressed,
+      // Su un utente già attivo il link permette di impostare una password e
+      // quindi di entrare come lui: la traccia è l'unica rilevabilità rimasta.
+      targetWasActive,
+      ...(result ? { adapter: result.adapter, ok: result.ok } : {}),
+      ...(result?.reason ? { failure: result.reason } : {}),
     },
   });
 
-  if (!result.ok) {
+  const linkPayload = {
+    activationUrl,
+    activationExpiresAt: expiresAt.toISOString(),
+    targetWasActive,
+  };
+
+  if (result && !result.ok) {
     console.error(
       `[auth] INVITO invio fallito userId=${recipient.id} motivo=${result.reason ?? "-"}`
     );
     return NextResponse.json(
       {
         error: "Non siamo riusciti a inviare l'email. Riprova tra poco.",
-        // Anche quando la mail non parte il link serve, purché il destinatario
-        // non si sia già attivato: è il solo modo di consegnare l'invito a mano.
+        // La mail non è partita: il link è l'unico modo di consegnare l'invito.
         ...linkPayload,
       },
       { status: 502 }
@@ -149,16 +159,24 @@ export async function POST(
   }
 
   console.log(
-    `[auth] INVITO inviato userId=${recipient.id} da=${actor.id} adapter=${result.adapter}`
+    emailSuppressed
+      ? `[auth] INVITO link rigenerato senza invio userId=${recipient.id} da=${actor.id}`
+      : `[auth] INVITO inviato userId=${recipient.id} da=${actor.id} adapter=${result?.adapter}`
   );
 
   return NextResponse.json({
     data: {
-      sent: true,
-      adapter: result.adapter,
+      // `sent` dice se l'email è partita davvero, non se la richiesta è riuscita.
+      sent: !emailSuppressed,
+      emailSent: !emailSuppressed,
+      adapter: result?.adapter ?? null,
       expiresAt,
-      // Su un account già attivo l'unica via resta la reimpostazione, che
-      // arriva alla sua casella: qui il link non compare mai.
+      ...(emailSuppressed
+        ? {
+            notice:
+              "L'email non è stata rispedita: ne è già partita una meno di un minuto fa. Usa il link qui sotto per consegnare l'accesso a mano.",
+          }
+        : {}),
       ...linkPayload,
     },
   });
