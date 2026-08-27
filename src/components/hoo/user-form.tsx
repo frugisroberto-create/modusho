@@ -1,10 +1,11 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import { useRouter } from "next/navigation";
 import { HelpTip } from "@/components/auth/help-tip";
 import { ActivationLinkBox } from "@/components/hoo/activation-link-box";
 import type { EditableField } from "@/lib/user-scope";
+import { buildSimpleAssignments, validateSimpleAssignments } from "@/lib/user-assignments";
 
 type RoleOption = "OPERATOR" | "HOD" | "HOTEL_MANAGER" | "CORPORATE" | "ADMIN";
 type ContentTypeOption = "SOP" | "DOCUMENT" | "MEMO";
@@ -38,6 +39,20 @@ interface UserFormProps {
   canSendActivation?: boolean;
   /** Idem per il link di reimpostazione (`canSendReset`). */
   canSendReset?: boolean;
+  /**
+   * Reparti in cui chi compila (HOD) è REALMENTE assegnato in modo operativo
+   * — non i reparti che può solo consultare. Serve a costruire l'elenco a
+   * caselle della veste hod: `/api/properties` filtra i department per
+   * `getAccessibleDepartmentIds`, che include anche eventuali reparti in
+   * sola visibilità (`viewDepartmentIds`) su cui l'HOD non può creare
+   * nessuno — offrirli come opzione porterebbe a un 403 dal server.
+   *
+   * `undefined` = il chiamante non è riuscito a leggerlo: il form non mostra
+   * nessun reparto e dice che non è riuscito a verificarlo (non finge un
+   * elenco). `[]` = letto correttamente, e l'HOD non ha reparti operativi:
+   * messaggio diverso, mirato a chi deve intervenire.
+   */
+  hodDepartmentIds?: string[];
   onSuccess?: () => void;
   initialData?: {
     name: string;
@@ -114,6 +129,7 @@ export function UserForm({
   isActivated = false,
   canSendActivation = false,
   canSendReset = false,
+  hodDepartmentIds,
   onSuccess,
   initialData,
 }: UserFormProps) {
@@ -150,9 +166,9 @@ export function UserForm({
   // Sezione 4+5 — Strutture e reparti
   const [properties, setProperties] = useState<Property[]>([]);
   const [assignments, setAssignments] = useState<AssignmentEntry[]>(initialData?.assignments ?? []);
-  /** Veste HM/HOD: property e reparto scelti da tendina, non da checkbox. */
+  /** Veste HM/HOD: struttura singola, reparti multipli (caselle). */
   const [simplePropertyId, setSimplePropertyId] = useState("");
-  const [simpleDepartmentId, setSimpleDepartmentId] = useState("");
+  const [simpleDepartmentIds, setSimpleDepartmentIds] = useState<string[]>([]);
 
   // Sezione 6 — Tipi contenuto
   const [contentTypes, setContentTypes] = useState<ContentTypeOption[]>(initialData?.contentTypes ?? []);
@@ -201,14 +217,17 @@ export function UserForm({
     if (!simplePropertyId) setSimplePropertyId(properties[0]!.id);
   }, [isSimpleVeste, isCreate, properties, simplePropertyId]);
 
-  // Veste HOD: reparto fisso, è il suo.
+  // Veste HOD: se ha un solo reparto operativo, non c'è scelta da fare —
+  // preselezionato ma restano visibile e deselezionabile (una sola volta:
+  // se l'utente lo toglie, non deve ricomparire da solo).
+  const hodAutoSelectedRef = useRef(false);
   useEffect(() => {
-    if (veste !== "hod" || !isCreate) return;
-    const prop = properties.find((p) => p.id === simplePropertyId);
-    if (prop && prop.departments.length > 0 && !simpleDepartmentId) {
-      setSimpleDepartmentId(prop.departments[0]!.id);
+    if (veste !== "hod" || !isCreate || hodAutoSelectedRef.current) return;
+    if (hodDepartmentIds && hodDepartmentIds.length === 1) {
+      setSimpleDepartmentIds(hodDepartmentIds);
+      hodAutoSelectedRef.current = true;
     }
-  }, [veste, isCreate, properties, simplePropertyId, simpleDepartmentId]);
+  }, [veste, isCreate, hodDepartmentIds]);
 
   const applyRolePreset = useCallback((newRole: RoleOption) => {
     const preset = ROLE_PRESETS[newRole];
@@ -254,6 +273,30 @@ export function UserForm({
   const selectedPropertyIds = [...new Set(assignments.map(a => a.propertyId))];
   const roleRequiresSpecificDepts = role === "OPERATOR" || role === "HOD" || role === "CORPORATE";
   const currentProperty = properties.find((p) => p.id === simplePropertyId);
+  /**
+   * Reparti proponibili nella veste hod: solo quelli in cui l'HOD è
+   * REALMENTE assegnato in modo operativo (`hodDepartmentIds`), mai
+   * l'elenco grezzo di `/api/properties` — che include anche eventuali
+   * reparti in sola visibilità, su cui l'HOD non può creare nessuno (il
+   * server risponderebbe "Puoi creare operatori solo nel tuo reparto.").
+   *
+   * Il ripiego quando manca il dato NON è più "mostra tutto": un elenco che
+   * offre caselle destinate a essere respinte dal server è il difetto che
+   * questa veste doveva eliminare. `hodDepartmentIds === undefined` (dato non
+   * letto) e `hodDepartmentIds === []` (letto: zero reparti operativi) sono
+   * due situazioni diverse e restano distinte fino alla UI — vedi i due
+   * messaggi nel blocco "Dove lavorerà".
+   */
+  const hodDataUnavailable = veste === "hod" && hodDepartmentIds === undefined;
+  const hodSelectableDepartments = hodDepartmentIds
+    ? (currentProperty?.departments.filter((d) => hodDepartmentIds.includes(d.id)) ?? [])
+    : [];
+
+  const toggleSimpleDepartment = (deptId: string) => {
+    setSimpleDepartmentIds((prev) =>
+      prev.includes(deptId) ? prev.filter((id) => id !== deptId) : [...prev, deptId]
+    );
+  };
 
   const toggleProperty = (propId: string) => {
     if (selectedPropertyIds.includes(propId)) {
@@ -353,14 +396,21 @@ export function UserForm({
       return;
     }
 
-    // Assegnazioni: nella veste semplificata vengono dalle tendine.
+    // Assegnazioni: nella veste semplificata vengono dai reparti scelti a caselle.
     let realAssignments: AssignmentEntry[];
     if (isSimpleVeste && isCreate) {
-      if (!simplePropertyId || !simpleDepartmentId) {
-        setError("Scegli la struttura e il reparto");
+      const validation = validateSimpleAssignments({
+        propertyId: simplePropertyId,
+        departmentIds: simpleDepartmentIds,
+      });
+      if (!validation.valid) {
+        setError(validation.reason);
         return;
       }
-      realAssignments = [{ propertyId: simplePropertyId, departmentId: simpleDepartmentId }];
+      realAssignments = buildSimpleAssignments({
+        propertyId: simplePropertyId,
+        departmentIds: simpleDepartmentIds,
+      });
     } else {
       realAssignments = assignments.filter(a => a.departmentId !== "__pending__");
       if (realAssignments.length === 0) {
@@ -622,29 +672,47 @@ export function UserForm({
         </section>
       )}
 
-      {/* Veste HOD in creazione: ruolo implicito, struttura e reparto fissi */}
+      {/* Veste HOD in creazione: ruolo implicito, struttura fissa, reparti a caselle */}
       {veste === "hod" && isCreate && (
         <section className="bg-ivory-medium border border-ivory-dark p-6 space-y-3">
           <h2 className="text-base font-heading font-semibold text-charcoal-dark">Dove lavorerà</h2>
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 text-sm font-ui">
-            <div>
-              <span className="block text-[11px] uppercase tracking-wider text-charcoal/45 mb-1">Struttura</span>
-              <span className="text-charcoal-dark font-medium">{currentProperty?.name ?? "—"}</span>
-            </div>
-            <div>
-              <span className="block text-[11px] uppercase tracking-wider text-charcoal/45 mb-1">Reparto</span>
-              <span className="text-charcoal-dark font-medium">
-                {currentProperty?.departments.find(d => d.id === simpleDepartmentId)?.name ?? "—"}
-              </span>
-            </div>
+          <div>
+            <span className="block text-[11px] uppercase tracking-wider text-charcoal/45 mb-1">Struttura</span>
+            <span className="text-charcoal-dark font-medium text-sm font-ui">{currentProperty?.name ?? "—"}</span>
+          </div>
+          <div>
+            <span className="block text-[11px] uppercase tracking-wider text-charcoal/45 mb-1.5">Reparto</span>
+            {hodDataUnavailable ? (
+              <p className="text-xs font-ui text-alert-red">
+                Non riusciamo a verificare in questo momento a quali reparti sei assegnato.
+                Riprova tra poco; se il problema persiste, avvisa l&apos;Head of Operations.
+              </p>
+            ) : hodSelectableDepartments.length === 0 ? (
+              <p className="text-xs font-ui text-alert-red">
+                Non risulti assegnato in modo operativo a nessun reparto di questa struttura:
+                non puoi ancora creare operatori. Chiedi all&apos;Head of Operations di
+                assegnarti a un reparto.
+              </p>
+            ) : (
+              <div className="grid grid-cols-2 sm:grid-cols-3 gap-1">
+                {hodSelectableDepartments.map((dept) => (
+                  <label key={dept.id} className="flex items-center gap-2 py-1 cursor-pointer">
+                    <input type="checkbox" checked={simpleDepartmentIds.includes(dept.id)}
+                      onChange={() => toggleSimpleDepartment(dept.id)}
+                      className="w-3.5 h-3.5 rounded border-ivory-dark text-terracotta focus:ring-terracotta" />
+                    <span className="text-sm font-ui text-charcoal">{dept.name}</span>
+                  </label>
+                ))}
+              </div>
+            )}
           </div>
           <p className="text-xs font-ui text-sage-light">
-            Sarà un <strong>Operatore</strong> del tuo reparto: legge le procedure e conferma la presa visione.
+            Sarà un <strong>Operatore</strong>: legge le procedure e conferma la presa visione nei reparti scelti.
           </p>
         </section>
       )}
 
-      {/* Veste HM in creazione: struttura e reparto da tendina */}
+      {/* Veste HM in creazione: struttura da tendina, reparti a caselle */}
       {veste === "hm" && isCreate && (
         <section className="bg-ivory-medium border border-ivory-dark p-6 space-y-4">
           <h2 className="text-base font-heading font-semibold text-charcoal-dark">Dove lavorerà</h2>
@@ -652,7 +720,7 @@ export function UserForm({
             <div>
               <label className="block text-sm font-ui font-medium text-charcoal mb-1.5">Struttura</label>
               <select value={simplePropertyId}
-                onChange={(e) => { setSimplePropertyId(e.target.value); setSimpleDepartmentId(""); }}
+                onChange={(e) => { setSimplePropertyId(e.target.value); setSimpleDepartmentIds([]); }}
                 className="w-full sm:max-w-xs text-sm font-ui border border-ivory-dark px-3 py-2.5 bg-white">
                 {properties.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
               </select>
@@ -660,11 +728,17 @@ export function UserForm({
           )}
           <div>
             <label className="block text-sm font-ui font-medium text-charcoal mb-1.5">Reparto</label>
-            <select value={simpleDepartmentId} onChange={(e) => setSimpleDepartmentId(e.target.value)}
-              className="w-full sm:max-w-xs text-sm font-ui border border-ivory-dark px-3 py-2.5 bg-white">
-              <option value="">Scegli il reparto</option>
-              {currentProperty?.departments.map(d => <option key={d.id} value={d.id}>{d.name}</option>)}
-            </select>
+            <p className="text-xs font-ui text-sage-light mb-1.5">Seleziona uno o più reparti:</p>
+            <div className="grid grid-cols-2 sm:grid-cols-3 gap-1">
+              {currentProperty?.departments.map((dept) => (
+                <label key={dept.id} className="flex items-center gap-2 py-1 cursor-pointer">
+                  <input type="checkbox" checked={simpleDepartmentIds.includes(dept.id)}
+                    onChange={() => toggleSimpleDepartment(dept.id)}
+                    className="w-3.5 h-3.5 rounded border-ivory-dark text-terracotta focus:ring-terracotta" />
+                  <span className="text-sm font-ui text-charcoal">{dept.name}</span>
+                </label>
+              ))}
+            </div>
           </div>
         </section>
       )}
