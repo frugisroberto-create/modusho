@@ -13,7 +13,7 @@ import {
   canEditField,
   getAssignableRoles,
   canChangeRole,
-  requiresDemotionNote,
+  isDemotionToOperator,
   canToggleCreateFlag,
   canDeactivateUser,
   canSendActivation,
@@ -335,27 +335,22 @@ describe("user-scope — cambio ruolo", () => {
     expect(canChangeRole(hm, target("OPERATOR"), "CORPORATE").allowed).toBe(false);
   });
 
-  it("la retrocessione da capo reparto a operatore ESIGE la motivazione", () => {
-    expect(requiresDemotionNote("HOD", "OPERATOR")).toBe(true);
-    expect(requiresDemotionNote("OPERATOR", "HOD")).toBe(false);
+  it("la retrocessione da capo reparto a operatore NON esige la motivazione", () => {
+    // La retrocessione resta riconoscibile — è da lì che discendono l'azzera-
+    // mento dei tipi di contenuto e lo spegnimento del flag di creazione — ma
+    // non è più un gate: la motivazione è facoltativa.
+    expect(isDemotionToOperator("HOD", "OPERATOR")).toBe(true);
+    expect(isDemotionToOperator("OPERATOR", "HOD")).toBe(false);
 
     const hm = actor("HOTEL_MANAGER");
     const capo = target("HOD");
 
-    const senzaNota = canChangeRole(hm, capo, "OPERATOR");
-    expect(senzaNota.allowed).toBe(false);
-    if (!senzaNota.allowed) expect(senzaNota.reason).toBe("La motivazione è obbligatoria");
-
-    const notaVuota = canChangeRole(hm, capo, "OPERATOR", "   ");
-    expect(notaVuota.allowed).toBe(false);
-
-    expect(canChangeRole(hm, capo, "OPERATOR", "Torna in sala").allowed).toBe(true);
+    expect(canChangeRole(hm, capo, "OPERATOR").allowed).toBe(true);
   });
 
-  it("l'obbligo di motivazione vale anche per l'ADMIN", () => {
+  it("nemmeno all'ADMIN si chiede più la motivazione", () => {
     const admin = actor("ADMIN");
-    expect(canChangeRole(admin, target("HOD"), "OPERATOR").allowed).toBe(false);
-    expect(canChangeRole(admin, target("HOD"), "OPERATOR", "Riorganizzazione").allowed).toBe(true);
+    expect(canChangeRole(admin, target("HOD"), "OPERATOR").allowed).toBe(true);
   });
 
   it("la promozione a capo reparto non richiede motivazione", () => {

@@ -18,8 +18,9 @@ import {
   getEditableFields,
   getAssignableRoles,
   getRolePresets,
-  requiresDemotionNote,
+  isDemotionToOperator,
 } from "@/lib/user-scope";
+import { getTouchedFields, sameAssignments, sameDepartmentIds } from "@/lib/user-field-touches";
 
 export async function GET(
   request: NextRequest,
@@ -106,7 +107,7 @@ const updateUserSchema = z.object({
     departmentId: z.string().nullable().optional(),
   })).optional(),
   contentTypes: z.array(z.enum(["SOP", "DOCUMENT", "MEMO"])).optional(),
-  /** Motivazione: obbligatoria per la retrocessione HOD → Operatore. */
+  /** Motivazione del cambio di ruolo: facoltativa, finisce a registro. */
   note: z.string().optional(),
 });
 
@@ -140,27 +141,70 @@ export async function PUT(
     targetDepartmentIds, viewDepartmentIds, isActive, propertyAssignments, contentTypes, note,
   } = parsed.data;
 
+  // I valori attuali servono per intero: il perimetro si applica a ciò che
+  // CAMBIA, quindi ogni campo modificabile va confrontato con il suo valore
+  // di adesso — relazioni comprese.
   const current = await prisma.user.findUnique({
     where: { id },
-    select: { role: true, canEdit: true, canApprove: true, email: true, name: true, isActive: true, canCreateUsers: true },
+    select: {
+      role: true, name: true, email: true, isActive: true,
+      canView: true, canEdit: true, canApprove: true, canPublish: true,
+      canCreateUsers: true,
+      targetDepartmentIds: true, viewDepartmentIds: true,
+      propertyAssignments: { select: { propertyId: true, departmentId: true } },
+      contentPermissions: { select: { contentType: true } },
+    },
   });
   if (!current) return NextResponse.json({ error: "Utente non trovato" }, { status: 404 });
 
-  // ─── Perimetro campo per campo: ogni dato toccato dev'essere concesso ───
-  const touches: Array<[boolean, Parameters<typeof canEditField>[2]]> = [
-    [name !== undefined, "name"],
-    [email !== undefined, "email"],
-    [role !== undefined, "role"],
-    [canView !== undefined || canEdit !== undefined || canApprove !== undefined || canPublish !== undefined, "permissionFlags"],
-    [canCreateUsers !== undefined, "canCreateUsers"],
-    [propertyAssignments !== undefined || targetDepartmentIds !== undefined, "departments"],
-    [viewDepartmentIds !== undefined, "viewDepartmentIds"],
-    [contentTypes !== undefined, "contentTypes"],
-    [isActive !== undefined, "isActive"],
-  ];
+  // ─── Cosa è stato toccato davvero ───
+  //
+  // Il form rimanda SEMPRE tutti i campi, anche quelli che nessuno ha
+  // sfiorato: leggere la sola PRESENZA di un campo come volontà di cambiarlo
+  // faceva scattare il perimetro su dati identici. Un Hotel Manager che
+  // promuoveva un operatore a capo reparto si prendeva un 403 sui tipi di
+  // contenuto (concessi solo sugli HOD) e sull'email (concessa solo prima
+  // dell'attivazione) senza aver toccato né gli uni né l'altra.
+  const touched = getTouchedFields(
+    {
+      name, email, role, canView, canEdit, canApprove, canPublish, canCreateUsers,
+      targetDepartmentIds, viewDepartmentIds, isActive, propertyAssignments, contentTypes,
+    },
+    {
+      name: current.name,
+      email: current.email,
+      role: current.role,
+      canView: current.canView,
+      canEdit: current.canEdit,
+      canApprove: current.canApprove,
+      canPublish: current.canPublish,
+      canCreateUsers: current.canCreateUsers,
+      targetDepartmentIds: current.targetDepartmentIds ?? [],
+      viewDepartmentIds: current.viewDepartmentIds ?? [],
+      isActive: current.isActive,
+      // Le due relazioni arrivano sempre valorizzate dalla select qui sopra.
+      // Il fallback tiene il confronto dal lato prudente: senza valore attuale
+      // tutto risulta toccato, quindi il perimetro si applica invece di tacere.
+      propertyAssignments: current.propertyAssignments ?? [],
+      contentTypes: (current.contentPermissions ?? []).map((p) => p.contentType),
+    }
+  );
 
-  for (const [isTouched, field] of touches) {
-    if (!isTouched) continue;
+  const roleChanges = touched.includes("role");
+  const isPromotion = roleChanges && current.role === "OPERATOR" && role === "HOD";
+  const isDemotion = roleChanges && isDemotionToOperator(current.role, role!);
+  // Nei due travasi fra operativo e capo reparto i tipi di contenuto li
+  // riscrive il sistema coi preset del ruolo nuovo: quello che è arrivato
+  // nella richiesta non finisce a database.
+  const presetsOverrideContentTypes = isPromotion || isDemotion;
+
+  // ─── Perimetro campo per campo: ogni dato toccato dev'essere concesso ───
+  for (const field of touched) {
+    // Un dato che il server scrive da sé non si giudica sul ruolo vecchio:
+    // giudicarlo lì significava negare a un Hotel Manager la promozione di un
+    // operatore, perché i tipi di contenuto gli sono concessi solo sugli HOD.
+    if (field === "contentTypes" && presetsOverrideContentTypes) continue;
+
     const verdict = canEditField(actor, target, field);
     if (!verdict.allowed) {
       return NextResponse.json({ error: verdict.reason }, { status: 403 });
@@ -170,9 +214,23 @@ export async function PUT(
   // ─── Perimetro sui VALORI: chi può toccare "departments" può comunque
   // scriverci solo dentro il proprio perimetro. La cancellazione e ricrea-
   // zione delle assegnazioni più sotto non deve mai partire da un valore
-  // fuori raggio: qui si nega PRIMA di qualunque scrittura ───
-  if (propertyAssignments !== undefined) {
-    const assignmentVerdict = await validateAssignments(actor, propertyAssignments, {
+  // fuori raggio: qui si nega PRIMA di qualunque scrittura.
+  //
+  // Anche qui vale il criterio del cambiamento: rimandare indietro le
+  // assegnazioni che l'utente ha già non è assegnarle. Un operatore con una
+  // struttura fuori dal perimetro dell'Hotel Manager resta visibile a
+  // quell'HM (basta un'intersezione), e il form gliela rimanda: giudicarla
+  // ogni volta bloccava salvataggi che non spostavano nessuno ───
+  const assignmentsChanged =
+    propertyAssignments !== undefined &&
+    !sameAssignments(propertyAssignments, current.propertyAssignments ?? []);
+  const viewDeptsChanged = touched.includes("viewDepartmentIds");
+  const targetDeptsChanged =
+    targetDepartmentIds !== undefined &&
+    !sameDepartmentIds(targetDepartmentIds, current.targetDepartmentIds ?? []);
+
+  if (assignmentsChanged) {
+    const assignmentVerdict = await validateAssignments(actor, propertyAssignments!, {
       outsideProperty: "Non puoi assegnare questo utente a una struttura fuori dal tuo perimetro.",
       outsideDepartment: "Non puoi assegnare questo utente a un reparto fuori dal tuo perimetro.",
     });
@@ -181,8 +239,8 @@ export async function PUT(
     }
   }
 
-  if (viewDepartmentIds !== undefined) {
-    const viewDeptVerdict = await validateDepartmentIds(actor, viewDepartmentIds, {
+  if (viewDeptsChanged) {
+    const viewDeptVerdict = await validateDepartmentIds(actor, viewDepartmentIds!, {
       outsideProperty: "Non puoi assegnare visibilità su una struttura fuori dal tuo perimetro.",
       outsideDepartment: "Non puoi assegnare visibilità su un reparto fuori dal tuo perimetro.",
     });
@@ -191,8 +249,8 @@ export async function PUT(
     }
   }
 
-  if (targetDepartmentIds !== undefined) {
-    const targetDeptVerdict = await validateDepartmentIds(actor, targetDepartmentIds, {
+  if (targetDeptsChanged) {
+    const targetDeptVerdict = await validateDepartmentIds(actor, targetDepartmentIds!, {
       outsideProperty: "Non puoi assegnare un reparto destinatario di una struttura fuori dal tuo perimetro.",
       outsideDepartment: "Non puoi assegnare un reparto destinatario fuori dal tuo perimetro.",
     });
@@ -202,17 +260,15 @@ export async function PUT(
   }
 
   // ─── Cambio ruolo ───
-  if (role !== undefined && role !== current.role) {
-    const verdict = canChangeRole(actor, target, role, note);
+  if (roleChanges) {
+    const verdict = canChangeRole(actor, target, role!);
     if (!verdict.allowed) {
-      // La nota mancante è un errore di compilazione, non di permesso.
-      const status = verdict.reason === "La motivazione è obbligatoria" ? 400 : 403;
-      return NextResponse.json({ error: verdict.reason }, { status });
+      return NextResponse.json({ error: verdict.reason }, { status: 403 });
     }
   }
 
   // ─── Flag di creazione utenti ───
-  if (canCreateUsers !== undefined && canCreateUsers !== current.canCreateUsers) {
+  if (touched.includes("canCreateUsers")) {
     const verdict = canToggleCreateFlag(actor, target);
     if (!verdict.allowed) {
       return NextResponse.json({ error: verdict.reason }, { status: 403 });
@@ -220,7 +276,7 @@ export async function PUT(
   }
 
   // ─── Disattivazione ───
-  if (isActive !== undefined && isActive !== current.isActive) {
+  if (touched.includes("isActive")) {
     const verdict = canDeactivateUser(actor, target);
     if (!verdict.allowed) {
       return NextResponse.json({ error: verdict.reason }, { status: 403 });
@@ -238,20 +294,20 @@ export async function PUT(
 
   const isAdminActor = actor.role === "ADMIN" || actor.role === "SUPER_ADMIN";
   const finalRole = role ?? current.role;
-  const isPromotion = role !== undefined && current.role === "OPERATOR" && role === "HOD";
-  const isDemotion = role !== undefined && requiresDemotionNote(current.role, role);
 
+  // Si scrive solo ciò che cambia: un campo rimandato indietro identico non
+  // ha nulla da dire al database.
   const updateData: Record<string, unknown> = {};
-  if (name !== undefined) updateData.name = name.trim();
-  if (normalizedEmail !== undefined) updateData.email = normalizedEmail;
-  if (role !== undefined) updateData.role = role;
-  if (targetDepartmentIds !== undefined) updateData.targetDepartmentIds = targetDepartmentIds;
-  if (viewDepartmentIds !== undefined) updateData.viewDepartmentIds = viewDepartmentIds;
-  if (isActive !== undefined) updateData.isActive = isActive;
-  if (canCreateUsers !== undefined) updateData.canCreateUsers = canCreateUsers;
+  if (touched.includes("name")) updateData.name = name!.trim();
+  if (touched.includes("email")) updateData.email = normalizedEmail;
+  if (roleChanges) updateData.role = role;
+  if (targetDeptsChanged) updateData.targetDepartmentIds = targetDepartmentIds;
+  if (viewDeptsChanged) updateData.viewDepartmentIds = viewDepartmentIds;
+  if (touched.includes("isActive")) updateData.isActive = isActive;
+  if (touched.includes("canCreateUsers")) updateData.canCreateUsers = canCreateUsers;
 
   // I flag di potere li tocca solo chi ne ha titolo.
-  if (isAdminActor) {
+  if (isAdminActor && touched.includes("permissionFlags")) {
     if (canView !== undefined) updateData.canView = canView;
     if (canEdit !== undefined) updateData.canEdit = canEdit;
     if (canApprove !== undefined) updateData.canApprove = canApprove;
@@ -261,8 +317,8 @@ export async function PUT(
   // Il cambio di ruolo riallinea i permessi tramite i preset: chi promuove non
   // sceglie i flag, li riceve dal sistema. canCreateUsers NON è mai automatico.
   let presetContentTypes: string[] | null = null;
-  if (role !== undefined && role !== current.role) {
-    const presets = getRolePresets(role);
+  if (roleChanges) {
+    const presets = getRolePresets(role!);
     updateData.canView = presets.canView;
     updateData.canEdit = presets.canEdit;
     updateData.canApprove = presets.canApprove;
@@ -292,13 +348,13 @@ export async function PUT(
 
   await prisma.user.update({ where: { id }, data: updateData });
 
-  if (propertyAssignments !== undefined) {
+  if (assignmentsChanged) {
     // Cancellazione e ricreazione in una transazione: senza, una create che
     // fallisce a metà lascerebbe l'utente senza alcuna assegnazione — le
     // righe già cancellate non tornerebbero indietro da sole.
     await prisma.$transaction(async (tx) => {
       await tx.propertyAssignment.deleteMany({ where: { userId: id } });
-      for (const a of propertyAssignments) {
+      for (const a of propertyAssignments!) {
         await tx.propertyAssignment.create({
           data: { userId: id, propertyId: a.propertyId, departmentId: a.departmentId || null },
         });
@@ -306,8 +362,9 @@ export async function PUT(
     });
   }
 
-  // I tipi di contenuto seguono il ruolo quando il ruolo cambia.
-  const finalContentTypes = presetContentTypes ?? contentTypes;
+  // I tipi di contenuto seguono il ruolo quando il ruolo cambia. Se il ruolo
+  // resta e l'elenco è identico a quello di adesso, non c'è nulla da riscrivere.
+  const finalContentTypes = presetContentTypes ?? (touched.includes("contentTypes") ? contentTypes : undefined);
   if (finalContentTypes !== undefined && finalContentTypes !== null) {
     await prisma.userContentPermission.deleteMany({ where: { userId: id } });
     for (const ct of finalContentTypes) {
@@ -318,7 +375,7 @@ export async function PUT(
   }
 
   // ─── Registro di governance ───
-  if (role !== undefined && role !== current.role) {
+  if (roleChanges) {
     await recordUserAudit({
       userId: id,
       actorId: actor.id,
@@ -328,7 +385,7 @@ export async function PUT(
     });
   }
 
-  if (canCreateUsers !== undefined && canCreateUsers !== current.canCreateUsers) {
+  if (touched.includes("canCreateUsers")) {
     await recordUserAudit({
       userId: id,
       actorId: actor.id,
@@ -337,7 +394,7 @@ export async function PUT(
     });
   }
 
-  if (isActive !== undefined && isActive !== current.isActive) {
+  if (touched.includes("isActive")) {
     await recordUserAudit({
       userId: id,
       actorId: actor.id,
@@ -348,7 +405,7 @@ export async function PUT(
 
   // ─── Email cambiata prima dell'attivazione: l'invito va rifatto ───
   let inviteResent = false;
-  if (normalizedEmail && normalizedEmail !== current.email) {
+  if (touched.includes("email")) {
     await recordUserAudit({
       userId: id,
       actorId: actor.id,
@@ -375,7 +432,7 @@ export async function PUT(
       const result = await sendEmail(
         buildActivationEmail({
           name: name?.trim() ?? current.name,
-          email: normalizedEmail,
+          email: normalizedEmail!,
           activationUrl: `${getAppUrl()}/attiva/${token}`,
           propertyName: context?.property?.name ?? null,
           departmentName: context?.department?.name ?? null,
