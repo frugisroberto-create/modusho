@@ -112,11 +112,13 @@ async function loadAudienceCandidates(userIds: string[]) {
     where: { id: { in: userIds } },
     select: {
       id: true,
+      role: true,
       propertyAssignments: { select: { departmentId: true } },
     },
   });
   return users.map((u) => ({
     id: u.id,
+    role: u.role,
     departmentIds: u.propertyAssignments
       .map((a) => a.departmentId)
       .filter((id): id is string => id !== null),

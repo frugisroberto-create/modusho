@@ -145,7 +145,7 @@ describe("checkAudienceForUser — CORPORATE", () => {
   it("rifiuta un utente che lavora fuori competenza", async () => {
     corporate([FB1]);
     mockedPrisma.user.findMany.mockResolvedValueOnce([
-      { id: "governante", propertyAssignments: [{ departmentId: PIANI1 }] },
+      { id: "governante", role: "OPERATOR", propertyAssignments: [{ departmentId: PIANI1 }] },
     ] as never);
 
     const verdetto = await checkAudienceForUser(ME, "CORPORATE", P1, {
@@ -161,7 +161,7 @@ describe("checkAudienceForUser — CORPORATE", () => {
   it("accetta un utente del proprio perimetro", async () => {
     corporate([FB1]);
     mockedPrisma.user.findMany.mockResolvedValueOnce([
-      { id: "chef", propertyAssignments: [{ departmentId: FB1 }] },
+      { id: "chef", role: "OPERATOR", propertyAssignments: [{ departmentId: FB1 }] },
     ] as never);
 
     const verdetto = await checkAudienceForUser(ME, "CORPORATE", P1, {
@@ -196,6 +196,60 @@ describe("checkAudienceForUser — CORPORATE", () => {
     });
 
     expect(verdetto).toEqual({ allowed: false, reason: AUDIENCE_MESSAGES.empty });
+  });
+
+  it("un altro referente corporate del proprio reparto non è nominabile", async () => {
+    // Il caso emerso in collaudo: ha davvero assegnazioni operative su quel
+    // reparto, quindi il filtro per reparto lo lasciava passare.
+    corporate([FB1]);
+    mockedPrisma.user.findMany.mockResolvedValueOnce([
+      { id: "altro-corp", role: "CORPORATE", propertyAssignments: [{ departmentId: FB1 }] },
+    ] as never);
+
+    const verdetto = await checkAudienceForUser(ME, "CORPORATE", P1, {
+      allDepartments: false,
+      roles: [],
+      departmentIds: [],
+      userIds: ["altro-corp"],
+    });
+
+    expect(verdetto).toEqual({ allowed: false, reason: AUDIENCE_MESSAGES.userRole });
+  });
+
+  it("un capo reparto del proprio reparto è nominabile", async () => {
+    corporate([FB1]);
+    mockedPrisma.user.findMany.mockResolvedValueOnce([
+      { id: "capo-cucina", role: "HOD", propertyAssignments: [{ departmentId: FB1 }] },
+    ] as never);
+
+    const verdetto = await checkAudienceForUser(ME, "CORPORATE", P1, {
+      allDepartments: false,
+      roles: [],
+      departmentIds: [],
+      userIds: ["capo-cucina"],
+    });
+
+    expect(verdetto).toEqual({ allowed: true });
+  });
+
+  it("il ponte carica il ruolo dei candidati, non solo i reparti", async () => {
+    // Se la select perdesse il ruolo, ogni candidato risulterebbe non
+    // nominabile e il difetto si trasformerebbe in un blocco totale.
+    corporate([FB1]);
+    mockedPrisma.user.findMany.mockResolvedValueOnce([] as never);
+
+    await checkAudienceForUser(ME, "CORPORATE", P1, {
+      allDepartments: false,
+      roles: [],
+      departmentIds: [],
+      userIds: ["chiunque"],
+    });
+
+    expect(mockedPrisma.user.findMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        select: expect.objectContaining({ role: true }),
+      })
+    );
   });
 
   it("un utente sconosciuto al database non è destinabile", async () => {

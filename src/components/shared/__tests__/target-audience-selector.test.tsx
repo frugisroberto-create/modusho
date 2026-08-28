@@ -47,6 +47,13 @@ const USERS = [
     propertyAssignments: [{ department: { id: SALA } }] },
   { id: "u-piani", name: "La Governante", role: "OPERATOR", email: "piani@hotel.it",
     propertyAssignments: [{ department: { id: PIANI } }] },
+  // Nel reparto del perimetro, ma di ruoli che il contenuto lo vedono già.
+  { id: "u-capo", name: "Il Capo Cucina", role: "HOD", email: "capo@hotel.it",
+    propertyAssignments: [{ department: { id: FB } }] },
+  { id: "u-corp", name: "L Altro Corporate", role: "CORPORATE", email: "corp@hotel.it",
+    propertyAssignments: [{ department: { id: FB } }] },
+  { id: "u-dir", name: "Il Direttore", role: "HOTEL_MANAGER", email: "dir@hotel.it",
+    propertyAssignments: [{ department: { id: FB } }] },
 ];
 
 // ─── Le quattro frasi che al di fuori del corporate non devono esistere ─
@@ -154,6 +161,13 @@ describe("Hotel Manager — il pannello resta quello di prima", () => {
     expect(screen.queryByText("Chi Sta Scrivendo")).toBeNull();
   });
 
+  it("continua a vedere anche capi reparto, corporate e direttori: la regola sul ruolo non lo tocca", async () => {
+    await montaPannello({ userRole: "HOTEL_MANAGER" });
+    expect(screen.getByText("Il Capo Cucina")).toBeTruthy();
+    expect(screen.getByText("L Altro Corporate")).toBeTruthy();
+    expect(screen.getByText("Il Direttore")).toBeTruthy();
+  });
+
   it("con «Tutti gli operatori» già scelto non gli compare nessun avviso di destinatari ereditati", async () => {
     await montaPannello({
       userRole: "HOTEL_MANAGER",
@@ -256,6 +270,21 @@ describe("Referente corporate — il perimetro morde, e si vede", () => {
     expect(screen.getByText("Il Maitre")).toBeTruthy();
     expect(screen.queryByText("La Governante")).toBeNull();
     expect(screen.queryByText("Chi Sta Scrivendo")).toBeNull();
+  });
+
+  it("non può nominare un altro corporate né un direttore, anche se lavorano nel suo reparto", async () => {
+    // La lacuna emersa in collaudo: il perimetro era per reparto e mai per
+    // ruolo, e quelle persone il contenuto lo vedono già.
+    await montaPannello({ userRole: "CORPORATE", allowedDepartmentIds: [FB, SALA] });
+
+    expect(screen.queryByText("L Altro Corporate")).toBeNull();
+    expect(screen.queryByText("Il Direttore")).toBeNull();
+  });
+
+  it("il capo reparto del proprio reparto resta nominabile", async () => {
+    await montaPannello({ userRole: "CORPORATE", allowedDepartmentIds: [FB, SALA] });
+
+    expect(screen.getByText("Il Capo Cucina")).toBeTruthy();
   });
 
   it("senza competenze in questa struttura non ripiega su tutti i reparti: si ferma e lo dice", async () => {
