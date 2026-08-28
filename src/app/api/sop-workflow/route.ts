@@ -5,6 +5,7 @@ import { prisma } from "@/lib/prisma";
 import { checkAccess, canUserManageContentType } from "@/lib/rbac";
 import { resolveRaciRoles, needsReview } from "@/lib/sop-workflow";
 import { checkAudienceForUser } from "@/lib/target-audience-scope-db";
+import { validateAccountableProposal } from "@/lib/accountable-scope-db";
 import { z } from "zod/v4";
 
 // ─── GET: lista bozze SOP in cui l'utente e' coinvolto come R/C/A ────
@@ -290,40 +291,23 @@ export async function POST(request: NextRequest) {
     hmUserId = hm.userId;
   }
 
-  if (!hooUserId) {
-    // A = chi approva. Priorità:
-    // 1. Se chi crea è CORPORATE con canApprove → lui stesso
-    // 2. Se chi crea è ADMIN/SUPER_ADMIN → lui stesso
-    // 3. Cerca CORPORATE con canApprove assegnato al reparto specifico
-    // 4. Fallback: primo ADMIN assegnato alla property
-    if (role === "CORPORATE" && session.user.canApprove) {
-      hooUserId = userId;
-    } else if (role === "ADMIN" || role === "SUPER_ADMIN") {
-      hooUserId = userId;
-    } else {
-      // Cerca un CORPORATE con canApprove per il reparto specifico
-      const corporate = await prisma.propertyAssignment.findFirst({
-        where: {
-          propertyId: data.propertyId,
-          departmentId: data.departmentId,
-          user: { role: "CORPORATE", canApprove: true, isActive: true },
-        },
-        select: { userId: true },
-      });
-      if (corporate) {
-        hooUserId = corporate.userId;
-      } else {
-        // Fallback: primo ADMIN assegnato alla property
-        const hoo = await prisma.propertyAssignment.findFirst({
-          where: { propertyId: data.propertyId, user: { role: { in: ["ADMIN", "SUPER_ADMIN"] }, isActive: true } },
-          select: { userId: true },
-        });
-        if (!hoo) {
-          return NextResponse.json({ error: "Nessun Accountable trovato per questa struttura/reparto" }, { status: 400 });
-        }
-        hooUserId = hoo.userId;
-      }
+  // A = chi approva. Chi apre la SOP lo nomina, non un automatismo:
+  //   CORPORATE  → è sempre l'Accountable di sé stesso. Nessuna scelta:
+  //                un eventuale hooUserId in arrivo dal client si ignora.
+  //   ADMIN/SUPER_ADMIN → restano self-accountable (regola già esistente).
+  //   HOD/HOTEL_MANAGER → l'Accountable è obbligatorio e va validato contro
+  //                la rosa di accountable-scope.ts: un ADMIN della struttura,
+  //                o un utente con canApprove per quel reparto.
+  if (role === "CORPORATE") {
+    hooUserId = userId;
+  } else if (role === "ADMIN" || role === "SUPER_ADMIN") {
+    if (!hooUserId) hooUserId = userId;
+  } else {
+    const verdict = await validateAccountableProposal(hooUserId, data.propertyId, data.departmentId);
+    if (!verdict.allowed) {
+      return NextResponse.json({ error: verdict.reason }, { status: 400 });
     }
+    hooUserId = verdict.accountableId;
   }
 
   // HOD coinvolto: se involveHod=true serve hodUserId
