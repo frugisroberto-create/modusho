@@ -1,6 +1,12 @@
 "use client";
 
 import { useState, useEffect, useRef } from "react";
+import type { Role } from "@prisma/client";
+import {
+  canTargetEveryone,
+  canTargetRoles,
+  filterTargetableUsers,
+} from "@/lib/target-audience-scope";
 
 interface Department {
   id: string;
@@ -13,6 +19,17 @@ interface User {
   name: string;
   role: string;
   email: string;
+  /** Reparti su cui l'utente è assegnato — servono a giudicarne la destinabilità. */
+  departmentIds: string[];
+}
+
+/** La forma con cui gli utenti arrivano da /api/users. */
+interface ApiUser {
+  id: string;
+  name: string;
+  role: string;
+  email: string;
+  propertyAssignments?: { department?: { id: string } | null }[];
 }
 
 export type TargetRole = "OPERATOR" | "HOD" | "HOTEL_MANAGER";
@@ -27,8 +44,16 @@ export interface TargetAudienceState {
 interface TargetAudienceSelectorProps {
   propertyId: string;
   userRole: string;                   // ruolo dell'utente che sta creando
+  /** Chi sta scrivendo: non compare mai fra i destinatari proponibili. */
+  currentUserId: string;
   userDepartmentId?: string | null;
-  allowedDepartmentIds?: string[];    // se valorizzato, mostra solo questi reparti come destinatari
+  /**
+   * Il perimetro dei reparti destinabili, già risolto da
+   * `target-audience-scope`. `undefined` = nessuna restrizione. Un array
+   * VUOTO è una restrizione che non lascia passare nulla: non si ripiega
+   * sull'elenco completo, si dice che non c'è niente da destinare.
+   */
+  allowedDepartmentIds?: string[];
   value: TargetAudienceState;
   onChange: (value: TargetAudienceState) => void;
 }
@@ -42,12 +67,19 @@ const ROLE_LABELS: Record<TargetRole, string> = {
 export function TargetAudienceSelector({
   propertyId,
   userRole,
+  currentUserId,
   userDepartmentId: _userDepartmentId,
   allowedDepartmentIds,
   value,
   onChange,
 }: TargetAudienceSelectorProps) {
   void _userDepartmentId; // legacy prop kept for backward compat
+  // `undefined` = nessuna restrizione. Distinguerlo dall'array vuoto è tutto il
+  // punto: prima un perimetro vuoto veniva letto come "nessun filtro".
+  const perimeter: string[] | null = allowedDepartmentIds ?? null;
+  const restricted = perimeter !== null;
+  const showEveryone = canTargetEveryone(userRole as Role);
+  const showRoles = canTargetRoles(userRole as Role);
   const [departments, setDepartments] = useState<Department[]>([]);
   const [myDepartments, setMyDepartments] = useState<Department[]>([]);
   const [users, setUsers] = useState<User[]>([]);
@@ -66,24 +98,27 @@ export function TargetAudienceSelector({
         ]);
         if (deptRes.ok) {
           const j = await deptRes.json();
-          const allDepts = j.data || [];
-          setDepartments(allowedDepartmentIds?.length
-            ? allDepts.filter((d: Department) => allowedDepartmentIds.includes(d.id))
-            : allDepts
+          const allDepts: Department[] = j.data || [];
+          setDepartments(perimeter === null
+            ? allDepts
+            : allDepts.filter((d) => perimeter.includes(d.id))
           );
         }
         if (usersRes.ok) {
           const j = await usersRes.json();
-          let userList = j.data || [];
-          // CORPORATE: filtra utenti solo dei reparti nel perimetro
-          if (allowedDepartmentIds?.length) {
-            userList = userList.filter((u: { propertyAssignments?: { department?: { id: string } | null }[] }) =>
-              u.propertyAssignments?.some((a: { department?: { id: string } | null }) =>
-                a.department && allowedDepartmentIds.includes(a.department.id)
-              )
-            );
-          }
-          setUsers(userList);
+          const apiUsers: ApiUser[] = j.data || [];
+          const candidates: User[] = apiUsers.map((u) => ({
+            id: u.id,
+            name: u.name,
+            role: u.role,
+            email: u.email,
+            departmentIds: (u.propertyAssignments ?? [])
+              .map((a) => a.department?.id)
+              .filter((id): id is string => Boolean(id)),
+          }));
+          // Chi scrive esce sempre dall'elenco; il perimetro, quando c'è,
+          // toglie anche chi lavora fuori dai reparti di competenza.
+          setUsers(filterTargetableUsers(currentUserId, candidates, perimeter));
         }
         if (myDeptsRes.ok) {
           const j = await myDeptsRes.json();
@@ -92,7 +127,8 @@ export function TargetAudienceSelector({
       } finally { setLoading(false); }
     }
     if (propertyId) load();
-  }, [propertyId]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [propertyId, currentUserId, allowedDepartmentIds?.join(",")]);
 
   // HOD: ruolo limitato — può creare contenuti solo per i propri reparti accessibili.
   // Auto-preseleziona tutti i suoi reparti la prima volta.
@@ -192,6 +228,23 @@ export function TargetAudienceSelector({
     value.roles.length +
     value.userIds.length;
 
+  // Un contenuto già esistente può portarsi dietro destinatari che chi lo sta
+  // aprendo non potrebbe più scegliere (li ha messi un ADMIN, o li ha lasciati
+  // il difetto che questa modifica chiude). Non si toccano da soli: si mostrano
+  // per quello che sono, con il modo di levarli. Cambiare i destinatari di una
+  // SOP alle spalle di chi la apre sarebbe peggio del difetto.
+  const strandedEveryone = value.allDepartments && !showEveryone;
+  const strandedRoles = showRoles ? [] : value.roles;
+  const strandedDepartments = perimeter === null
+    ? []
+    : value.departmentIds.filter((id) => !perimeter.includes(id));
+  const hasStranded = strandedEveryone || strandedRoles.length > 0 || strandedDepartments.length > 0;
+
+  const dropEveryone = () => onChange({ ...value, allDepartments: false });
+  const dropRoles = () => onChange({ ...value, roles: [] });
+  const dropStrandedDepartments = () =>
+    onChange({ ...value, departmentIds: value.departmentIds.filter((id) => !strandedDepartments.includes(id)) });
+
   if (loading) return <div className="text-sm text-charcoal/40 font-ui">Caricamento destinatari...</div>;
 
   return (
@@ -200,6 +253,37 @@ export function TargetAudienceSelector({
       <p className="text-xs text-charcoal/45 -mt-3">
         Seleziona uno o più tipi di destinatari. Il contenuto sarà visibile a chi corrisponde ad almeno una delle scelte.
       </p>
+
+      {/* Destinatari che questo contenuto ha ma che chi lo apre non può scegliere */}
+      {hasStranded && (
+        <div className="border-l-4 border-alert-red bg-ivory-medium/50 px-3 py-2.5 space-y-1.5">
+          <p className="text-xs font-ui text-charcoal">
+            Questo contenuto è rivolto anche a destinatari fuori dai reparti di tua competenza.
+            Finché restano, il salvataggio verrà rifiutato. Toglili qui sotto, oppure chiedi a un
+            amministratore di intervenire se devono rimanere.
+          </p>
+          <div className="flex flex-wrap gap-1.5">
+            {strandedEveryone && (
+              <button type="button" onClick={dropEveryone}
+                className="text-[11px] font-ui font-medium px-2 py-1 bg-alert-red/10 text-alert-red rounded hover:bg-alert-red/20 transition-colors">
+                Tutti gli operatori ×
+              </button>
+            )}
+            {strandedRoles.length > 0 && (
+              <button type="button" onClick={dropRoles}
+                className="text-[11px] font-ui font-medium px-2 py-1 bg-alert-red/10 text-alert-red rounded hover:bg-alert-red/20 transition-colors">
+                {strandedRoles.length === 1 ? "Ruolo trasversale" : `${strandedRoles.length} ruoli trasversali`} ×
+              </button>
+            )}
+            {strandedDepartments.length > 0 && (
+              <button type="button" onClick={dropStrandedDepartments}
+                className="text-[11px] font-ui font-medium px-2 py-1 bg-alert-red/10 text-alert-red rounded hover:bg-alert-red/20 transition-colors">
+                {strandedDepartments.length === 1 ? "1 reparto" : `${strandedDepartments.length} reparti`} fuori competenza ×
+              </button>
+            )}
+          </div>
+        </div>
+      )}
 
       {/* Selection summary — always visible */}
       {totalSelected > 0 && (
@@ -230,8 +314,8 @@ export function TargetAudienceSelector({
         </div>
       )}
 
-      {/* SEZIONE 1 — Tutti gli operatori (nascosta per CORPORATE) */}
-      {userRole !== "CORPORATE" && (
+      {/* SEZIONE 1 — Tutti gli operatori (chi ha perimetro ristretto non ce l'ha) */}
+      {showEveryone && (
         <div>
           <label className="flex items-center gap-3 py-2.5 px-3 border border-ivory-dark cursor-pointer hover:bg-ivory-medium/30 transition-colors">
             <input type="checkbox" checked={value.allDepartments} onChange={toggleAllDepartments} className="w-4 h-4 accent-terracotta" />
@@ -246,6 +330,11 @@ export function TargetAudienceSelector({
       {/* SEZIONE 2 — Reparti specifici */}
       <div>
         <p className="text-xs font-ui font-semibold uppercase tracking-wider text-charcoal/70 mb-1.5">Reparti</p>
+        {restricted && (
+          <p className="text-xs font-ui text-charcoal/45 mb-1.5">
+            Sono elencati soltanto i reparti di tua competenza.
+          </p>
+        )}
         <div className="border border-ivory-dark divide-y divide-ivory-dark/50 max-h-[200px] overflow-y-auto">
           {departments.map((dept) => {
             const coveredByAll = value.allDepartments;
@@ -265,13 +354,17 @@ export function TargetAudienceSelector({
             );
           })}
           {departments.length === 0 && (
-            <p className="px-3 py-2 text-xs font-ui text-charcoal/40 italic">Nessun reparto configurato</p>
+            <p className="px-3 py-2 text-xs font-ui text-charcoal/40 italic">
+              {restricted
+                ? "In questa struttura non hai reparti di tua competenza: chiedi all'amministratore di assegnarteli."
+                : "Nessun reparto configurato"}
+            </p>
           )}
         </div>
       </div>
 
-      {/* SEZIONE 3 — Ruoli trasversali (nascosta per CORPORATE) */}
-      {userRole !== "CORPORATE" && (
+      {/* SEZIONE 3 — Ruoli trasversali (chi ha perimetro ristretto non li ha) */}
+      {showRoles && (
         <div>
           <p className="text-xs font-ui font-semibold uppercase tracking-wider text-charcoal/70 mb-1.5">Ruoli trasversali</p>
           <div className="border border-ivory-dark divide-y divide-ivory-dark/50">

@@ -6,6 +6,7 @@ import { getAccessiblePropertyIds, getAccessibleDepartmentIds, checkAccess, canU
 import { changeContentStatus } from "@/lib/content-status";
 import { getSubmitTargetStatus } from "@/lib/content-workflow";
 import { sendContentPublishedPush } from "@/lib/push-notification";
+import { checkAudienceForUser } from "@/lib/target-audience-scope-db";
 import { z } from "zod/v4";
 
 const contentQuerySchema = z.object({
@@ -284,6 +285,19 @@ export async function POST(request: NextRequest) {
   const hasAccess = await checkAccess(userId, "HOD", propertyId, departmentId ?? undefined);
   if (!hasAccess) {
     return NextResponse.json({ error: "Accesso negato a questa property/reparto" }, { status: 403 });
+  }
+
+  // Perimetro dei destinatari: la regola vive in target-audience-scope.ts e
+  // qui si chiama soltanto. Per HOD, HM, ADMIN e SUPER_ADMIN esce subito
+  // concedendo, senza una query in più.
+  const audience = await checkAudienceForUser(userId, propertyId, {
+    allDepartments: parsed.data.targetAllDepartments,
+    roles: parsed.data.targetRoles,
+    departmentIds: parsed.data.targetDepartmentIds,
+    userIds: parsed.data.targetUserIds,
+  });
+  if (!audience.allowed) {
+    return NextResponse.json({ error: audience.reason }, { status: 403 });
   }
 
   // Validazione server-side: publishDirectly

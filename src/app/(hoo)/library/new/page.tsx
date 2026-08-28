@@ -10,7 +10,7 @@ interface Property { id: string; name: string; code: string; departments: { id: 
 
 export default function NewDocumentPage() {
   const router = useRouter();
-  const { userRole } = useHooContext();
+  const { userRole, userId, targetableDepartmentIds } = useHooContext();
 
   const [title, setTitle] = useState("");
   const [body, setBody] = useState("");
@@ -142,6 +142,8 @@ export default function NewDocumentPage() {
           <TargetAudienceSelector
             propertyId={propertyId}
             userRole={userRole}
+            currentUserId={userId}
+            allowedDepartmentIds={targetableDepartmentIds ?? undefined}
             value={targetAudience}
             onChange={setTargetAudience}
           />

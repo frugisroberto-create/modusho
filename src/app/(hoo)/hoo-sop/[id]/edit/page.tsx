@@ -53,6 +53,7 @@ export default async function EditSopPage({ params }: Props) {
           departmentId: content.departmentId,
         }}
         userRole={user.role}
+        currentUserId={user.id}
         userDepartmentIds={userDepartmentIds}
         userTargetDepartmentIds={userTargetDepartmentIds}
       />

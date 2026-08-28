@@ -2,6 +2,8 @@ import { redirect } from "next/navigation";
 import { getSessionUser, getUserProperties } from "@/lib/session";
 import { prisma } from "@/lib/prisma";
 import { HooShell } from "@/components/hoo/hoo-shell";
+import { loadAudienceActor } from "@/lib/target-audience-scope-db";
+import { getTargetableDepartmentIds } from "@/lib/target-audience-scope";
 
 export default async function HooLayout({
   children,
@@ -30,10 +32,20 @@ export default async function HooLayout({
     properties = await getUserProperties(user.id);
   }
 
+  // Il perimetro dei destinatari, risolto una volta sola per tutta la shell.
+  // I moduli di creazione lo passano al selettore, così l'elenco che si vede è
+  // esattamente quello che le rotte accetteranno.
+  const audienceActor = await loadAudienceActor(user.id);
+  const targetableDepartmentIds = audienceActor
+    ? getTargetableDepartmentIds(audienceActor)
+    : [];
+
   return (
     <HooShell
       userName={user.name}
       userRole={user.role}
+      userId={user.id}
+      targetableDepartmentIds={targetableDepartmentIds}
       canEdit={user.canEdit}
       properties={properties}
     >

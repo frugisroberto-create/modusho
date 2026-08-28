@@ -4,6 +4,7 @@ import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { SopEditor } from "@/components/shared/sop-editor";
 import { TargetAudienceSelector, type TargetAudienceState, type TargetRole } from "@/components/shared/target-audience-selector";
+import { useHooContext } from "@/components/hoo/hoo-shell";
 
 interface Property { id: string; name: string; code: string; departments: { id: string; name: string; code: string }[] }
 
@@ -19,6 +20,9 @@ interface BookFormProps {
 
 export function BookForm({ mode, contentType, backPath, contentId, initialData, canDelete, userRole = "ADMIN" }: BookFormProps) {
   const router = useRouter();
+  // Brand e Standard Book sono roba da ADMIN: il perimetro qui non morde mai,
+  // ma chi scrive resta comunque fuori dai destinatari.
+  const { userId, targetableDepartmentIds } = useHooContext();
   const [title, setTitle] = useState(initialData?.title ?? "");
   const [body, setBody] = useState(initialData?.body ?? "");
   const [propertyId, setPropertyId] = useState(initialData?.propertyId ?? "");
@@ -189,6 +193,8 @@ export function BookForm({ mode, contentType, backPath, contentId, initialData, 
           <TargetAudienceSelector
             propertyId={propertyId}
             userRole={userRole}
+            currentUserId={userId}
+            allowedDepartmentIds={targetableDepartmentIds ?? undefined}
             value={targetAudience}
             onChange={setTargetAudience}
           />

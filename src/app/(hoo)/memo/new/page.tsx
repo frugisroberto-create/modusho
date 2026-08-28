@@ -9,7 +9,7 @@ interface Property { id: string; name: string; code: string }
 
 export default function NewMemoPage() {
   const router = useRouter();
-  const { userRole } = useHooContext();
+  const { userRole, userId, targetableDepartmentIds } = useHooContext();
 
   const [title, setTitle] = useState("");
   const [body, setBody] = useState("");
@@ -119,6 +119,8 @@ export default function NewMemoPage() {
             <TargetAudienceSelector
               propertyId={propertyId}
               userRole={userRole}
+              currentUserId={userId}
+              allowedDepartmentIds={targetableDepartmentIds ?? undefined}
               value={targetAudience}
               onChange={setTargetAudience}
             />

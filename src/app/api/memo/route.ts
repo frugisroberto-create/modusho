@@ -4,6 +4,7 @@ import { authOptions } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { getAccessiblePropertyIds, getAccessibleDepartmentIds, checkAccess, canUserManageContentType } from "@/lib/rbac";
 import { sendContentPublishedPush } from "@/lib/push-notification";
+import { checkAudienceForUser } from "@/lib/target-audience-scope-db";
 import { z } from "zod/v4";
 
 const memoQuerySchema = z.object({
@@ -161,6 +162,19 @@ export async function POST(request: NextRequest) {
   // Accesso minimo HOD alla property
   const hasAccess = await checkAccess(userId, "HOD", propertyId);
   if (!hasAccess) return NextResponse.json({ error: "Accesso negato" }, { status: 403 });
+
+  // Perimetro dei destinatari: la regola vive in target-audience-scope.ts e
+  // qui si chiama soltanto. Per HOD, HM, ADMIN e SUPER_ADMIN concede senza
+  // guardare nulla — la restrizione dell'HOD qui sotto resta quella di sempre.
+  const audience = await checkAudienceForUser(userId, propertyId, {
+    allDepartments: targetAllDepartments,
+    roles: targetRoles,
+    departmentIds: targetDepartmentIds,
+    userIds: targetUserIds,
+  });
+  if (!audience.allowed) {
+    return NextResponse.json({ error: audience.reason }, { status: 403 });
+  }
 
   // Restrizione HOD: può targettare solo i propri reparti, niente ruoli/utenti/all
   if (role === "HOD") {

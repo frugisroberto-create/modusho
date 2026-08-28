@@ -2,6 +2,8 @@
 
 import { useState, useEffect, useRef } from "react";
 import { useRouter } from "next/navigation";
+import type { Role } from "@prisma/client";
+import { canTargetEveryone, getTargetableDepartmentIds } from "@/lib/target-audience-scope";
 import { TargetAudienceSelector, type TargetAudienceState, type TargetRole } from "@/components/shared/target-audience-selector";
 import { AttachmentUploader } from "@/components/shared/attachment-uploader";
 import { SopEditor } from "@/components/shared/sop-editor";
@@ -18,21 +20,35 @@ interface SopFormProps {
   contentId?: string;
   initialData?: { title: string; body: string; propertyId: string; departmentId: string | null };
   userRole?: string;
+  /** Chi sta scrivendo: non compare mai fra i destinatari proponibili. */
+  currentUserId: string;
   userDepartmentId?: string | null;
   userDepartmentIds?: string[];
   userTargetDepartmentIds?: string[];
 }
 
-export function SopForm({ mode, contentId, initialData, userRole, userDepartmentId, userDepartmentIds, userTargetDepartmentIds }: SopFormProps) {
+export function SopForm({ mode, contentId, initialData, userRole, currentUserId, userDepartmentId, userDepartmentIds, userTargetDepartmentIds }: SopFormProps) {
   const router = useRouter();
   const effectiveRole = userRole || "OPERATOR";
+
+  // Il perimetro dei destinatari, chiesto al modulo che lo definisce.
+  // `null` = nessuna restrizione; un array vuoto è una restrizione che non
+  // lascia passare nulla, e va tenuto distinto da "nessun filtro".
+  const audiencePerimeter = getTargetableDepartmentIds({
+    id: currentUserId,
+    role: effectiveRole as Role,
+    targetDepartmentIds: userTargetDepartmentIds ?? [],
+    assignedDepartmentIds: userDepartmentIds ?? [],
+  });
 
   const [title, setTitle] = useState(initialData?.title || "");
   const [body, setBody] = useState(initialData?.body || "");
   const [propertyId, setPropertyId] = useState(initialData?.propertyId || "");
   const [departmentId, setDepartmentId] = useState(initialData?.departmentId || "");
   const [targetAudience, setTargetAudience] = useState<TargetAudienceState>({
-    allDepartments: !initialData?.departmentId,
+    // Nascondere un interruttore acceso lo rende obbligatorio: chi non può
+    // usare "Tutti gli operatori" non deve nemmeno partire con quello acceso.
+    allDepartments: canTargetEveryone(effectiveRole as Role) && !initialData?.departmentId,
     departmentIds: initialData?.departmentId ? [initialData.departmentId] : [],
     roles: [],
     userIds: [],
@@ -158,14 +174,10 @@ export function SopForm({ mode, contentId, initialData, userRole, userDepartment
     : (effectiveRole === "CORPORATE" && userDepartmentIds?.length)
       ? allDepartments.filter(d => userDepartmentIds.includes(d.id))
       : allDepartments;
-  // Destinatari: CORPORATE con targetDepartmentIds → solo quei reparti (della property corrente). Altrimenti tutti.
-  const departments = (effectiveRole === "CORPORATE" && userTargetDepartmentIds?.length)
-    ? allDepartments.filter(d => userTargetDepartmentIds.includes(d.id))
-    : allDepartments;
-  // Se il filtro non trova nessun reparto della property corrente, mostra tutti (fallback)
-  const effectiveDepartments = (effectiveRole === "CORPORATE" && userTargetDepartmentIds?.length && departments.length === 0)
-    ? allDepartments
-    : departments;
+  // I destinatari li elenca il selettore, filtrando per `audiencePerimeter`.
+  // Qui non si ricalcola nulla: il ripiego che mostrava TUTTI i reparti quando
+  // il perimetro non intersecava la struttura è stato tolto — un perimetro
+  // vuoto deve chiudere, non aprire.
 
   const totalTargets =
     (targetAudience.allDepartments ? 1 : 0) +
@@ -447,7 +459,8 @@ export function SopForm({ mode, contentId, initialData, userRole, userDepartment
           propertyId={propertyId}
           userRole={effectiveRole}
           userDepartmentId={userDepartmentId}
-          allowedDepartmentIds={effectiveRole === "CORPORATE" && userTargetDepartmentIds?.length ? userTargetDepartmentIds : undefined}
+          currentUserId={currentUserId}
+          allowedDepartmentIds={audiencePerimeter ?? undefined}
           value={targetAudience}
           onChange={(next) => { setTargetAudience(next); setDirty(true); }}
         />
