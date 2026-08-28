@@ -4,6 +4,7 @@ import { useState, useEffect, useRef } from "react";
 import { useRouter } from "next/navigation";
 import type { Role } from "@prisma/client";
 import { canTargetEveryone, getTargetableDepartmentIds } from "@/lib/target-audience-scope";
+import { requiresAccountableSelection, hasSingleCandidate, ACCOUNTABLE_MESSAGES } from "@/lib/accountable-scope";
 import { TargetAudienceSelector, type TargetAudienceState, type TargetRole } from "@/components/shared/target-audience-selector";
 import { AttachmentUploader } from "@/components/shared/attachment-uploader";
 import { SopEditor } from "@/components/shared/sop-editor";
@@ -78,6 +79,14 @@ export function SopForm({ mode, contentId, initialData, userRole, currentUserId,
   const [hodUserId, setHodUserId] = useState("");
   const [hodUsers, setHodUsers] = useState<{ id: string; name: string }[]>([]);
 
+  // RACI: chi sarà l'Accountable? Solo HOD e HOTEL_MANAGER scelgono — il
+  // CORPORATE è sempre l'Accountable di sé stesso, ADMIN/SUPER_ADMIN restano
+  // self-accountable. La rosa e la regola sono in accountable-scope.ts.
+  const showAccountableSelector = mode === "create" && requiresAccountableSelection(effectiveRole as Role);
+  const [accountableId, setAccountableId] = useState("");
+  const [accountableCandidates, setAccountableCandidates] = useState<{ id: string; name: string }[]>([]);
+  const [accountableLoading, setAccountableLoading] = useState(false);
+
   // Fetch properties
   useEffect(() => {
     async function fetchProps() {
@@ -129,6 +138,35 @@ export function SopForm({ mode, contentId, initialData, userRole, currentUserId,
     fetchHods();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [canInvolveHod, propertyId, effectiveRole, userDepartmentIds]);
+
+  // Fetch della rosa Accountable per la struttura + reparto scelti. Un solo
+  // candidato si preseleziona (non è una domanda); due o più lasciano il
+  // campo vuoto — la SOP non si crea finché non è scelto.
+  useEffect(() => {
+    if (!showAccountableSelector || !propertyId || !departmentId || isAllProperties) {
+      setAccountableCandidates([]);
+      setAccountableId("");
+      return;
+    }
+    let cancelled = false;
+    setAccountableLoading(true);
+    async function fetchCandidates() {
+      try {
+        const res = await fetch(`/api/sop-workflow/accountable-candidates?propertyId=${propertyId}&departmentId=${departmentId}`);
+        if (res.ok && !cancelled) {
+          const json = await res.json();
+          const list: { id: string; name: string }[] = json.data || [];
+          setAccountableCandidates(list);
+          setAccountableId(hasSingleCandidate(list) ? list[0].id : "");
+        }
+      } finally {
+        if (!cancelled) setAccountableLoading(false);
+      }
+    }
+    fetchCandidates();
+    return () => { cancelled = true; };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [showAccountableSelector, propertyId, departmentId, isAllProperties]);
 
   // In edit mode, load existing targets (tutti i tipi: ROLE, DEPARTMENT, USER)
   useEffect(() => {
@@ -202,6 +240,10 @@ export function SopForm({ mode, contentId, initialData, userRole, currentUserId,
       setError("Seleziona l'HOD da coinvolgere");
       return false;
     }
+    if (showAccountableSelector && !accountableId) {
+      setError(ACCOUNTABLE_MESSAGES.required);
+      return false;
+    }
     return true;
   };
 
@@ -229,6 +271,7 @@ export function SopForm({ mode, contentId, initialData, userRole, currentUserId,
           title, body, propertyId, departmentId,
           involveHod,
           ...(involveHod && hodUserId ? { hodUserId } : {}),
+          ...(showAccountableSelector && accountableId ? { hooUserId: accountableId } : {}),
           targetAllDepartments: targetAudience.allDepartments,
           targetDepartmentIds: targetAudience.departmentIds,
           targetRoles: targetAudience.roles,
@@ -355,7 +398,8 @@ export function SopForm({ mode, contentId, initialData, userRole, currentUserId,
     router.refresh();
   };
 
-  const isValid = title.trim() && body.trim() && propertyId && departmentId && (isAllProperties || totalTargets > 0);
+  const isValid = title.trim() && body.trim() && propertyId && departmentId && (isAllProperties || totalTargets > 0)
+    && (!showAccountableSelector || Boolean(accountableId));
 
   return (
     <div className="max-w-3xl space-y-6">
@@ -378,6 +422,7 @@ export function SopForm({ mode, contentId, initialData, userRole, currentUserId,
               setTargetAudience({ allDepartments: false, departmentIds: [], roles: [], userIds: [] });
               setInvolveHod(false);
               setHodUserId("");
+              setAccountableId("");
               if (newPropId === "__ALL__") {
                 setDepartmentId("");
               } else {
@@ -416,6 +461,30 @@ export function SopForm({ mode, contentId, initialData, userRole, currentUserId,
               <option value="">Seleziona reparto proprietario</option>
               {creatableDepartments.map(d => <option key={d.id} value={d.id}>{d.name} ({d.code})</option>)}
             </select>
+          </div>
+        )}
+
+        {/* Accountable: obbligatorio per HOD/HOTEL_MANAGER. Il CORPORATE è
+            sempre l'Accountable di sé stesso e non vede questo campo. */}
+        {showAccountableSelector && propertyId && departmentId && !isAllProperties && (
+          <div>
+            <label className="block text-sm font-ui font-medium text-charcoal mb-1.5">Accountable</label>
+            <p className="text-xs font-ui text-charcoal/45 mb-2">
+              Chi darà l&apos;approvazione finale della SOP: un Amministratore della struttura, o una persona abilitata all&apos;approvazione per questo reparto.
+            </p>
+            {accountableLoading ? (
+              <p className="text-xs font-ui text-charcoal/40">Caricamento candidati...</p>
+            ) : accountableCandidates.length === 1 ? (
+              <p className="w-full text-sm font-ui text-charcoal-dark bg-ivory border border-ivory-dark px-4 py-3">
+                {accountableCandidates[0].name}
+              </p>
+            ) : (
+              <select value={accountableId} onChange={(e) => { setAccountableId(e.target.value); setDirty(true); }}
+                className="w-full">
+                <option value="">Seleziona Accountable</option>
+                {accountableCandidates.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
+              </select>
+            )}
           </div>
         )}
 
@@ -521,6 +590,7 @@ export function SopForm({ mode, contentId, initialData, userRole, currentUserId,
           {!propertyId && <p>— Seleziona una struttura</p>}
           {!departmentId && <p>— Seleziona il reparto della SOP</p>}
           {!isAllProperties && totalTargets === 0 && <p>— Seleziona almeno un destinatario</p>}
+          {showAccountableSelector && !accountableId && <p>— Seleziona l&apos;Accountable</p>}
         </div>
       )}
 
