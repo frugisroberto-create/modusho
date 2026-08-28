@@ -327,16 +327,22 @@ export function getAssignableRoles(actor: ScopeActor, target: ScopeTarget): Role
   return [];
 }
 
-/** Una retrocessione da capo reparto a operatore esige sempre una motivazione. */
-export function requiresDemotionNote(fromRole: Role, toRole: Role): boolean {
+/**
+ * La retrocessione da capo reparto a operatore.
+ *
+ * È il travaso che porta con sé conseguenze automatiche: i tipi di contenuto
+ * si azzerano e il flag di creazione utenti si spegne. La motivazione NON è
+ * più un requisito — resta facoltativa e finisce a registro insieme
+ * all'annotazione automatica del cambio di ruolo.
+ */
+export function isDemotionToOperator(fromRole: Role, toRole: Role): boolean {
   return fromRole === "HOD" && toRole === "OPERATOR";
 }
 
 export function canChangeRole(
   actor: ScopeActor,
   target: ScopeTarget,
-  newRole: Role,
-  note?: string | null
+  newRole: Role
 ): ScopeResult {
   if (newRole === target.role) return ALLOW;
 
@@ -346,10 +352,6 @@ export function canChangeRole(
   }
   if (!assignable.includes(newRole)) {
     return deny("Non puoi assegnare questo ruolo.");
-  }
-
-  if (requiresDemotionNote(target.role, newRole) && !note?.trim()) {
-    return deny("La motivazione è obbligatoria");
   }
 
   return ALLOW;
