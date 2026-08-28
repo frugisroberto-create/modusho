@@ -53,33 +53,39 @@ describe("checkAudienceForUser — HOD, HM, ADMIN, SUPER_ADMIN invariati", () =>
 
   for (const role of roles) {
     it(`${role}: concede qualunque proposta, compresi ruoli trasversali e sé stesso`, async () => {
-      mockedPrisma.user.findUnique.mockResolvedValueOnce(dbUser(role, [FB1], [FB1]) as never);
-
-      const verdetto = await checkAudienceForUser(ME, P1, EVERYTHING);
+      const verdetto = await checkAudienceForUser(ME, role, P1, EVERYTHING);
 
       expect(verdetto).toEqual({ allowed: true });
     });
 
-    it(`${role}: non interroga nemmeno reparti e destinatari — nessun costo, nessun giudizio nuovo`, async () => {
-      mockedPrisma.user.findUnique.mockResolvedValueOnce(dbUser(role, [FB1], [FB1]) as never);
+    it(`${role}: non tocca il database — nemmeno per sapere chi è`, async () => {
+      await checkAudienceForUser(ME, role, P1, EVERYTHING);
 
-      await checkAudienceForUser(ME, P1, EVERYTHING);
-
-      // Una sola query: quella che carica l'attore. Se un giorno queste due
-      // aspettative cadranno, vorrà dire che il controllo ha iniziato a
-      // guardare dentro le proposte di ruoli che non deve giudicare.
+      // Zero letture. È la garanzia che conta: questa funzione sta sul
+      // percorso di tutti, e su chi non ha un perimetro deve passare senza
+      // che accada niente. Nessuna riga letta significa nessuna riga da cui
+      // possa uscire un verdetto — compreso il "negato" di un utente non
+      // trovato, che a un Hotel Manager non deve poter capitare.
+      expect(mockedPrisma.user.findUnique).not.toHaveBeenCalled();
       expect(mockedPrisma.department.findMany).not.toHaveBeenCalled();
       expect(mockedPrisma.user.findMany).not.toHaveBeenCalled();
+    });
+
+    it(`${role}: nemmeno un database che risponde male lo blocca`, async () => {
+      // Il caso che fa danno in silenzio: se il controllo leggesse la riga
+      // utente e non la trovasse, risponderebbe "negato" a chi con questo
+      // perimetro non c'entra nulla. Qui la riga non esiste, e non importa.
+      mockedPrisma.user.findUnique.mockResolvedValue(null as never);
+
+      const verdetto = await checkAudienceForUser(ME, role, P1, EVERYTHING);
+
+      expect(verdetto).toEqual({ allowed: true });
     });
   }
 
   it("un HOTEL_MANAGER con targetDepartmentIds valorizzati resta senza restrizione", async () => {
     // Il campo esiste su ogni utente: non deve iniziare a mordere qui.
-    mockedPrisma.user.findUnique.mockResolvedValueOnce(
-      dbUser("HOTEL_MANAGER", [FB1], [FB1]) as never
-    );
-
-    const verdetto = await checkAudienceForUser(ME, P1, {
+    const verdetto = await checkAudienceForUser(ME, "HOTEL_MANAGER", P1, {
       allDepartments: false,
       roles: [],
       departmentIds: [PIANI1],
@@ -102,7 +108,7 @@ describe("checkAudienceForUser — CORPORATE", () => {
 
   it("accetta i reparti di competenza", async () => {
     corporate([FB1, SALA1]);
-    const verdetto = await checkAudienceForUser(ME, P1, {
+    const verdetto = await checkAudienceForUser(ME, "CORPORATE", P1, {
       allDepartments: false,
       roles: [],
       departmentIds: [FB1, SALA1],
@@ -114,7 +120,7 @@ describe("checkAudienceForUser — CORPORATE", () => {
 
   it("rifiuta «Tutti gli operatori»", async () => {
     corporate([FB1]);
-    const verdetto = await checkAudienceForUser(ME, P1, {
+    const verdetto = await checkAudienceForUser(ME, "CORPORATE", P1, {
       allDepartments: true,
       roles: [],
       departmentIds: [],
@@ -126,7 +132,7 @@ describe("checkAudienceForUser — CORPORATE", () => {
 
   it("rifiuta un reparto fuori competenza", async () => {
     corporate([FB1]);
-    const verdetto = await checkAudienceForUser(ME, P1, {
+    const verdetto = await checkAudienceForUser(ME, "CORPORATE", P1, {
       allDepartments: false,
       roles: [],
       departmentIds: [PIANI1],
@@ -142,7 +148,7 @@ describe("checkAudienceForUser — CORPORATE", () => {
       { id: "governante", propertyAssignments: [{ departmentId: PIANI1 }] },
     ] as never);
 
-    const verdetto = await checkAudienceForUser(ME, P1, {
+    const verdetto = await checkAudienceForUser(ME, "CORPORATE", P1, {
       allDepartments: false,
       roles: [],
       departmentIds: [],
@@ -158,7 +164,7 @@ describe("checkAudienceForUser — CORPORATE", () => {
       { id: "chef", propertyAssignments: [{ departmentId: FB1 }] },
     ] as never);
 
-    const verdetto = await checkAudienceForUser(ME, P1, {
+    const verdetto = await checkAudienceForUser(ME, "CORPORATE", P1, {
       allDepartments: false,
       roles: [],
       departmentIds: [],
@@ -170,7 +176,7 @@ describe("checkAudienceForUser — CORPORATE", () => {
 
   it("reparti destinabili VUOTI: vale l'assegnazione, non la struttura intera", async () => {
     corporate([], [SALA1]);
-    const verdetto = await checkAudienceForUser(ME, P1, {
+    const verdetto = await checkAudienceForUser(ME, "CORPORATE", P1, {
       allDepartments: false,
       roles: [],
       departmentIds: [SALA1, PIANI1],
@@ -182,7 +188,7 @@ describe("checkAudienceForUser — CORPORATE", () => {
 
   it("nessuna competenza in questa struttura: si chiude, non si apre", async () => {
     corporate([], []);
-    const verdetto = await checkAudienceForUser(ME, P1, {
+    const verdetto = await checkAudienceForUser(ME, "CORPORATE", P1, {
       allDepartments: false,
       roles: [],
       departmentIds: [FB1],
@@ -196,7 +202,7 @@ describe("checkAudienceForUser — CORPORATE", () => {
     corporate([FB1]);
     mockedPrisma.user.findMany.mockResolvedValueOnce([] as never);
 
-    const verdetto = await checkAudienceForUser(ME, P1, {
+    const verdetto = await checkAudienceForUser(ME, "CORPORATE", P1, {
       allDepartments: false,
       roles: [],
       departmentIds: [],
@@ -211,7 +217,7 @@ describe("checkAudienceForUser — attore inesistente", () => {
   it("non concede nulla", async () => {
     mockedPrisma.user.findUnique.mockResolvedValueOnce(null as never);
 
-    const verdetto = await checkAudienceForUser("ignoto", P1, EVERYTHING);
+    const verdetto = await checkAudienceForUser("ignoto", "CORPORATE", P1, EVERYTHING);
 
     expect(verdetto.allowed).toBe(false);
   });

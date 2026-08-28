@@ -258,7 +258,7 @@ export async function POST(request: NextRequest) {
   // Perimetro dei destinatari: la regola vive in target-audience-scope.ts e
   // qui si chiama soltanto. Per HOD, HM, ADMIN e SUPER_ADMIN esce subito
   // concedendo, senza una query in piu'.
-  const audience = await checkAudienceForUser(userId, data.propertyId, {
+  const audience = await checkAudienceForUser(userId, role, data.propertyId, {
     allDepartments: data.targetAllDepartments,
     roles: data.targetRoles,
     departmentIds: data.targetDepartmentIds,

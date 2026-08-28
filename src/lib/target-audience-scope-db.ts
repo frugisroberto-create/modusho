@@ -8,6 +8,7 @@
  * Stessa divisione già adottata da `user-scope.ts` / `user-scope-db.ts`.
  */
 
+import type { Role } from "@prisma/client";
 import { prisma } from "./prisma";
 import {
   checkAudienceProposal,
@@ -75,18 +76,27 @@ async function loadPropertyDepartmentIds(propertyId: string): Promise<string[]> 
 /**
  * Il giudizio che ogni rotta chiama prima di scrivere i `ContentTarget`.
  *
- * Per chi non ha perimetro ristretto esce subito, senza toccare il database:
- * HOD, Hotel Manager, ADMIN e SUPER_ADMIN non pagano nemmeno una query in più
- * e attraversano questa funzione come se non ci fosse.
+ * Il ruolo si passa dall'esterno, e si guarda PRIMA di toccare il database.
+ * È deliberato: questa funzione sta sul percorso di tutti, e chi non ha un
+ * perimetro deve attraversarla senza che accada niente — nessuna lettura,
+ * nessuna riga da cui possa arrivare un verdetto. Caricare l'attore e poi
+ * scoprire il ruolo significherebbe che una riga utente non trovata risponde
+ * "negato" anche a un Hotel Manager, che con questo perimetro non c'entra.
+ *
+ * Il ruolo di sessione è quello giusto da guardare: il callback JWT lo rilegge
+ * dal database a ogni rinnovo del token (`src/lib/auth.ts`), ed è lo stesso
+ * valore su cui si reggono già tutti gli altri cancelli di queste rotte.
  */
 export async function checkAudienceForUser(
   userId: string,
+  role: Role,
   propertyId: string,
   proposal: AudienceProposal
 ): Promise<AudienceVerdict> {
+  if (!hasRestrictedAudience(role)) return { allowed: true };
+
   const actor = await loadAudienceActor(userId);
   if (!actor) return { allowed: false, reason: "Utente non trovato" };
-  if (!hasRestrictedAudience(actor.role)) return { allowed: true };
 
   const [propertyDepartmentIds, candidates] = await Promise.all([
     loadPropertyDepartmentIds(propertyId),

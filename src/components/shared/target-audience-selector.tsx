@@ -6,6 +6,7 @@ import {
   canTargetEveryone,
   canTargetRoles,
   filterTargetableUsers,
+  hasRestrictedAudience,
 } from "@/lib/target-audience-scope";
 
 interface Department {
@@ -49,9 +50,12 @@ interface TargetAudienceSelectorProps {
   userDepartmentId?: string | null;
   /**
    * Il perimetro dei reparti destinabili, già risolto da
-   * `target-audience-scope`. `undefined` = nessuna restrizione. Un array
-   * VUOTO è una restrizione che non lascia passare nulla: non si ripiega
-   * sull'elenco completo, si dice che non c'è niente da destinare.
+   * `target-audience-scope`. Un array VUOTO è una restrizione che non lascia
+   * passare nulla: non si ripiega sull'elenco completo, si dice che non c'è
+   * niente da destinare.
+   *
+   * Vale SOLO per i ruoli che un perimetro ce l'hanno. Su tutti gli altri
+   * questa prop viene ignorata di proposito — vedi sotto.
    */
   allowedDepartmentIds?: string[];
   value: TargetAudienceState;
@@ -74,12 +78,21 @@ export function TargetAudienceSelector({
   onChange,
 }: TargetAudienceSelectorProps) {
   void _userDepartmentId; // legacy prop kept for backward compat
-  // `undefined` = nessuna restrizione. Distinguerlo dall'array vuoto è tutto il
-  // punto: prima un perimetro vuoto veniva letto come "nessun filtro".
-  const perimeter: string[] | null = allowedDepartmentIds ?? null;
-  const restricted = perimeter !== null;
-  const showEveryone = canTargetEveryone(userRole as Role);
-  const showRoles = canTargetRoles(userRole as Role);
+  // Chi è ristretto lo decide il ruolo, non ciò che arriva dalle prop.
+  //
+  // Questo componente è uno solo per tutti i ruoli, e sta sul percorso di
+  // tutti: un perimetro passato per sbaglio a un Hotel Manager gli toglierebbe
+  // dei reparti senza dire niente, e un'assenza non la segnala nessuno. Quindi
+  // la prop non ha il potere di restringere chi il perimetro non ce l'ha: su
+  // quei ruoli viene ignorata.
+  //
+  // Distinguere l'array vuoto da "nessun filtro" resta l'altro cardine: prima
+  // un perimetro vuoto veniva letto come "mostra tutto".
+  const role = userRole as Role;
+  const restricted = hasRestrictedAudience(role);
+  const perimeter: string[] | null = restricted ? (allowedDepartmentIds ?? []) : null;
+  const showEveryone = canTargetEveryone(role);
+  const showRoles = canTargetRoles(role);
   const [departments, setDepartments] = useState<Department[]>([]);
   const [myDepartments, setMyDepartments] = useState<Department[]>([]);
   const [users, setUsers] = useState<User[]>([]);
@@ -253,6 +266,18 @@ export function TargetAudienceSelector({
       <p className="text-xs text-charcoal/45 -mt-3">
         Seleziona uno o più tipi di destinatari. Il contenuto sarà visibile a chi corrisponde ad almeno una delle scelte.
       </p>
+
+      {/* Le due sezioni che mancano si dicono, non si lasciano mancare in
+          silenzio. Un'assenza non la segnala nessuno: la si aggira, o si pensa
+          di aver capito male. Una frase sbagliata, invece, si vede subito — e
+          se questa comparisse a un Hotel Manager sarebbe palesemente falsa. */}
+      {restricted && (
+        <p className="text-xs font-ui text-charcoal/55 border-l-2 border-terracotta/40 pl-2.5">
+          Come referente corporate ti rivolgi ai reparti di tua competenza e alle persone che
+          vi lavorano. «Tutti gli operatori» e i ruoli trasversali non sono fra le tue scelte:
+          per questo qui sotto non li trovi.
+        </p>
+      )}
 
       {/* Destinatari che questo contenuto ha ma che chi lo apre non può scegliere */}
       {hasStranded && (

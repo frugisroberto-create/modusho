@@ -128,3 +128,37 @@ describe("le regole degli altri ruoli restano dove sono sempre state", () => {
     expect(code).toContain('if (role === "HOD" && data.involveHod)');
   });
 });
+
+describe("il selettore dei destinatari è uno solo per tutti i ruoli", () => {
+  const SELECTOR = "src/components/shared/target-audience-selector.tsx";
+
+  it("decide chi è ristretto dal ruolo, non da ciò che gli passano", () => {
+    // Un perimetro passato per errore a un Hotel Manager gli toglierebbe dei
+    // reparti in silenzio. Il componente non deve avere quel potere: la prop
+    // vale solo su chi un perimetro ce l'ha davvero.
+    const code = source(SELECTOR);
+    expect(code).toContain("const restricted = hasRestrictedAudience(role);");
+    expect(code).toContain(
+      "const perimeter: string[] | null = restricted ? (allowedDepartmentIds ?? []) : null;"
+    );
+  });
+
+  it("non nasconde niente in silenzio: dice perché le sezioni mancano", () => {
+    // Un'assenza non la segnala nessuno. Una frase, se comparisse al ruolo
+    // sbagliato, sarebbe palesemente falsa e verrebbe riferita subito.
+    const code = source(SELECTOR);
+    expect(code).toContain("Come referente corporate ti rivolgi ai reparti di tua competenza");
+    expect(code).toContain("per questo qui sotto non li trovi");
+  });
+
+  it("le sezioni riservate le governa il perimetro, non un confronto scritto a mano", () => {
+    const code = source(SELECTOR);
+    expect(code).toContain("const showEveryone = canTargetEveryone(role);");
+    expect(code).toContain("const showRoles = canTargetRoles(role);");
+    const handWritten = code
+      .split("\n")
+      .filter((line) => !line.trim().startsWith("//") && !line.trim().startsWith("*"))
+      .filter((line) => line.includes('"CORPORATE"'));
+    expect(handWritten).toEqual([]);
+  });
+});

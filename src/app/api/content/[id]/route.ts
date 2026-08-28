@@ -196,7 +196,7 @@ export async function PUT(
     parsed.data.targetUserIds !== undefined;
 
   if ((content.status === "DRAFT" || content.status === "RETURNED") && hasTargetUpdate) {
-    const audience = await checkAudienceForUser(userId, content.propertyId, {
+    const audience = await checkAudienceForUser(userId, role, content.propertyId, {
       allDepartments: parsed.data.targetAllDepartments ?? false,
       roles: parsed.data.targetRoles ?? [],
       departmentIds: parsed.data.targetDepartmentIds ?? [],
