@@ -9,6 +9,7 @@ import {
   isTargetableUser,
   filterTargetableUsers,
   checkAudienceProposal,
+  isNominableUserRole,
   AUDIENCE_MESSAGES,
   type AudienceActor,
   type AudienceProposal,
@@ -49,6 +50,11 @@ function headOfFb(overrides: Partial<AudienceActor> = {}): AudienceActor {
 
 function proposal(overrides: Partial<AudienceProposal> = {}): AudienceProposal {
   return { allDepartments: false, roles: [], departmentIds: [], userIds: [], ...overrides };
+}
+
+/** Un candidato destinatario. Operatore, salvo diversa indicazione. */
+function persona(id: string, departmentIds: string[], role: Role = "OPERATOR") {
+  return { id, role, departmentIds };
 }
 
 function context(overrides: Partial<AudienceContext> = {}): AudienceContext {
@@ -143,37 +149,81 @@ describe("canTargetEveryone / canTargetRoles", () => {
 
 describe("isTargetableUser", () => {
   it("chi scrive non è mai destinabile, nemmeno senza perimetro", () => {
-    expect(isTargetableUser(ME, { id: ME, departmentIds: [FB1] }, [FB1])).toBe(false);
-    expect(isTargetableUser(ME, { id: ME, departmentIds: [FB1] }, null)).toBe(false);
+    expect(isTargetableUser(ME, persona(ME, [FB1]), [FB1])).toBe(false);
+    expect(isTargetableUser(ME, persona(ME, [FB1]), null)).toBe(false);
   });
 
   it("dentro il perimetro passa", () => {
-    expect(isTargetableUser(ME, { id: "u1", departmentIds: [SALA1] }, [FB1, SALA1])).toBe(true);
+    expect(isTargetableUser(ME, persona("u1", [SALA1]), [FB1, SALA1])).toBe(true);
   });
 
   it("fuori dal perimetro non passa", () => {
-    expect(isTargetableUser(ME, { id: "u1", departmentIds: [PIANI1] }, [FB1, SALA1])).toBe(false);
+    expect(isTargetableUser(ME, persona("u1", [PIANI1]), [FB1, SALA1])).toBe(false);
   });
 
   it("basta un reparto in comune", () => {
-    expect(isTargetableUser(ME, { id: "u1", departmentIds: [PIANI1, FB1] }, [FB1])).toBe(true);
+    expect(isTargetableUser(ME, persona("u1", [PIANI1, FB1]), [FB1])).toBe(true);
   });
 
   it("senza reparti assegnati non passa quando c'è un perimetro", () => {
-    expect(isTargetableUser(ME, { id: "u1", departmentIds: [] }, [FB1])).toBe(false);
+    expect(isTargetableUser(ME, persona("u1", []), [FB1])).toBe(false);
   });
 
   it("senza perimetro passa chiunque tranne chi scrive", () => {
-    expect(isTargetableUser(ME, { id: "u1", departmentIds: [] }, null)).toBe(true);
+    expect(isTargetableUser(ME, persona("u1", []), null)).toBe(true);
+  });
+
+  // Il perimetro era definito per reparto e mai per ruolo: un altro referente
+  // corporate con assegnazioni operative sui reparti giusti passava. Il
+  // contenuto lo vede già — nominarlo aggiungeva una riga falsa nel registro
+  // delle prese visione.
+  it("dentro il perimetro, un OPERATOR è nominabile", () => {
+    expect(isTargetableUser(ME, persona("chef", [FB1], "OPERATOR"), [FB1])).toBe(true);
+  });
+
+  it("dentro il perimetro, un HOD è nominabile", () => {
+    expect(isTargetableUser(ME, persona("capo", [FB1], "HOD"), [FB1])).toBe(true);
+  });
+
+  it("dentro il perimetro, un altro CORPORATE NON è nominabile", () => {
+    expect(isTargetableUser(ME, persona("altro-corp", [FB1], "CORPORATE"), [FB1])).toBe(false);
+  });
+
+  it("dentro il perimetro, un HOTEL_MANAGER NON è nominabile", () => {
+    expect(isTargetableUser(ME, persona("direttore", [FB1], "HOTEL_MANAGER"), [FB1])).toBe(false);
+  });
+
+  it("dentro il perimetro, ADMIN e SUPER_ADMIN NON sono nominabili", () => {
+    expect(isTargetableUser(ME, persona("hoo", [FB1], "ADMIN"), [FB1])).toBe(false);
+    expect(isTargetableUser(ME, persona("tecnico", [FB1], "SUPER_ADMIN"), [FB1])).toBe(false);
+  });
+
+  it("senza perimetro tutti e quattro i ruoli restano nominabili", () => {
+    // La regola sul ruolo è una conseguenza del perimetro ristretto: chi non
+    // ce l'ha non deve perdere una sola riga dal proprio elenco.
+    for (const role of ["OPERATOR", "HOD", "CORPORATE", "HOTEL_MANAGER"] as Role[]) {
+      expect(isTargetableUser(ME, persona("x", [FB1], role), null), `ruolo ${role}`).toBe(true);
+    }
+  });
+});
+
+describe("isNominableUserRole", () => {
+  it("operatori e capi reparto sì, chi dirige no", () => {
+    expect(isNominableUserRole("OPERATOR")).toBe(true);
+    expect(isNominableUserRole("HOD")).toBe(true);
+    expect(isNominableUserRole("CORPORATE")).toBe(false);
+    expect(isNominableUserRole("HOTEL_MANAGER")).toBe(false);
+    expect(isNominableUserRole("ADMIN")).toBe(false);
+    expect(isNominableUserRole("SUPER_ADMIN")).toBe(false);
   });
 });
 
 describe("filterTargetableUsers", () => {
   const people = [
-    { id: ME, departmentIds: [FB1] },
-    { id: "chef", departmentIds: [FB1] },
-    { id: "cameriere", departmentIds: [SALA1] },
-    { id: "governante", departmentIds: [PIANI1] },
+    persona(ME, [FB1]),
+    persona("chef", [FB1]),
+    persona("cameriere", [SALA1]),
+    persona("governante", [PIANI1]),
   ];
 
   it("il CORPORATE vede solo il proprio perimetro, sé stesso escluso", () => {
@@ -188,6 +238,32 @@ describe("filterTargetableUsers", () => {
 
   it("perimetro vuoto: nessuno", () => {
     expect(filterTargetableUsers(ME, people, [])).toEqual([]);
+  });
+
+  it("dal perimetro ristretto spariscono i ruoli che il contenuto lo vedono già", () => {
+    const misti = [
+      persona("chef", [FB1], "OPERATOR"),
+      persona("capo-cucina", [FB1], "HOD"),
+      persona("altro-corp", [FB1], "CORPORATE"),
+      persona("direttore", [FB1], "HOTEL_MANAGER"),
+      persona("hoo", [FB1], "ADMIN"),
+    ];
+    const result = filterTargetableUsers(ME, misti, [FB1]);
+    expect(result.map((p) => p.id)).toEqual(["chef", "capo-cucina"]);
+  });
+
+  it("senza perimetro quell'elenco non perde nessuno", () => {
+    const misti = [
+      persona("chef", [FB1], "OPERATOR"),
+      persona("capo-cucina", [FB1], "HOD"),
+      persona("altro-corp", [FB1], "CORPORATE"),
+      persona("direttore", [FB1], "HOTEL_MANAGER"),
+      persona("hoo", [FB1], "ADMIN"),
+    ];
+    const result = filterTargetableUsers(ME, misti, null);
+    expect(result.map((p) => p.id)).toEqual([
+      "chef", "capo-cucina", "altro-corp", "direttore", "hoo",
+    ]);
   });
 });
 
@@ -232,7 +308,7 @@ describe("checkAudienceProposal — CORPORATE", () => {
     const verdict = checkAudienceProposal(
       headOfFb(),
       proposal({ userIds: ["governante"] }),
-      context({ candidates: [{ id: "governante", departmentIds: [PIANI1] }] })
+      context({ candidates: [persona("governante", [PIANI1])] })
     );
     expect(verdict).toEqual({ allowed: false, reason: AUDIENCE_MESSAGES.users });
   });
@@ -241,7 +317,7 @@ describe("checkAudienceProposal — CORPORATE", () => {
     const verdict = checkAudienceProposal(
       headOfFb(),
       proposal({ userIds: ["chef"] }),
-      context({ candidates: [{ id: "chef", departmentIds: [FB1] }] })
+      context({ candidates: [persona("chef", [FB1])] })
     );
     expect(verdict).toEqual({ allowed: true });
   });
@@ -255,11 +331,39 @@ describe("checkAudienceProposal — CORPORATE", () => {
     expect(verdict).toEqual({ allowed: false, reason: AUDIENCE_MESSAGES.users });
   });
 
+  it("rifiuta un altro referente corporate, e lo dice con la frase giusta", () => {
+    // Lavora davvero in quel reparto: dirgli che non ci lavora sarebbe falso.
+    const verdict = checkAudienceProposal(
+      headOfFb(),
+      proposal({ userIds: ["altro-corp"] }),
+      context({ candidates: [persona("altro-corp", [FB1], "CORPORATE")] })
+    );
+    expect(verdict).toEqual({ allowed: false, reason: AUDIENCE_MESSAGES.userRole });
+  });
+
+  it("rifiuta un Hotel Manager con la stessa frase", () => {
+    const verdict = checkAudienceProposal(
+      headOfFb(),
+      proposal({ userIds: ["direttore"] }),
+      context({ candidates: [persona("direttore", [FB1], "HOTEL_MANAGER")] })
+    );
+    expect(verdict).toEqual({ allowed: false, reason: AUDIENCE_MESSAGES.userRole });
+  });
+
+  it("accetta un capo reparto del perimetro", () => {
+    const verdict = checkAudienceProposal(
+      headOfFb(),
+      proposal({ userIds: ["capo-cucina"] }),
+      context({ candidates: [persona("capo-cucina", [FB1], "HOD")] })
+    );
+    expect(verdict).toEqual({ allowed: true });
+  });
+
   it("rifiuta chi scrive fra i destinatari", () => {
     const verdict = checkAudienceProposal(
       headOfFb(),
       proposal({ userIds: [ME] }),
-      context({ candidates: [{ id: ME, departmentIds: [FB1] }] })
+      context({ candidates: [persona(ME, [FB1], "CORPORATE")] })
     );
     expect(verdict).toEqual({ allowed: false, reason: AUDIENCE_MESSAGES.self });
   });

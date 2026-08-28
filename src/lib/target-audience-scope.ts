@@ -58,9 +58,10 @@ export interface AudienceProposal {
   userIds: string[];
 }
 
-/** Un utente proposto come destinatario, con i reparti su cui è assegnato. */
+/** Un utente proposto come destinatario, con ruolo e reparti su cui è assegnato. */
 export interface AudienceCandidate {
   id: string;
+  role: Role;
   departmentIds: string[];
 }
 
@@ -68,7 +69,7 @@ export interface AudienceCandidate {
 export interface AudienceContext {
   /** Tutti i reparti della struttura del contenuto. */
   propertyDepartmentIds: string[];
-  /** I soli utenti nominati in `proposal.userIds`, con i loro reparti. */
+  /** I soli utenti nominati in `proposal.userIds`, con ruolo e reparti. */
   candidates: AudienceCandidate[];
 }
 
@@ -92,6 +93,8 @@ export const AUDIENCE_MESSAGES = {
     "Uno o più reparti destinatari non rientrano fra i reparti di tua competenza.",
   users:
     "Uno o più destinatari non lavorano nei reparti di tua competenza.",
+  userRole:
+    "Fra i destinatari puoi indicare gli operatori e i capi reparto. Chi dirige la struttura, l'amministrazione e gli altri referenti corporate il contenuto lo vedono già, e indicarli falserebbe il conteggio delle prese visione.",
   self:
     "Non puoi indicare te stesso fra i destinatari del contenuto.",
   empty:
@@ -158,6 +161,24 @@ export function canTargetRoles(role: Role): boolean {
 // ─── Gli utenti destinabili ──────────────────────────────────────────
 
 /**
+ * I ruoli che chi ha perimetro ristretto può nominare come «utente specifico».
+ *
+ * Fuori restano Hotel Manager, ADMIN, SUPER_ADMIN e gli altri referenti
+ * corporate. Non è una questione di reparto — un altro corporate può benissimo
+ * avere assegnazioni operative sui reparti giusti — è che quelle persone il
+ * contenuto lo vedono già: l'Hotel Manager e l'ADMIN hanno accesso a tutta la
+ * struttura, un corporate ai propri reparti. Nominarle non aggiunge un
+ * destinatario: aggiunge una riga falsa nel registro di chi doveva leggere, e
+ * quel registro è la misura su cui si giudica l'adozione.
+ */
+const NOMINABILI_DA_PERIMETRO_RISTRETTO: Role[] = ["OPERATOR", "HOD"];
+
+/** Il ruolo è fra quelli nominabili come «utente specifico»? */
+export function isNominableUserRole(role: Role): boolean {
+  return NOMINABILI_DA_PERIMETRO_RISTRETTO.includes(role);
+}
+
+/**
  * Un utente è destinabile?
  *
  * Chi scrive non è mai destinabile: destinare a sé stessi una procedura di cui
@@ -166,7 +187,8 @@ export function canTargetRoles(role: Role): boolean {
  * il solo CORPORATE.
  *
  * `perimeter` è il valore di `getTargetableDepartmentIdsInProperty`: `null`
- * lascia passare chiunque, un elenco chiede almeno un reparto in comune.
+ * lascia passare chiunque, un elenco chiede il reparto in comune E un ruolo
+ * fra quelli nominabili.
  */
 export function isTargetableUser(
   actorId: string,
@@ -175,6 +197,7 @@ export function isTargetableUser(
 ): boolean {
   if (candidate.id === actorId) return false;
   if (perimeter === null) return true;
+  if (!isNominableUserRole(candidate.role)) return false;
   return candidate.departmentIds.some((id) => perimeter.includes(id));
 }
 
@@ -225,6 +248,10 @@ export function checkAudienceProposal(
     // Un utente che il ponte non ha trovato è fuori dalla struttura o non
     // esiste: in nessuno dei due casi è destinabile.
     if (!candidate) return deny(AUDIENCE_MESSAGES.users);
+    // Due motivi diversi meritano due frasi diverse: dire "non lavora nei tuoi
+    // reparti" a chi ci lavora davvero manderebbe il direttore a cercare un
+    // problema che non c'è.
+    if (!isNominableUserRole(candidate.role)) return deny(AUDIENCE_MESSAGES.userRole);
     if (!isTargetableUser(actor.id, candidate, perimeter)) return deny(AUDIENCE_MESSAGES.users);
   }
 

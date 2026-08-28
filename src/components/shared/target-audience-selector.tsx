@@ -18,7 +18,7 @@ interface Department {
 interface User {
   id: string;
   name: string;
-  role: string;
+  role: Role;
   email: string;
   /** Reparti su cui l'utente è assegnato — servono a giudicarne la destinabilità. */
   departmentIds: string[];
@@ -28,7 +28,7 @@ interface User {
 interface ApiUser {
   id: string;
   name: string;
-  role: string;
+  role: Role;
   email: string;
   propertyAssignments?: { department?: { id: string } | null }[];
 }
