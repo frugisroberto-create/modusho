@@ -102,6 +102,27 @@ describe("le regole degli altri ruoli restano dove sono sempre state", () => {
     expect(verdict - branch).toBeLessThan(200);
   });
 
+  it("la shell HOO non fa pagare il perimetro a chi non ce l'ha", () => {
+    // Il layout copre ogni pagina della zona: una lettura incondizionata
+    // sarebbe una query in più su ogni schermata, per quattro ruoli su cinque,
+    // per scoprire che non c'è nessuna restrizione.
+    const code = source("src/app/(hoo)/layout.tsx");
+    const gate = code.indexOf("hasRestrictedAudience(user.role)");
+    const load = code.indexOf("loadAudienceActor(user.id)");
+    expect(gate).toBeGreaterThan(-1);
+    expect(load).toBeGreaterThan(gate);
+    expect(load - gate).toBeLessThan(120);
+  });
+
+  it("la shell HOO legge la riga utente una volta sola, per ogni ruolo", () => {
+    // Dove il perimetro serve, la sua lettura È la verifica che l'account
+    // esista: le due letture non devono tornare a essere due.
+    const code = source("src/app/(hoo)/layout.tsx");
+    const reads = code.split("prisma.user.findUnique").length - 1;
+    expect(reads).toBe(1);
+    expect(code).toContain("accountStillExists");
+  });
+
   it("POST /api/sop-workflow conserva intatto il divieto all'HOD di coinvolgere un altro HOD", () => {
     const code = source(ROUTES["POST /api/sop-workflow"]);
     expect(code).toContain('if (role === "HOD" && data.involveHod)');
