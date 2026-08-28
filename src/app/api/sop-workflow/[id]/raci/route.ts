@@ -3,6 +3,7 @@ import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { checkAccess } from "@/lib/rbac";
+import { validateAccountableProposal } from "@/lib/accountable-scope-db";
 import { z } from "zod/v4";
 
 type RouteParams = { params: Promise<{ id: string }> };
@@ -53,7 +54,7 @@ export async function PUT(request: NextRequest, { params }: RouteParams) {
       accountableId: true,
       submittedToC: true,
       submittedToA: true,
-      content: { select: { status: true, propertyId: true } },
+      content: { select: { status: true, propertyId: true, departmentId: true } },
     },
   });
 
@@ -99,6 +100,21 @@ export async function PUT(request: NextRequest, { params }: RouteParams) {
     return NextResponse.json({
       error: "Uno o più utenti non sono assegnati a questa struttura",
     }, { status: 400 });
+  }
+
+  // L'Accountable non è una qualunque persona assegnata alla struttura: deve
+  // essere un candidato legittimo secondo la stessa rosa della creazione
+  // (accountable-scope.ts) — un ADMIN/SUPER_ADMIN della struttura, o un utente
+  // con canApprove per quel preciso reparto. R e C restano sulla sola verifica
+  // di assegnazione alla struttura, sopra: qui si aggiunge un vincolo in più
+  // per A, non si tocca nulla di ciò che vale per R e C.
+  const accountableVerdict = await validateAccountableProposal(
+    accountableId,
+    wf.content.propertyId,
+    wf.content.departmentId ?? ""
+  );
+  if (!accountableVerdict.allowed) {
+    return NextResponse.json({ error: accountableVerdict.reason }, { status: 400 });
   }
 
   // Determina se R o C sono cambiati (per resettare la consultazione)

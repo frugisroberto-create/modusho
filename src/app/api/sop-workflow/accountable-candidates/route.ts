@@ -13,7 +13,10 @@ import { z } from "zod/v4";
 
 const querySchema = z.object({
   propertyId: z.string().min(1),
-  departmentId: z.string().min(1),
+  // Vuoto/assente per una SOP senza reparto proprietario (caso raro, possibile
+  // solo dopo modifica): la rosa si restringe agli ADMIN della struttura, come
+  // fa la regola pura quando nessuna assegnazione ha un reparto corrispondente.
+  departmentId: z.string().optional().default(""),
 });
 
 export async function GET(request: NextRequest) {

@@ -1047,6 +1047,7 @@ function RaciReassignPanel({ wf, propertyId, onReassigned }: {
 }) {
   const [open, setOpen] = useState(false);
   const [users, setUsers] = useState<{ id: string; name: string; role: string }[]>([]);
+  const [accountableCandidates, setAccountableCandidates] = useState<{ id: string; name: string; role: string }[]>([]);
   const [responsibleId, setResponsibleId] = useState(wf.responsible.id);
   const [consultedId, setConsultedId] = useState<string>(wf.consulted?.id ?? "");
   const [accountableId, setAccountableId] = useState(wf.accountable.id);
@@ -1064,6 +1065,21 @@ function RaciReassignPanel({ wf, propertyId, onReassigned }: {
     }
     loadUsers();
   }, [open, propertyId]);
+
+  // L'Accountable non si filtra più da un ruolo: la rosa è la stessa della
+  // creazione (accountable-scope.ts), interrogata dalla stessa rotta.
+  useEffect(() => {
+    if (!open) return;
+    async function loadAccountableCandidates() {
+      const departmentId = wf.department?.id ?? "";
+      const res = await fetch(`/api/sop-workflow/accountable-candidates?propertyId=${propertyId}&departmentId=${departmentId}`);
+      if (res.ok) {
+        const json = await res.json();
+        setAccountableCandidates(json.data || []);
+      }
+    }
+    loadAccountableCandidates();
+  }, [open, propertyId, wf.department?.id]);
 
   const handleSave = async () => {
     setLoading(true);
@@ -1090,7 +1106,7 @@ function RaciReassignPanel({ wf, propertyId, onReassigned }: {
 
   const eligibleR = users.filter(u => ["HOD", "HOTEL_MANAGER", "ADMIN", "SUPER_ADMIN"].includes(u.role));
   const eligibleC = users.filter(u => ["HOTEL_MANAGER", "ADMIN", "SUPER_ADMIN"].includes(u.role));
-  const eligibleA = users.filter(u => ["ADMIN", "SUPER_ADMIN"].includes(u.role));
+  const eligibleA = accountableCandidates;
 
   if (!open) {
     return (
