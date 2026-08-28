@@ -30,7 +30,7 @@ export default async function NewSopPage() {
   return (
     <div>
       <h1 className="text-xl font-heading font-medium text-charcoal-dark mb-6">Nuova SOP</h1>
-      <SopForm mode="create" userRole={user.role} userDepartmentIds={userDepartmentIds} userTargetDepartmentIds={userTargetDepartmentIds} />
+      <SopForm mode="create" userRole={user.role} currentUserId={user.id} userDepartmentIds={userDepartmentIds} userTargetDepartmentIds={userTargetDepartmentIds} />
     </div>
   );
 }

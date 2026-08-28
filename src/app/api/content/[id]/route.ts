@@ -6,6 +6,7 @@ import { checkAccess, canUserManageContentType, getAccessibleDepartmentIds } fro
 import { changeContentStatus } from "@/lib/content-status";
 import { getSubmitTargetStatus } from "@/lib/content-workflow";
 import { sendContentPublishedPush } from "@/lib/push-notification";
+import { checkAudienceForUser } from "@/lib/target-audience-scope-db";
 import { z } from "zod/v4";
 
 export async function GET(
@@ -183,6 +184,29 @@ export async function PUT(
 
   const { title, body, departmentId, sendToReview, publishDirectly, requireNewAcknowledgment, revisionNote } = parsed.data;
 
+  // Perimetro dei destinatari — solo il ramo che riscrive davvero i target
+  // (DRAFT/RETURNED). Si giudica QUI, prima di qualunque scrittura: un rifiuto
+  // a metà lascerebbe il titolo aggiornato e i destinatari vecchi.
+  // La regola vive in target-audience-scope.ts; per HOD, HM, ADMIN e
+  // SUPER_ADMIN questa chiamata concede senza guardare nulla.
+  const hasTargetUpdate =
+    parsed.data.targetDepartmentIds !== undefined ||
+    parsed.data.targetAllDepartments !== undefined ||
+    parsed.data.targetRoles !== undefined ||
+    parsed.data.targetUserIds !== undefined;
+
+  if ((content.status === "DRAFT" || content.status === "RETURNED") && hasTargetUpdate) {
+    const audience = await checkAudienceForUser(userId, role, content.propertyId, {
+      allDepartments: parsed.data.targetAllDepartments ?? false,
+      roles: parsed.data.targetRoles ?? [],
+      departmentIds: parsed.data.targetDepartmentIds ?? [],
+      userIds: parsed.data.targetUserIds ?? [],
+    });
+    if (!audience.allowed) {
+      return NextResponse.json({ error: audience.reason }, { status: 403 });
+    }
+  }
+
   // Blocca cambio departmentId non autorizzato
   if (departmentId !== undefined && departmentId !== content.departmentId) {
     if (departmentId !== null) {
@@ -251,13 +275,8 @@ export async function PUT(
   }
 
   // Aggiornamento ContentTarget (solo se non ancora pubblicato)
-  // Replace-all: se uno qualsiasi dei campi target è presente, riscrive tutti i target
-  const hasTargetUpdate =
-    parsed.data.targetDepartmentIds !== undefined ||
-    parsed.data.targetAllDepartments !== undefined ||
-    parsed.data.targetRoles !== undefined ||
-    parsed.data.targetUserIds !== undefined;
-
+  // Replace-all: se uno qualsiasi dei campi target è presente, riscrive tutti i
+  // target. Il perimetro è già stato giudicato sopra, prima delle scritture.
   if ((content.status === "DRAFT" || content.status === "RETURNED") && hasTargetUpdate) {
     await prisma.contentTarget.deleteMany({ where: { contentId: id } });
 

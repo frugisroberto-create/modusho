@@ -4,6 +4,7 @@ import { authOptions } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { checkAccess, canUserManageContentType } from "@/lib/rbac";
 import { resolveRaciRoles, needsReview } from "@/lib/sop-workflow";
+import { checkAudienceForUser } from "@/lib/target-audience-scope-db";
 import { z } from "zod/v4";
 
 // ─── GET: lista bozze SOP in cui l'utente e' coinvolto come R/C/A ────
@@ -252,6 +253,19 @@ export async function POST(request: NextRequest) {
   const hasAccess = await checkAccess(userId, "HOD", data.propertyId, data.departmentId);
   if (!hasAccess) {
     return NextResponse.json({ error: "Accesso negato a questa property/reparto" }, { status: 403 });
+  }
+
+  // Perimetro dei destinatari: la regola vive in target-audience-scope.ts e
+  // qui si chiama soltanto. Per HOD, HM, ADMIN e SUPER_ADMIN esce subito
+  // concedendo, senza una query in piu'.
+  const audience = await checkAudienceForUser(userId, role, data.propertyId, {
+    allDepartments: data.targetAllDepartments,
+    roles: data.targetRoles,
+    departmentIds: data.targetDepartmentIds,
+    userIds: data.targetUserIds,
+  });
+  if (!audience.allowed) {
+    return NextResponse.json({ error: audience.reason }, { status: 403 });
   }
 
   // HOD: puo' aprire solo per il proprio reparto (verificato da checkAccess con departmentId)

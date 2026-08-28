@@ -15,6 +15,13 @@ interface HooContextValue {
   setCurrentPropertyId: (id: string) => void;
   properties: HooProperty[];
   userRole: string;
+  /** Chi sta usando l'applicazione: serve a tenerlo fuori dai destinatari. */
+  userId: string;
+  /**
+   * I reparti che l'utente può usare come destinatari, risolti una volta sola
+   * dal perimetro di `target-audience-scope`. `null` = nessuna restrizione.
+   */
+  targetableDepartmentIds: string[] | null;
 }
 
 const HooContext = createContext<HooContextValue | null>(null);
@@ -28,16 +35,18 @@ export function useHooContext() {
 interface HooShellProps {
   userName: string;
   userRole: string;
+  userId: string;
+  targetableDepartmentIds: string[] | null;
   canEdit?: boolean;
   properties: HooProperty[];
   children: React.ReactNode;
 }
 
-export function HooShell({ userName, userRole, canEdit, properties, children }: HooShellProps) {
+export function HooShell({ userName, userRole, userId, targetableDepartmentIds, canEdit, properties, children }: HooShellProps) {
   const [currentPropertyId, setCurrentPropertyId] = useState("");
 
   return (
-    <HooContext.Provider value={{ currentPropertyId, setCurrentPropertyId, properties, userRole }}>
+    <HooContext.Provider value={{ currentPropertyId, setCurrentPropertyId, properties, userRole, userId, targetableDepartmentIds }}>
       <div className="min-h-screen bg-ivory-medium">
         <HooHeader
           userName={userName}
