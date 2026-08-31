@@ -9,11 +9,11 @@
 
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod/v4";
-import { prisma } from "@/lib/prisma";
 import { issueToken } from "@/lib/auth-tokens";
 import { buildResetEmail, sendEmail, getAppUrl } from "@/lib/email";
 import { checkRateLimit, getClientIp } from "@/lib/rate-limit";
 import { normalizeEmail } from "@/lib/email-normalize";
+import { findUserForReset } from "@/lib/login-lookup-db";
 
 const bodySchema = z.object({
   email: z.string().min(1).max(320),
@@ -52,17 +52,29 @@ export async function POST(request: NextRequest) {
 
   const email = normalizeEmail(parsed.data.email);
 
-  const user = await prisma.user.findUnique({
-    where: { email },
-    select: { id: true, name: true, email: true, isActive: true, activatedAt: true },
-  });
+  // Stessa ricerca del login (case-insensitive, vedi login-lookup-db.ts):
+  // copre anche un indirizzo salvato con maiuscole, digitato qui in
+  // minuscolo. Se più righe idonee corrispondono (indirizzi che differiscono
+  // solo per maiuscole/minuscole), non si sceglie: nessuna email, come per
+  // qualunque altro caso non idoneo — l'ambiguità non deve mai diventare
+  // visibile dall'esterno.
+  const lookup = await findUserForReset(email);
+
+  if (lookup.kind === "ambiguous") {
+    console.error(
+      `[auth] ANOMALIA-EMAIL-DUPLICATA ip=${ip} email=${email} — ${lookup.count} account corrispondono, nessun reset inviato. Richiede pulizia manuale.`
+    );
+    return neutralResponse(startedAt);
+  }
 
   // Nessuna email a chi non esiste, è disattivato o non ha mai attivato
   // l'account (per quel caso serve un nuovo invito, non un reset).
-  if (!user || !user.isActive || user.activatedAt === null) {
+  if (lookup.kind === "not_found") {
     console.log(`[auth] FORGOT ignorata ip=${ip} — nessun destinatario idoneo`);
     return neutralResponse(startedAt);
   }
+
+  const user = lookup.user;
 
   const { token } = await issueToken({ userId: user.id, type: "RESET" });
   const resetUrl = `${getAppUrl()}/reimposta/${token}`;

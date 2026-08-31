@@ -6,8 +6,10 @@ import { describe, it, expect, vi, beforeEach } from "vitest";
  * rapporto: lo stesso indirizzo scritto in quattro modi diversi entra allo
  * stesso modo; un account storico salvato con maiuscole (il caso Mihaela)
  * continua a funzionare sia scrivendolo come prima sia in minuscolo; due
- * righe che differiscono solo per maiuscole vengono rifiutate, non scelte a
- * caso; il blocco per coppia IP+email non tocca altre email sullo stesso IP.
+ * righe ENTRAMBE autenticabili che differiscono solo per maiuscole vengono
+ * rifiutate, non scelte a caso; una riga disattivata o mai attivata accanto
+ * a quella vera non conta come ambiguità — il login con quella vera riesce;
+ * il blocco per coppia IP+email non tocca altre email sullo stesso IP.
  */
 
 type Row = { key: string; type: string; createdAt: Date };
@@ -130,7 +132,8 @@ describe("authorize — account storico salvato con maiuscole (il caso Mihaela)"
 });
 
 describe("authorize — righe ambigue: non si sceglie", () => {
-  it("due account che differiscono solo per maiuscole vengono rifiutati, non scelti a caso", async () => {
+  it("due account ENTRAMBI autenticabili che differiscono solo per maiuscole vengono rifiutati, con il log ANOMALIA", async () => {
+    const errorSpy = vi.spyOn(console, "error").mockImplementation(() => {});
     const a = activeUser({ id: "u1", email: "Vanessa1812@libero.it" });
     const b = activeUser({ id: "u2", email: "vanessa1812@libero.it" });
     mockedPrisma.user.findMany.mockResolvedValueOnce([a, b] as never);
@@ -138,6 +141,42 @@ describe("authorize — righe ambigue: non si sceglie", () => {
     const result = await authorize({ email: "vanessa1812@libero.it", password: "giusta" }, REQ);
 
     expect(result).toBeNull();
+    expect(errorSpy).toHaveBeenCalledWith(expect.stringContaining("ANOMALIA-EMAIL-DUPLICATA"));
+    errorSpy.mockRestore();
+  });
+
+  it("una riga disattivata accanto a una riga attiva: il login con quella attiva riesce, non è ambiguità", async () => {
+    const disattivata = activeUser({ id: "guscio-1", email: "a@x.it", isActive: false });
+    const attiva = activeUser({ id: "vera-1", email: "a@x.it" });
+    mockedPrisma.user.findMany.mockResolvedValueOnce([disattivata, attiva] as never);
+
+    const result = await authorize({ email: "a@x.it", password: "giusta" }, REQ);
+
+    expect(result).toMatchObject({ id: "vera-1" });
+  });
+
+  it("una riga con l'invito mai completato (hash vuoto) accanto a una riga attiva: il login con quella attiva riesce", async () => {
+    const nonAttivata = activeUser({ id: "guscio-1", email: "a@x.it", passwordHash: "" });
+    const attiva = activeUser({ id: "vera-1", email: "a@x.it" });
+    mockedPrisma.user.findMany.mockResolvedValueOnce([nonAttivata, attiva] as never);
+
+    const result = await authorize({ email: "a@x.it", password: "giusta" }, REQ);
+
+    expect(result).toMatchObject({ id: "vera-1" });
+  });
+
+  it("una riga sola, disattivata: not_found, stesso messaggio di un indirizzo inesistente", async () => {
+    const warnSpy = vi.spyOn(console, "warn").mockImplementation(() => {});
+    const disattivata = activeUser({ id: "guscio-1", email: "a@x.it", isActive: false });
+    mockedPrisma.user.findMany.mockResolvedValueOnce([disattivata] as never);
+
+    const result = await authorize({ email: "a@x.it", password: "qualsiasi" }, REQ);
+
+    expect(result).toBeNull();
+    expect(warnSpy).toHaveBeenCalledWith(
+      expect.stringContaining("utente non trovato o disattivato")
+    );
+    warnSpy.mockRestore();
   });
 });
 

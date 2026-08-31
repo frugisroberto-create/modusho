@@ -9,6 +9,7 @@ import {
   SESSION_EXPIRED_VALUE,
   SESSION_EXPIRED_MESSAGE,
 } from "@/lib/session-expiry";
+import { displayAuthError } from "@/lib/auth-error-message";
 
 function LoginForm() {
   const searchParams = useSearchParams();
@@ -36,16 +37,12 @@ function LoginForm() {
 
     if (result?.error) {
       setLoading(false);
-      // "CredentialsSignin" è il codice generico che NextAuth assegna quando
-      // authorize() restituisce null (email o password sbagliate): lì il
-      // messaggio resta neutro, non deve mai far capire se l'indirizzo è
-      // registrato o no. Qualsiasi altro testo arriva da un throw esplicito
-      // in authorize() — un blocco per troppi tentativi — ed è già scritto
-      // per essere mostrato così com'è: parla di tentativi e minuti, mai
+      // Il messaggio vero solo se è un blocco riconosciuto (vedi
+      // auth-error-message.ts); qualunque altro valore — compreso il codice
+      // generico "CredentialsSignin" per email o password sbagliate, o
+      // un'eccezione non prevista — resta un testo neutro, mai il nome
       // dell'account.
-      setError(
-        result.error === "CredentialsSignin" ? "Credenziali non valide" : result.error
-      );
+      setError(displayAuthError(result.error, "Credenziali non valide"));
     } else {
       window.location.href = callbackUrl;
     }

@@ -5,6 +5,7 @@ import { signIn } from "next-auth/react";
 import { PasswordFields } from "@/components/auth/password-fields";
 import { HelpTip } from "@/components/auth/help-tip";
 import { checkPasswordForm } from "@/lib/password-policy";
+import { displayAuthError } from "@/lib/auth-error-message";
 
 interface ChangePasswordFormProps {
   /** Email dell'utente: serve a rinnovare la sessione dopo il cambio. */
@@ -73,7 +74,15 @@ export function ChangePasswordForm({
       // Rinnova la sessione di questo dispositivo con la password nuova.
       const result = await signIn("credentials", { email, password, redirect: false });
       if (result?.error) {
-        window.location.href = "/login";
+        // Password salvata ma sessione non rinnovata: il motivo va letto
+        // qui, non scoperto dopo un redirect silenzioso a un login vuoto.
+        setError(
+          displayAuthError(
+            result.error,
+            "La password è stata salvata, ma non siamo riusciti a rinnovare la sessione. Riprova dalla pagina di accesso."
+          )
+        );
+        setLoading(false);
         return;
       }
 

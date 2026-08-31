@@ -12,7 +12,7 @@ import {
 import { normalizeEmail } from "./email-normalize";
 import { findUserForLogin } from "./login-lookup-db";
 import { isSessionStale } from "./session-validity";
-import { hasUsablePassword } from "./login-guard";
+import { tooManyAttemptsMessage, accountLockedMessage } from "./auth-error-message";
 import "@/types";
 
 export const authOptions: NextAuthOptions = {
@@ -43,7 +43,7 @@ export const authOptions: NextAuthOptions = {
         if (!ipEmailCheck.allowed) {
           const retryMin = Math.ceil(ipEmailCheck.retryAfterMs / 60000);
           console.warn(`[auth] BLOCKED-IP-EMAIL ip=${ip} email=${email} — riprova tra ${retryMin} min`);
-          throw new Error(`Troppi tentativi. Riprova tra ${retryMin} minuti.`);
+          throw new Error(tooManyAttemptsMessage(retryMin));
         }
 
         // Tetto largo sul solo IP (50 tentativi / 15 min): difesa contro un
@@ -52,7 +52,7 @@ export const authOptions: NextAuthOptions = {
         if (!ipCeilingCheck.allowed) {
           const retryMin = Math.ceil(ipCeilingCheck.retryAfterMs / 60000);
           console.warn(`[auth] BLOCKED-IP ip=${ip} email=${email} — riprova tra ${retryMin} min`);
-          throw new Error(`Troppi tentativi. Riprova tra ${retryMin} minuti.`);
+          throw new Error(tooManyAttemptsMessage(retryMin));
         }
 
         // Rate limit per email/account (10 tentativi / 30 min) — invariato
@@ -60,11 +60,14 @@ export const authOptions: NextAuthOptions = {
         if (!emailCheck.allowed) {
           const retryMin = Math.ceil(emailCheck.retryAfterMs / 60000);
           console.warn(`[auth] BLOCKED-ACCOUNT ip=${ip} email=${email} — account bloccato, riprova tra ${retryMin} min`);
-          throw new Error(`Account temporaneamente bloccato. Riprova tra ${retryMin} minuti.`);
+          throw new Error(accountLockedMessage(retryMin));
         }
 
-        // Ricerca case-insensitive: copre anche le righe storiche salvate con
-        // maiuscole, senza bisogno di correggerle. Se trova più di una riga
+        // Ricerca case-insensitive, solo tra le righe che possono davvero
+        // autenticare (attive, con password impostata — vedi
+        // login-lookup-db.ts): copre anche le righe storiche salvate con
+        // maiuscole, senza bisogno di correggerle, e un guscio disattivato o
+        // mai attivato non conta come candidato. Se sopravvivono più righe
         // (indirizzi che in tabella differiscono solo per maiuscole/minuscole:
         // il vincolo di unicità sulla colonna è case-sensitive), non sceglie:
         // nega l'accesso e traccia l'anomalia nei log.
@@ -79,26 +82,15 @@ export const authOptions: NextAuthOptions = {
         }
 
         if (lookup.kind === "not_found") {
+          // Stesso messaggio sia che l'indirizzo non esista, sia che esista ma
+          // non possa autenticare (disattivato, invito mai completato): non
+          // deve trapelare quale dei due casi sia.
           await recordFailedAttempt(ip, email);
           console.warn(`[auth] FAILED ip=${ip} email=${email} — utente non trovato o disattivato`);
           return null;
         }
 
         const user = lookup.user;
-
-        if (!user.isActive) {
-          await recordFailedAttempt(ip, email);
-          console.warn(`[auth] FAILED ip=${ip} email=${email} — utente non trovato o disattivato`);
-          return null;
-        }
-
-        // Account creato ma non ancora attivato (hash vuoto): fallisce qui,
-        // senza passare a bcrypt un hash malformato.
-        if (!hasUsablePassword(user.passwordHash)) {
-          await recordFailedAttempt(ip, email);
-          console.warn(`[auth] FAILED ip=${ip} email=${email} — account non ancora attivato`);
-          return null;
-        }
 
         const isPasswordValid = await bcrypt.compare(
           credentials.password,
