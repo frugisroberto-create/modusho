@@ -9,6 +9,7 @@ import {
   SESSION_EXPIRED_VALUE,
   SESSION_EXPIRED_MESSAGE,
 } from "@/lib/session-expiry";
+import { displayAuthError } from "@/lib/auth-error-message";
 
 function LoginForm() {
   const searchParams = useSearchParams();
@@ -36,7 +37,12 @@ function LoginForm() {
 
     if (result?.error) {
       setLoading(false);
-      setError("Credenziali non valide");
+      // Il messaggio vero solo se è un blocco riconosciuto (vedi
+      // auth-error-message.ts); qualunque altro valore — compreso il codice
+      // generico "CredentialsSignin" per email o password sbagliate, o
+      // un'eccezione non prevista — resta un testo neutro, mai il nome
+      // dell'account.
+      setError(displayAuthError(result.error, "Credenziali non valide"));
     } else {
       window.location.href = callbackUrl;
     }
@@ -55,7 +61,7 @@ function LoginForm() {
       <form onSubmit={handleSubmit} className="space-y-5">
         <div>
           <label htmlFor="email" className="block text-sm font-ui font-medium text-charcoal mb-1.5">
-            Nome utente
+            Email
           </label>
           <input
             id="email"
@@ -66,6 +72,9 @@ function LoginForm() {
             autoComplete="email"
             className="w-full"
           />
+          <p className="mt-1 text-xs font-ui text-charcoal/50">
+            L&apos;indirizzo a cui è arrivato il tuo invito.
+          </p>
         </div>
         <div>
           <label htmlFor="password" className="block text-sm font-ui font-medium text-charcoal mb-1.5">

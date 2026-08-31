@@ -6,6 +6,7 @@ import { z } from "zod/v4";
 import { issueToken } from "@/lib/auth-tokens";
 import { buildActivationEmail, sendEmail, getAppUrl } from "@/lib/email";
 import { recordUserAudit } from "@/lib/user-audit";
+import { normalizeEmail } from "@/lib/email-normalize";
 import { loadActor, loadTarget, validateAssignments, validateDepartmentIds } from "@/lib/user-scope-db";
 import {
   canViewUser,
@@ -284,7 +285,7 @@ export async function PUT(
   }
 
   // ─── Email: identificativo unico ───
-  const normalizedEmail = email?.trim().toLowerCase();
+  const normalizedEmail = email !== undefined ? normalizeEmail(email) : undefined;
   if (normalizedEmail && normalizedEmail !== current.email) {
     const existing = await prisma.user.findUnique({ where: { email: normalizedEmail }, select: { id: true } });
     if (existing && existing.id !== id) {

@@ -5,6 +5,7 @@ import { signIn } from "next-auth/react";
 import { PasswordFields } from "@/components/auth/password-fields";
 import { HelpTip } from "@/components/auth/help-tip";
 import { checkPasswordForm } from "@/lib/password-policy";
+import { displayAuthError } from "@/lib/auth-error-message";
 
 /** Form di reimpostazione password: salva ed entra, senza ridigitare nulla. */
 export function ResetForm({ token, email }: { token: string; email: string }) {
@@ -38,7 +39,15 @@ export function ResetForm({ token, email }: { token: string; email: string }) {
 
       const result = await signIn("credentials", { email, password, redirect: false });
       if (result?.error) {
-        window.location.href = "/login";
+        // Password impostata ma sessione non creata: il motivo va letto qui,
+        // non scoperto dopo un redirect silenzioso a un login vuoto.
+        setError(
+          displayAuthError(
+            result.error,
+            "La password è stata salvata, ma non siamo riusciti a farti entrare automaticamente. Riprova dalla pagina di accesso."
+          )
+        );
+        setLoading(false);
         return;
       }
 

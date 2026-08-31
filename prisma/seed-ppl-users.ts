@@ -2,6 +2,7 @@
 // Creazione automatica utenti OPERATOR — Patria Palace Hotel (PPL)
 import { PrismaClient } from "@prisma/client";
 import bcrypt from "bcryptjs";
+import { normalizeEmail } from "../src/lib/email-normalize";
 
 const prisma = new PrismaClient();
 
@@ -79,12 +80,13 @@ async function main() {
 
     try {
       const passwordHash = await bcrypt.hash(u.password, 12);
+      const email = normalizeEmail(u.email);
 
       const user = await prisma.user.upsert({
-        where:  { email: u.email },
+        where:  { email },
         update: {},
         create: {
-          email: u.email,
+          email,
           name:  u.name,
           passwordHash,
           role:       "OPERATOR",

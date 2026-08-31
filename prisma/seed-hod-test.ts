@@ -2,6 +2,7 @@
 // Crea utente Test HOD assegnato a tutti i reparti di Patria Palace Hotel (PPL)
 import { PrismaClient } from "@prisma/client";
 import bcrypt from "bcryptjs";
+import { normalizeEmail } from "../src/lib/email-normalize";
 
 const prisma = new PrismaClient();
 
@@ -34,9 +35,10 @@ async function main() {
   console.log(`✓ Reparti trovati: ${Object.keys(deptMap).join(", ")}\n`);
 
   const passwordHash = await bcrypt.hash(TEST_USER.password, 12);
+  const email = normalizeEmail(TEST_USER.email);
 
   const user = await prisma.user.upsert({
-    where: { email: TEST_USER.email },
+    where: { email },
     update: {
       name: TEST_USER.name,
       passwordHash,
@@ -47,7 +49,7 @@ async function main() {
       isActive: TEST_USER.isActive,
     },
     create: {
-      email: TEST_USER.email,
+      email,
       name: TEST_USER.name,
       passwordHash,
       role: TEST_USER.role,

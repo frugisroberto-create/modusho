@@ -17,6 +17,7 @@
  */
 
 import type { EditableField } from "./user-scope";
+import { normalizeEmail } from "./email-normalize";
 
 export interface AssignmentValue {
   propertyId: string;
@@ -64,10 +65,8 @@ export function normalizeIncomingName(name: string): string {
   return name.trim();
 }
 
-/** L'email viene salvata trimmata e minuscola: idem. */
-export function normalizeIncomingEmail(email: string): string {
-  return email.trim().toLowerCase();
-}
+/** L'email viene salvata trimmata e minuscola: idem. Regola unica in normalizeEmail(). */
+export const normalizeIncomingEmail = normalizeEmail;
 
 /**
  * Confronto insensibile all'ordine ma NON alle ripetizioni: due elenchi
