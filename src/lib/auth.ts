@@ -2,7 +2,15 @@ import { NextAuthOptions } from "next-auth";
 import CredentialsProvider from "next-auth/providers/credentials";
 import bcrypt from "bcryptjs";
 import { prisma } from "./prisma";
-import { checkRateLimit, checkEmailRateLimit, recordFailedAttempt, resetAttempts } from "./rate-limit";
+import {
+  checkIpEmailRateLimit,
+  checkIpCeilingRateLimit,
+  checkEmailRateLimit,
+  recordFailedAttempt,
+  resetAttempts,
+} from "./rate-limit";
+import { normalizeEmail } from "./email-normalize";
+import { findUserForLogin } from "./login-lookup-db";
 import { isSessionStale } from "./session-validity";
 import { hasUsablePassword } from "./login-guard";
 import "@/types";
@@ -25,37 +33,70 @@ export const authOptions: NextAuthOptions = {
           || req?.headers?.["x-real-ip"]?.toString()
           || "unknown";
 
-        // Rate limit per IP (5 tentativi / 15 min)
-        const ipCheck = await checkRateLimit(ip);
-        if (!ipCheck.allowed) {
-          const retryMin = Math.ceil(ipCheck.retryAfterMs / 60000);
-          console.warn(`[auth] BLOCKED-IP ip=${ip} email=${credentials.email} — riprova tra ${retryMin} min`);
+        // L'indirizzo va ripulito PRIMA di ogni ricerca o conteggio: è quello
+        // che identifica l'account, non quello che la persona ha digitato.
+        const email = normalizeEmail(credentials.email);
+
+        // Rate limit per coppia IP+email (5 tentativi / 15 min): chi sbaglia
+        // il proprio indirizzo non blocca nessun altro sullo stesso IP.
+        const ipEmailCheck = await checkIpEmailRateLimit(ip, email);
+        if (!ipEmailCheck.allowed) {
+          const retryMin = Math.ceil(ipEmailCheck.retryAfterMs / 60000);
+          console.warn(`[auth] BLOCKED-IP-EMAIL ip=${ip} email=${email} — riprova tra ${retryMin} min`);
           throw new Error(`Troppi tentativi. Riprova tra ${retryMin} minuti.`);
         }
 
-        // Rate limit per email/account (10 tentativi / 30 min)
-        const emailCheck = await checkEmailRateLimit(credentials.email);
+        // Tetto largo sul solo IP (50 tentativi / 15 min): difesa contro un
+        // attacco automatico che provi molte email diverse dallo stesso IP.
+        const ipCeilingCheck = await checkIpCeilingRateLimit(ip);
+        if (!ipCeilingCheck.allowed) {
+          const retryMin = Math.ceil(ipCeilingCheck.retryAfterMs / 60000);
+          console.warn(`[auth] BLOCKED-IP ip=${ip} email=${email} — riprova tra ${retryMin} min`);
+          throw new Error(`Troppi tentativi. Riprova tra ${retryMin} minuti.`);
+        }
+
+        // Rate limit per email/account (10 tentativi / 30 min) — invariato
+        const emailCheck = await checkEmailRateLimit(email);
         if (!emailCheck.allowed) {
           const retryMin = Math.ceil(emailCheck.retryAfterMs / 60000);
-          console.warn(`[auth] BLOCKED-ACCOUNT ip=${ip} email=${credentials.email} — account bloccato, riprova tra ${retryMin} min`);
+          console.warn(`[auth] BLOCKED-ACCOUNT ip=${ip} email=${email} — account bloccato, riprova tra ${retryMin} min`);
           throw new Error(`Account temporaneamente bloccato. Riprova tra ${retryMin} minuti.`);
         }
 
-        const user = await prisma.user.findUnique({
-          where: { email: credentials.email },
-        });
+        // Ricerca case-insensitive: copre anche le righe storiche salvate con
+        // maiuscole, senza bisogno di correggerle. Se trova più di una riga
+        // (indirizzi che in tabella differiscono solo per maiuscole/minuscole:
+        // il vincolo di unicità sulla colonna è case-sensitive), non sceglie:
+        // nega l'accesso e traccia l'anomalia nei log.
+        const lookup = await findUserForLogin(email);
 
-        if (!user || !user.isActive) {
-          await recordFailedAttempt(ip, credentials.email);
-          console.warn(`[auth] FAILED ip=${ip} email=${credentials.email} — utente non trovato o disattivato`);
+        if (lookup.kind === "ambiguous") {
+          await recordFailedAttempt(ip, email);
+          console.error(
+            `[auth] ANOMALIA-EMAIL-DUPLICATA ip=${ip} email=${email} — ${lookup.count} account corrispondono, accesso negato. Richiede pulizia manuale.`
+          );
+          return null;
+        }
+
+        if (lookup.kind === "not_found") {
+          await recordFailedAttempt(ip, email);
+          console.warn(`[auth] FAILED ip=${ip} email=${email} — utente non trovato o disattivato`);
+          return null;
+        }
+
+        const user = lookup.user;
+
+        if (!user.isActive) {
+          await recordFailedAttempt(ip, email);
+          console.warn(`[auth] FAILED ip=${ip} email=${email} — utente non trovato o disattivato`);
           return null;
         }
 
         // Account creato ma non ancora attivato (hash vuoto): fallisce qui,
         // senza passare a bcrypt un hash malformato.
         if (!hasUsablePassword(user.passwordHash)) {
-          await recordFailedAttempt(ip, credentials.email);
-          console.warn(`[auth] FAILED ip=${ip} email=${credentials.email} — account non ancora attivato`);
+          await recordFailedAttempt(ip, email);
+          console.warn(`[auth] FAILED ip=${ip} email=${email} — account non ancora attivato`);
           return null;
         }
 
@@ -65,14 +106,14 @@ export const authOptions: NextAuthOptions = {
         );
 
         if (!isPasswordValid) {
-          await recordFailedAttempt(ip, credentials.email);
-          console.warn(`[auth] FAILED ip=${ip} email=${credentials.email} — password errata`);
+          await recordFailedAttempt(ip, email);
+          console.warn(`[auth] FAILED ip=${ip} email=${email} — password errata`);
           return null;
         }
 
         // Login riuscito: reset contatore tentativi
-        await resetAttempts(ip, credentials.email);
-        console.log(`[auth] OK ip=${ip} email=${credentials.email} role=${user.role}`);
+        await resetAttempts(ip, email);
+        console.log(`[auth] OK ip=${ip} email=${email} role=${user.role}`);
 
         return {
           id: user.id,

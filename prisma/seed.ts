@@ -1,5 +1,6 @@
 import { PrismaClient, Role, ContentStatus, ContentType } from "@prisma/client";
 import bcrypt from "bcryptjs";
+import { normalizeEmail } from "../src/lib/email-normalize";
 
 const prisma = new PrismaClient();
 
@@ -204,8 +205,9 @@ async function main() {
   ];
 
   for (const userData of users) {
+    const email = normalizeEmail(userData.email);
     const user = await prisma.user.upsert({
-      where: { email: userData.email },
+      where: { email },
       update: {
         role: userData.role,
         canView: userData.canView,
@@ -213,7 +215,7 @@ async function main() {
         canApprove: userData.canApprove,
       },
       create: {
-        email: userData.email,
+        email,
         name: userData.name,
         passwordHash,
         role: userData.role,

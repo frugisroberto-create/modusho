@@ -36,7 +36,16 @@ function LoginForm() {
 
     if (result?.error) {
       setLoading(false);
-      setError("Credenziali non valide");
+      // "CredentialsSignin" è il codice generico che NextAuth assegna quando
+      // authorize() restituisce null (email o password sbagliate): lì il
+      // messaggio resta neutro, non deve mai far capire se l'indirizzo è
+      // registrato o no. Qualsiasi altro testo arriva da un throw esplicito
+      // in authorize() — un blocco per troppi tentativi — ed è già scritto
+      // per essere mostrato così com'è: parla di tentativi e minuti, mai
+      // dell'account.
+      setError(
+        result.error === "CredentialsSignin" ? "Credenziali non valide" : result.error
+      );
     } else {
       window.location.href = callbackUrl;
     }
@@ -55,7 +64,7 @@ function LoginForm() {
       <form onSubmit={handleSubmit} className="space-y-5">
         <div>
           <label htmlFor="email" className="block text-sm font-ui font-medium text-charcoal mb-1.5">
-            Nome utente
+            Email
           </label>
           <input
             id="email"
@@ -66,6 +75,9 @@ function LoginForm() {
             autoComplete="email"
             className="w-full"
           />
+          <p className="mt-1 text-xs font-ui text-charcoal/50">
+            L&apos;indirizzo a cui è arrivato il tuo invito.
+          </p>
         </div>
         <div>
           <label htmlFor="password" className="block text-sm font-ui font-medium text-charcoal mb-1.5">

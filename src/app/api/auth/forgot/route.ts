@@ -13,6 +13,7 @@ import { prisma } from "@/lib/prisma";
 import { issueToken } from "@/lib/auth-tokens";
 import { buildResetEmail, sendEmail, getAppUrl } from "@/lib/email";
 import { checkRateLimit, getClientIp } from "@/lib/rate-limit";
+import { normalizeEmail } from "@/lib/email-normalize";
 
 const bodySchema = z.object({
   email: z.string().min(1).max(320),
@@ -49,7 +50,7 @@ export async function POST(request: NextRequest) {
   // Anche un body malformato riceve la risposta neutra: nessun segnale utile.
   if (!parsed.success) return neutralResponse(startedAt);
 
-  const email = parsed.data.email.trim().toLowerCase();
+  const email = normalizeEmail(parsed.data.email);
 
   const user = await prisma.user.findUnique({
     where: { email },
