@@ -20,6 +20,8 @@
   --color-alert-red: #C0392B;
   --color-alert-yellow: #D4A017;
   --color-info-blue: #5B7B8A;
+  /* Verde della lettura: il pulsante con cui si apre una procedura. */
+  --color-green-read: #5F7A56;
   --color-badge-sop-bg: #EDE7F6;
   --color-badge-sop-text: #5E35B1;
   --color-badge-doc-bg: #E3F2FD;

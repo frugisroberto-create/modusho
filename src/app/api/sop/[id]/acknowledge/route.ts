@@ -3,11 +3,12 @@ import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { canUserAccessContent } from "@/lib/rbac";
+import { recordSopRead } from "@/lib/sop-read-db";
 
 type RouteParams = { params: Promise<{ id: string }> };
 
 /**
- * POST: Conferma formale visualizzazione SOP (version-aware).
+ * POST: Registra la lettura di una SOP (version-aware).
  * Crea/aggiorna SopViewRecord con acknowledgedAt.
  * Mantiene compatibilità con ContentAcknowledgment esistente.
  *
@@ -51,32 +52,13 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
     return NextResponse.json({ error: "Non sei tra i destinatari di questa SOP" }, { status: 403 });
   }
 
-  const now = new Date();
-
-  // Upsert SopViewRecord con acknowledgedAt
-  const record = await prisma.sopViewRecord.upsert({
-    where: {
-      contentId_userId_contentVersion: {
-        contentId,
-        userId,
-        contentVersion: content.version,
-      },
-    },
-    update: { acknowledgedAt: now, viewedAt: now },
-    create: {
-      contentId,
-      userId,
-      contentVersion: content.version,
-      viewedAt: now,
-      acknowledgedAt: now,
-    },
-  });
-
-  // Compatibilità: mantieni aggiornato anche ContentAcknowledgment
-  await prisma.contentAcknowledgment.upsert({
-    where: { contentId_userId: { contentId, userId } },
-    update: { acknowledgedAt: now },
-    create: { contentId, userId, required: true },
+  // Scrittore unico (SopViewRecord + ContentAcknowledgment): la stessa
+  // funzione che usa la registrazione automatica di HM/ADMIN/SUPER_ADMIN.
+  const record = await recordSopRead({
+    contentId,
+    userId,
+    contentVersion: content.version,
+    now: new Date(),
   });
 
   return NextResponse.json({

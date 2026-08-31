@@ -2,7 +2,8 @@ import { notFound, redirect } from "next/navigation";
 import { getSessionUser } from "@/lib/session";
 import { prisma } from "@/lib/prisma";
 import { canUserAccessContent } from "@/lib/rbac";
-import { AcknowledgeButton } from "@/components/operator/acknowledge-button";
+import { SopReadPanel } from "@/components/operator/sop-read-panel";
+import { SopReadReceipt } from "@/components/operator/sop-read-receipt";
 import { SopViewTracker } from "@/components/operator/sop-view-tracker";
 import { ContentActions } from "@/components/hoo/content-actions";
 import { SopViewRegistry } from "@/components/shared/sop-view-registry";
@@ -13,6 +14,8 @@ import { ValidityBadge } from "@/components/shared/validity-badge";
 import { ContentTimeline } from "@/components/shared/content-timeline";
 import { ListBackLink } from "@/components/operator/list-back-link";
 import { sanitizeHtml } from "@/lib/sanitize";
+import { showsReadPanel } from "@/lib/sop-read";
+import { recordSopRead } from "@/lib/sop-read-db";
 
 interface Props { params: Promise<{ id: string }> }
 
@@ -81,21 +84,15 @@ export default async function SopDetailPage({ params }: Props) {
       ? anyPreviousAck.acknowledgedAt!.toISOString()
       : null;
 
-  // Auto-acknowledge per HM/ADMIN/SUPER_ADMIN: aprire la SOP = presa visione
+  // HM/ADMIN/SUPER_ADMIN: aprire la SOP vale come lettura, si registra da sola.
+  // Stesso scrittore del pulsante di OPERATOR/HOD — una sola forma per due gesti.
   if (isFullGovernance && !acknowledged) {
-    const now = new Date();
-    await Promise.all([
-      prisma.sopViewRecord.upsert({
-        where: { contentId_userId_contentVersion: { contentId: content.id, userId: user.id, contentVersion: currentVersion } },
-        update: { acknowledgedAt: now, viewedAt: now },
-        create: { contentId: content.id, userId: user.id, contentVersion: currentVersion, viewedAt: now, acknowledgedAt: now },
-      }),
-      prisma.contentAcknowledgment.upsert({
-        where: { contentId_userId: { contentId: content.id, userId: user.id } },
-        update: { acknowledgedAt: now },
-        create: { contentId: content.id, userId: user.id, required: true },
-      }),
-    ]);
+    await recordSopRead({
+      contentId: content.id,
+      userId: user.id,
+      contentVersion: currentVersion,
+      now: new Date(),
+    });
     acknowledged = true;
   }
 
@@ -139,39 +136,18 @@ export default async function SopDetailPage({ params }: Props) {
         </MobileHide>
       </div>
 
-      {/* ── Gate presa visione: solo OPERATOR/HOD. HM+ vede sempre il contenuto ── */}
-      {!acknowledged && !isFullGovernance ? (
-        <div className="bg-white border border-ivory-dark mb-8">
-          <div className="px-5 py-3 bg-ivory border-b border-ivory-dark">
-            <span className="text-xs font-ui font-semibold uppercase tracking-wider text-charcoal/50">
-              Presa visione richiesta
-            </span>
-          </div>
-          <div className="px-5 py-8 space-y-4 text-center">
-            <svg className="w-12 h-12 text-[#E65100] mx-auto" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L4.082 16.5c-.77.833.192 2.5 1.732 2.5z" />
-            </svg>
-            <div>
-              <p className="text-base font-ui font-semibold text-charcoal-dark">
-                Questa procedura richiede la tua presa visione
-              </p>
-              <p className="text-sm font-ui text-charcoal/60 mt-1">
-                Conferma per accedere al contenuto della procedura (v{currentVersion})
-              </p>
-            </div>
-            <div className="pt-2">
-              <AcknowledgeButton
-                contentId={content.id}
-                acknowledged={false}
-                acknowledgedAt={null}
-                useSopEndpoint
-              />
-            </div>
-          </div>
-        </div>
+      {/* ── Pannello di lettura: OPERATOR/HOD su SOP pubblicate. HM+ vede sempre il contenuto ── */}
+      {showsReadPanel({ role: user.role, contentStatus: content.status, alreadyRead: acknowledged }) ? (
+        <SopReadPanel
+          contentId={content.id}
+          title={content.title}
+          departmentName={content.department?.name}
+          propertyName={content.property.name}
+          version={currentVersion}
+        />
       ) : (
         <>
-          {/* ── Corpo SOP (visibile solo dopo presa visione) ── */}
+          {/* ── Corpo SOP ── */}
           <article
             className="prose prose-gray max-w-none mb-8 bg-ivory-medium border border-ivory-dark p-4 sm:p-6 font-body"
             dangerouslySetInnerHTML={{ __html: sanitizeHtml(content.body) }}
@@ -180,31 +156,12 @@ export default async function SopDetailPage({ params }: Props) {
           {/* ── Allegati ── */}
           <AttachmentUploader contentId={content.id} canEdit={false} />
 
-          {/* ── Conferma presa visione — solo OPERATOR/HOD ── */}
-          {!isFullGovernance && acknowledged && (
-            <div className="bg-white border border-ivory-dark">
-              <div className="px-5 py-3 bg-ivory border-b border-ivory-dark">
-                <span className="text-xs font-ui font-semibold uppercase tracking-wider text-charcoal/50">
-                  Presa visione
-                </span>
-              </div>
-              <div className="px-5 py-5">
-                <div className="flex items-center gap-3">
-                  <svg className="w-5 h-5 text-[#2E7D32] shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-                  </svg>
-                  <div>
-                    <p className="text-sm font-ui font-medium text-[#2E7D32]">
-                      Presa visione confermata
-                    </p>
-                    <p className="text-xs font-ui text-charcoal/50 mt-0.5">
-                      {acknowledgedAt && new Date(acknowledgedAt).toLocaleString("it-IT", { day: "2-digit", month: "2-digit", year: "numeric", hour: "2-digit", minute: "2-digit" })}
-                      {" "}— versione {acknowledgedCurrentVersion ? currentVersion : anyPreviousAck?.contentVersion}
-                    </p>
-                  </div>
-                </div>
-              </div>
-            </div>
+          {/* ── Lettura registrata — solo OPERATOR/HOD ── */}
+          {!isFullGovernance && acknowledged && acknowledgedAt && (
+            <SopReadReceipt
+              readAt={acknowledgedAt}
+              version={acknowledgedCurrentVersion ? currentVersion : anyPreviousAck?.contentVersion}
+            />
           )}
         </>
       )}
