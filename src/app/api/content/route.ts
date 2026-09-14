@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
-import { getAccessiblePropertyIds, getAccessibleDepartmentIds, checkAccess, canUserManageContentType } from "@/lib/rbac";
+import { getAccessiblePropertyIds, getAccessibleDepartmentIds, getOperativeDepartmentIds, checkAccess, canUserManageContentType } from "@/lib/rbac";
 import { changeContentStatus } from "@/lib/content-status";
 import { getSubmitTargetStatus } from "@/lib/content-workflow";
 import { sendContentPublishedPush } from "@/lib/push-notification";
@@ -83,23 +83,41 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({ data: [], meta: { page, pageSize, total: 0 } });
   }
 
+  // Condizioni da combinare in AND (visibilità, scadenza memo)
+  const andClauses: Record<string, unknown>[] = [];
+
   // Visibilità per OPERATOR/HOD basata su targetAudience (ContentTarget)
   // Vale per SOP, DOCUMENT, MEMO, STANDARD_BOOK
   // Match su:
   //  - ROLE/OPERATOR (tutti gli operatori — visibile a OPERATOR e HOD)
   //  - ROLE/<userRole> (target rivolto al ruolo dell'utente — es. ROLE/HOD)
   //  - USER/<userId> (target rivolto specificamente all'utente)
-  //  - DEPARTMENT/<deptId> (target su uno dei reparti accessibili dell'utente)
+  //  - DEPARTMENT/<deptId> (target su uno dei reparti operativi dell'utente)
+  //  - DEPARTMENT/<deptId> su un reparto visibile aggiuntivo: consultazione sì,
+  //    ma mai nella lista "da prendere visione" (non rende destinatari)
   if (userRole === "OPERATOR" || userRole === "HOD") {
+    const operativeDeptIds: string[] = [];
+    for (const pid of filteredPropertyIds) {
+      operativeDeptIds.push(...(await getOperativeDepartmentIds(userId, pid)));
+    }
+    const viewOnlyDeptIds = allAccessibleDeptIds.filter((d) => !operativeDeptIds.includes(d));
+
     const orClauses: Record<string, unknown>[] = [
       { targetType: "ROLE", targetRole: "OPERATOR" },
       { targetType: "ROLE", targetRole: userRole },
       { targetType: "USER", targetUserId: userId },
     ];
-    if (allAccessibleDeptIds.length > 0) {
-      orClauses.push({ targetType: "DEPARTMENT", targetDepartmentId: { in: allAccessibleDeptIds } });
+    if (operativeDeptIds.length > 0) {
+      orClauses.push({ targetType: "DEPARTMENT", targetDepartmentId: { in: operativeDeptIds } });
     }
-    where.targetAudience = { some: { OR: orClauses } };
+
+    const audience: Record<string, unknown>[] = [{ targetAudience: { some: { OR: orClauses } } }];
+    if (viewOnlyDeptIds.length > 0 && acknowledged !== "false") {
+      audience.push({
+        targetAudience: { some: { targetType: "DEPARTMENT", targetDepartmentId: { in: viewOnlyDeptIds } } },
+      });
+    }
+    andClauses.push({ OR: audience });
   } else {
     // HM/ADMIN/SUPER_ADMIN: vedono tutto in base alla property accessibile
     // (logica dipartimentale legacy mantenuta come fallback opzionale)
@@ -128,14 +146,22 @@ export async function GET(request: NextRequest) {
     where.acknowledgments = { some: { userId } };
   } else if (acknowledged === "false") {
     where.acknowledgments = { none: { userId } };
-    // Escludi memo scaduti dalla lista "da prendere visione"
-    where.NOT = {
-      AND: [
-        { type: "MEMO" },
-        { memo: { expiresAt: { lt: new Date() } } },
+    // Escludi memo scaduti dalla lista "da prendere visione".
+    // Condizione scritta in positivo, senza NOT: un memo senza scadenza ha
+    // expiresAt NULL, e in SQL un NOT su un confronto con NULL vale NULL e
+    // scarta la riga invece di tenerla.
+    const now = new Date();
+    andClauses.push({
+      OR: [
+        { type: { not: "MEMO" } },
+        { memo: { is: null } },
+        { memo: { is: { expiresAt: null } } },
+        { memo: { is: { expiresAt: { gt: now } } } },
       ],
-    };
+    });
   }
+
+  if (andClauses.length > 0) where.AND = andClauses;
 
   if (excludeUpdatedBy) {
     where.updatedById = { not: excludeUpdatedBy };

@@ -151,10 +151,13 @@ export async function getAccessiblePropertyIds(
  * Restituisce gli ID dei department accessibili dall'utente in una property.
  * Assignment senza departmentId = accesso a tutti i reparti.
  * SUPER_ADMIN: tutti i reparti.
+ * Include i reparti visibili aggiuntivi (viewDepartmentIds), salvo
+ * `includeViewDepartments: false`.
  */
 export async function getAccessibleDepartmentIds(
   userId: string,
-  propertyId: string
+  propertyId: string,
+  { includeViewDepartments = true }: { includeViewDepartments?: boolean } = {}
 ): Promise<string[]> {
   const user = await prisma.user.findUnique({
     where: { id: userId },
@@ -191,7 +194,7 @@ export async function getAccessibleDepartmentIds(
     .filter((a) => a.departmentId !== null)
     .map((a) => a.departmentId!);
 
-  if (user.viewDepartmentIds?.length) {
+  if (includeViewDepartments && user.viewDepartmentIds?.length) {
     // Filtra viewDepartmentIds per la property corrente
     const propertyDepts = await prisma.department.findMany({
       where: { propertyId, id: { in: user.viewDepartmentIds } },
@@ -202,6 +205,18 @@ export async function getAccessibleDepartmentIds(
   }
 
   return operativeIds;
+}
+
+/**
+ * Reparti in cui l'utente lavora, senza i reparti visibili aggiuntivi.
+ * Sono gli unici che lo rendono destinatario di un contenuto (presa visione
+ * obbligatoria): i reparti visibili danno solo la consultazione.
+ */
+export async function getOperativeDepartmentIds(
+  userId: string,
+  propertyId: string
+): Promise<string[]> {
+  return getAccessibleDepartmentIds(userId, propertyId, { includeViewDepartments: false });
 }
 
 /**
@@ -217,6 +232,44 @@ export interface ContentVisibilityInput {
     targetDepartmentId: string | null;
     targetUserId: string | null;
   }>;
+}
+
+/**
+ * OPERATOR/HOD: l'utente è destinatario del contenuto, e quindi deve prenderne
+ * visione? Conta solo ciò che gli è rivolto (tutti gli operatori, il suo ruolo,
+ * lui stesso, un suo reparto operativo). Un reparto visibile aggiuntivo gli
+ * permette di consultare il contenuto, non lo rende destinatario.
+ * Funzione pura: i reparti operativi li passa il chiamante.
+ */
+export function isContentRecipient(
+  user: { id: string; role: Role },
+  operativeDepartmentIds: string[],
+  targetAudience: ContentVisibilityInput["targetAudience"]
+): boolean {
+  return targetAudience.some((t) => {
+    if (t.targetType === "ROLE") return t.targetRole === "OPERATOR" || t.targetRole === user.role;
+    if (t.targetType === "USER") return t.targetUserId === user.id;
+    return t.targetDepartmentId !== null && operativeDepartmentIds.includes(t.targetDepartmentId);
+  });
+}
+
+/**
+ * Registro presa visione: l'utente rientra tra i destinatari del contenuto?
+ * Stessa regola di /api/compliance (e delle notifiche di pubblicazione):
+ *  - ROLE/X: utenti con quel ruolo esatto
+ *  - DEPARTMENT/d: utenti assegnati a quel reparto (assegnazione esplicita)
+ *  - USER/u: solo quell'utente
+ * I reparti visibili aggiuntivi non contano. Funzione pura.
+ */
+export function isInTargetAudience(
+  user: { id: string; role: Role; assignedDepartmentIds: string[] },
+  targetAudience: ContentVisibilityInput["targetAudience"]
+): boolean {
+  return targetAudience.some((t) => {
+    if (t.targetType === "ROLE") return t.targetRole === user.role;
+    if (t.targetType === "USER") return t.targetUserId === user.id;
+    return t.targetDepartmentId !== null && user.assignedDepartmentIds.includes(t.targetDepartmentId);
+  });
 }
 
 /**

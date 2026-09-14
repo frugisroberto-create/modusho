@@ -14,6 +14,8 @@ interface MemoItem {
   id: string; contentId: string; title: string; body: string;
   publishedAt: string | null; author: string; createdById: string; isPinned: boolean; expiresAt: string | null;
   acknowledged: boolean; acknowledgedAt: string | null;
+  /** false = memo di un reparto solo visibile: si consulta, nessuna presa visione. */
+  acknowledgmentRequired: boolean;
 }
 
 export default function MemoListPage() {
@@ -120,7 +122,7 @@ export default function MemoListPage() {
                     {isExpired && (
                       <span className="text-[10px] font-ui uppercase tracking-wider px-2 py-0.5 bg-ivory-dark text-charcoal/50">Scaduto</span>
                     )}
-                    {!memo.acknowledged && !isExpired && (
+                    {memo.acknowledgmentRequired && !memo.acknowledged && !isExpired && (
                       <span className="text-[10px] font-ui font-bold uppercase tracking-wider px-2 py-0.5 bg-terracotta/10 text-terracotta">Da leggere</span>
                     )}
                     {memo.acknowledged && (
@@ -131,7 +133,7 @@ export default function MemoListPage() {
                     const newExpanded = expandedMemo === memo.id ? null : memo.id;
                     setExpandedMemo(newExpanded);
                     // Auto-acknowledge on expand
-                    if (newExpanded && !memo.acknowledged) {
+                    if (newExpanded && memo.acknowledgmentRequired && !memo.acknowledged) {
                       fetch(`/api/content/${memo.contentId}/acknowledge`, { method: "POST" }).catch(() => {});
                     }
                   }}
@@ -142,9 +144,11 @@ export default function MemoListPage() {
                     <>
                       <div className="text-sm text-charcoal prose prose-sm max-w-none mt-2 p-3 bg-ivory border border-ivory-dark whitespace-pre-line"
                         dangerouslySetInnerHTML={{ __html: sanitizeHtml(memo.body) }} />
-                      <div className="mt-3">
-                        <AcknowledgeButton contentId={memo.contentId} acknowledged={memo.acknowledged} acknowledgedAt={memo.acknowledgedAt?.toString() ?? null} />
-                      </div>
+                      {memo.acknowledgmentRequired && (
+                        <div className="mt-3">
+                          <AcknowledgeButton contentId={memo.contentId} acknowledged={memo.acknowledged} acknowledgedAt={memo.acknowledgedAt?.toString() ?? null} />
+                        </div>
+                      )}
                       {/* Registro presa visione: HM+ sempre, HOD solo per i propri memo */}
                       {(userRole === "HOTEL_MANAGER" || userRole === "ADMIN" || userRole === "SUPER_ADMIN" ||
                         (userRole === "HOD" && memo.createdById === userId)) && (
