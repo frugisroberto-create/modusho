@@ -17,6 +17,9 @@ import {
   canUserManageContentType,
   getAccessiblePropertyIds,
   getAccessibleDepartmentIds,
+  getOperativeDepartmentIds,
+  isContentRecipient,
+  isInTargetAudience,
   canUserAccessContent,
   type ContentVisibilityInput,
 } from "../rbac";
@@ -217,5 +220,114 @@ describe("canUserAccessContent", () => {
     } as any);
     mockedPrisma.propertyAssignment.findMany.mockResolvedValue([]);
     expect(await canUserAccessContent("op-1", "OPERATOR", content)).toBe(false);
+  });
+});
+
+// ─── Reparti operativi vs reparti visibili ─────────────────────────────
+
+describe("getOperativeDepartmentIds", () => {
+  const hodFrontOfficeConHousekeepingVisibile = () => {
+    mockedPrisma.user.findUnique.mockResolvedValue({
+      role: "HOD", viewDepartmentIds: ["dept-hk"],
+    } as any);
+    mockedPrisma.propertyAssignment.findMany.mockResolvedValue([
+      { id: "a1", userId: "hod-1", propertyId: "prop-1", departmentId: "dept-fo" },
+    ] as any);
+    mockedPrisma.department.findMany.mockResolvedValue([{ id: "dept-hk" }] as any);
+  };
+
+  it("i reparti visibili restano accessibili in consultazione", async () => {
+    hodFrontOfficeConHousekeepingVisibile();
+    expect(await getAccessibleDepartmentIds("hod-1", "prop-1")).toEqual(["dept-fo", "dept-hk"]);
+  });
+
+  it("i reparti visibili NON sono reparti operativi", async () => {
+    hodFrontOfficeConHousekeepingVisibile();
+    expect(await getOperativeDepartmentIds("hod-1", "prop-1")).toEqual(["dept-fo"]);
+    expect(mockedPrisma.department.findMany).not.toHaveBeenCalled();
+  });
+
+  it("assegnazione a tutta la property -> tutti i reparti sono operativi", async () => {
+    mockedPrisma.user.findUnique.mockResolvedValue({ role: "HOTEL_MANAGER", viewDepartmentIds: [] } as any);
+    mockedPrisma.propertyAssignment.findMany.mockResolvedValue([
+      { id: "a1", userId: "hm-1", propertyId: "prop-1", departmentId: null },
+    ] as any);
+    mockedPrisma.department.findMany.mockResolvedValue([{ id: "dept-fo" }, { id: "dept-hk" }] as any);
+    expect(await getOperativeDepartmentIds("hm-1", "prop-1")).toEqual(["dept-fo", "dept-hk"]);
+  });
+
+  it("nessuna assegnazione nella property -> nessun reparto, anche con visibili", async () => {
+    mockedPrisma.user.findUnique.mockResolvedValue({ role: "HOD", viewDepartmentIds: ["dept-hk"] } as any);
+    mockedPrisma.propertyAssignment.findMany.mockResolvedValue([]);
+    expect(await getOperativeDepartmentIds("hod-1", "prop-1")).toEqual([]);
+  });
+});
+
+// ─── Destinatario vs consultazione ─────────────────────────────────────
+
+describe("isContentRecipient", () => {
+  const target = (t: Partial<ContentVisibilityInput["targetAudience"][number]>) => ({
+    targetType: "DEPARTMENT" as const, targetRole: null, targetDepartmentId: null, targetUserId: null, ...t,
+  });
+  const memoFrontOffice = [target({ targetDepartmentId: "dept-fo" })];
+
+  it("operatore del reparto destinatario -> destinatario", () => {
+    expect(isContentRecipient({ id: "op-1", role: "OPERATOR" }, ["dept-fo"], memoFrontOffice)).toBe(true);
+  });
+
+  it("HOD con il reparto solo tra i visibili -> NON destinatario", () => {
+    // I reparti visibili non vengono passati: sono solo consultazione
+    expect(isContentRecipient({ id: "hod-hk", role: "HOD" }, ["dept-hk"], memoFrontOffice)).toBe(false);
+  });
+
+  it("tutti gli operatori -> destinatari anche gli HOD", () => {
+    const tutti = [target({ targetType: "ROLE", targetRole: "OPERATOR" })];
+    expect(isContentRecipient({ id: "hod-hk", role: "HOD" }, ["dept-hk"], tutti)).toBe(true);
+  });
+
+  it("target sul ruolo HOD -> non raggiunge gli operatori", () => {
+    const soloHod = [target({ targetType: "ROLE", targetRole: "HOD" })];
+    expect(isContentRecipient({ id: "hod-1", role: "HOD" }, [], soloHod)).toBe(true);
+    expect(isContentRecipient({ id: "op-1", role: "OPERATOR" }, ["dept-fo"], soloHod)).toBe(false);
+  });
+
+  it("target su utente specifico -> solo quell'utente", () => {
+    const soloAntonia = [target({ targetType: "USER", targetUserId: "op-antonia" })];
+    expect(isContentRecipient({ id: "op-antonia", role: "OPERATOR" }, [], soloAntonia)).toBe(true);
+    expect(isContentRecipient({ id: "op-altro", role: "OPERATOR" }, ["dept-fo"], soloAntonia)).toBe(false);
+  });
+
+  it("nessun target -> nessun destinatario", () => {
+    expect(isContentRecipient({ id: "op-1", role: "OPERATOR" }, ["dept-fo"], [])).toBe(false);
+  });
+});
+
+// ─── Registro presa visione ────────────────────────────────────────────
+
+describe("isInTargetAudience", () => {
+  const t = (x: Partial<ContentVisibilityInput["targetAudience"][number]>) => ({
+    targetType: "DEPARTMENT" as const, targetRole: null, targetDepartmentId: null, targetUserId: null, ...x,
+  });
+  const memoFrontOffice = [t({ targetDepartmentId: "dept-fo" })];
+
+  it("memo al Front Office: dentro operatori e HOD del Front Office", () => {
+    expect(isInTargetAudience({ id: "op-fo", role: "OPERATOR", assignedDepartmentIds: ["dept-fo"] }, memoFrontOffice)).toBe(true);
+    expect(isInTargetAudience({ id: "hod-fo", role: "HOD", assignedDepartmentIds: ["dept-fo"] }, memoFrontOffice)).toBe(true);
+  });
+
+  it("memo al Front Office: fuori i capi reparto degli altri reparti", () => {
+    expect(isInTargetAudience({ id: "hod-hk", role: "HOD", assignedDepartmentIds: ["dept-hk"] }, memoFrontOffice)).toBe(false);
+  });
+
+  it("tutti gli operatori: solo operatori, come nella pagina Presa visione", () => {
+    const tutti = [t({ targetType: "ROLE", targetRole: "OPERATOR" })];
+    expect(isInTargetAudience({ id: "op-hk", role: "OPERATOR", assignedDepartmentIds: ["dept-hk"] }, tutti)).toBe(true);
+    expect(isInTargetAudience({ id: "hod-hk", role: "HOD", assignedDepartmentIds: ["dept-hk"] }, tutti)).toBe(false);
+  });
+
+  it("utente specifico: solo lui", () => {
+    const soloUno = [t({ targetType: "USER", targetUserId: "op-1" })];
+    expect(isInTargetAudience({ id: "op-1", role: "OPERATOR", assignedDepartmentIds: [] }, soloUno)).toBe(true);
+    expect(isInTargetAudience({ id: "op-2", role: "OPERATOR", assignedDepartmentIds: ["dept-fo"] }, soloUno)).toBe(false);
   });
 });

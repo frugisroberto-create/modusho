@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
-import { getAccessiblePropertyIds, getAccessibleDepartmentIds, checkAccess, canUserManageContentType } from "@/lib/rbac";
+import { getAccessiblePropertyIds, getAccessibleDepartmentIds, getOperativeDepartmentIds, isContentRecipient, checkAccess, canUserManageContentType } from "@/lib/rbac";
 import { sendContentPublishedPush } from "@/lib/push-notification";
 import { checkAudienceForUser } from "@/lib/target-audience-scope-db";
 import { z } from "zod/v4";
@@ -48,8 +48,12 @@ export async function GET(request: NextRequest) {
   };
 
   // Visibilità per OPERATOR/HOD basata su targetAudience (ContentTarget)
-  // Allinea il filtro alla logica di /api/content GET
-  if (userRole === "OPERATOR" || userRole === "HOD") {
+  // Allinea il filtro alla logica di /api/content GET: i reparti visibili
+  // aggiuntivi danno la consultazione, ma solo i reparti operativi rendono
+  // destinatari (acknowledgmentRequired nella risposta).
+  const isTargetedRole = userRole === "OPERATOR" || userRole === "HOD";
+  const operativeDepts = isTargetedRole ? await getOperativeDepartmentIds(userId, propertyId) : [];
+  if (isTargetedRole) {
     const accessibleDepts = await getAccessibleDepartmentIds(userId, propertyId);
     contentWhere.targetAudience = {
       some: {
@@ -91,6 +95,9 @@ export async function GET(request: NextRequest) {
               select: { acknowledgedAt: true },
               take: 1,
             },
+            targetAudience: {
+              select: { targetType: true, targetRole: true, targetDepartmentId: true, targetUserId: true },
+            },
           },
         },
       },
@@ -114,6 +121,10 @@ export async function GET(request: NextRequest) {
       expiresAt: m.expiresAt,
       acknowledged: m.content.acknowledgments.length > 0,
       acknowledgedAt: m.content.acknowledgments[0]?.acknowledgedAt ?? null,
+      // HM e superiori: comportamento invariato (nessun filtro destinatari)
+      acknowledgmentRequired: isTargetedRole
+        ? isContentRecipient({ id: userId, role: userRole }, operativeDepts, m.content.targetAudience)
+        : true,
     })),
     meta: { page, pageSize, total },
   });

@@ -2,13 +2,13 @@ import { NextRequest, NextResponse } from "next/server";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
-import { checkAccess } from "@/lib/rbac";
+import { checkAccess, isInTargetAudience } from "@/lib/rbac";
 
 type RouteParams = { params: Promise<{ id: string }> };
 
 /**
  * GET: Registro presa visione per contenuti non-SOP (Document, Memo, ecc.)
- * Mostra tutti gli utenti della property con il loro stato di acknowledgment.
+ * Mostra i destinatari del contenuto (OPERATOR e HOD) con il loro stato di acknowledgment.
  * Accessibile solo a HM+.
  */
 export async function GET(request: NextRequest, { params }: RouteParams) {
@@ -27,7 +27,12 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
 
   const content = await prisma.content.findUnique({
     where: { id: contentId, isDeleted: false },
-    select: { id: true, propertyId: true, departmentId: true, status: true },
+    select: {
+      id: true, propertyId: true, departmentId: true, status: true,
+      targetAudience: {
+        select: { targetType: true, targetRole: true, targetDepartmentId: true, targetUserId: true },
+      },
+    },
   });
 
   if (!content || content.status !== "PUBLISHED") {
@@ -45,9 +50,11 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
   const hasAccess = await checkAccess(session.user.id, "OPERATOR", content.propertyId, requiredDept);
   if (!hasAccess) return NextResponse.json({ error: "Accesso negato" }, { status: 403 });
 
-  // Find all users assigned to this property, filtered by department if specified
-  // Exclude the current user from the registry
-  const deptFilter = filterDepartmentId || content.departmentId;
+  // Utenti della property, filtrati per reparto se richiesto (HOD: il proprio).
+  // Senza destinatari salvati (contenuti storici) resta il filtro sul reparto
+  // del contenuto. Escluso l'utente corrente.
+  const hasTargets = content.targetAudience.length > 0;
+  const deptFilter = filterDepartmentId || (hasTargets ? undefined : content.departmentId);
   const userWhere: Record<string, unknown> = {
     isActive: true,
     id: { not: session.user.id },
@@ -62,11 +69,34 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
     },
   };
 
-  const users = await prisma.user.findMany({
+  const candidates = await prisma.user.findMany({
     where: userWhere,
-    select: { id: true, name: true, role: true },
+    select: {
+      id: true, name: true, role: true,
+      propertyAssignments: {
+        where: { propertyId: content.propertyId },
+        select: { departmentId: true },
+      },
+    },
     orderBy: [{ role: "asc" }, { name: "asc" }],
   });
+
+  // Solo i destinatari reali, con la stessa regola della pagina Presa visione:
+  // un capo reparto non compare nel registro di un memo destinato a un altro reparto.
+  const users = hasTargets
+    ? candidates.filter((u) =>
+        isInTargetAudience(
+          {
+            id: u.id,
+            role: u.role,
+            assignedDepartmentIds: u.propertyAssignments
+              .map((a) => a.departmentId)
+              .filter((d): d is string => d !== null),
+          },
+          content.targetAudience
+        )
+      )
+    : candidates;
 
   // Get all acknowledgments for this content
   const acks = await prisma.contentAcknowledgment.findMany({

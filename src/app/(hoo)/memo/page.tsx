@@ -13,6 +13,8 @@ interface MemoItem {
   id: string; contentId: string; title: string; body: string;
   publishedAt: string | null; author: string; isPinned: boolean; expiresAt: string | null;
   acknowledged: boolean; acknowledgedAt: string | null;
+  /** false = memo di un reparto solo visibile: si consulta, nessuna presa visione. */
+  acknowledgmentRequired: boolean;
 }
 
 interface Property { id: string; name: string; code: string }
@@ -122,9 +124,11 @@ export default function MemoManagementPage() {
                       <>
                         <div className="text-sm text-charcoal prose prose-sm max-w-none mt-2 p-3 bg-ivory border border-ivory-dark whitespace-pre-line"
                           dangerouslySetInnerHTML={{ __html: sanitizeHtml(m.body) }} />
-                        <div className="mt-3">
-                          <AcknowledgeButton contentId={m.contentId} acknowledged={m.acknowledged} acknowledgedAt={m.acknowledgedAt?.toString() ?? null} />
-                        </div>
+                        {m.acknowledgmentRequired && (
+                          <div className="mt-3">
+                            <AcknowledgeButton contentId={m.contentId} acknowledged={m.acknowledged} acknowledgedAt={m.acknowledgedAt?.toString() ?? null} />
+                          </div>
+                        )}
                         <ContentAckRegistry contentId={m.contentId} userRole={userRole} userId={userId} propertyId={propertyId} />
                       </>
                     ) : (
