@@ -1140,6 +1140,8 @@ Il sistema invia notifiche push via Web Push API a chi ha accettato il banner di
 | SOP inviata per revisione (submit) | C e A del workflow RACI (escluso R che invia) | "[codice] — [titolo]: inviata per revisione da [nome]" |
 | Bozza SOP salvata (nuova versione) | C e A del workflow RACI (escluso R che salva) | "[codice] — [titolo]: nuova versione salvata da [nome]" |
 | Nota aggiunta su bozza SOP | R, C e A del workflow RACI (escluso autore nota) | "[codice] — [titolo]: nuova nota da [nome]" |
+| SOP restituita (dal workflow o dalla revisione) | R, C e A del workflow RACI (escluso chi restituisce); per contenuti senza workflow, chi li ha inviati | "[Ruolo] [nome] ha restituito la procedura [codice] — [titolo]: «[motivazione]»" |
+| Destinatari aggiunti a un contenuto già pubblicato | Solo chi diventa destinatario con la modifica (non chi lo era già) | "Nuova procedura / Nuovo documento da leggere: [titolo]" |
 | Sollecito presa visione (cron giornaliero 09:00 CET) | Utenti con contenuti PUBLISHED da >24h non confermati | "Hai N contenuti da prendere visione che attendono la tua conferma da più di 24 ore." |
 
 **Tap sulla notifica**: apre la pagina rilevante (dettaglio SOP, workflow editor, o home per i solleciti).

@@ -3,6 +3,7 @@ import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { checkAccess } from "@/lib/rbac";
+import { getContentRecipientUserIds, sendRecipientsAddedPush } from "@/lib/push-notification";
 import { z } from "zod/v4";
 
 interface RouteParams { params: Promise<{ id: string }> }
@@ -65,7 +66,7 @@ export async function PUT(req: NextRequest, { params }: RouteParams) {
 
   const content = await prisma.content.findUnique({
     where: { id, isDeleted: false },
-    select: { id: true, type: true, propertyId: true },
+    select: { id: true, type: true, propertyId: true, status: true, title: true },
   });
   if (!content) return NextResponse.json({ error: "Contenuto non trovato" }, { status: 404 });
 
@@ -97,6 +98,11 @@ export async function PUT(req: NextRequest, { params }: RouteParams) {
     }
   }
 
+  // Per avvisare chi entra fra i destinatari serve l'elenco di prima
+  const previousRecipientIds = content.status === "PUBLISHED"
+    ? await getContentRecipientUserIds(id, session.user.id)
+    : null;
+
   // Transazione: elimina tutti i target esistenti e ricrea
   await prisma.$transaction(async (tx) => {
     await tx.contentTarget.deleteMany({ where: { contentId: id } });
@@ -122,6 +128,16 @@ export async function PUT(req: NextRequest, { params }: RouteParams) {
     }
     // Se departmentIds=[] e allDepartments=false → nessun target (sezione nascosta a tutti)
   });
+
+  if (previousRecipientIds) {
+    await sendRecipientsAddedPush({
+      contentId: id,
+      contentTitle: content.title,
+      contentType: content.type,
+      actorId: session.user.id,
+      previousRecipientIds,
+    });
+  }
 
   return NextResponse.json({ data: { ok: true } });
 }
