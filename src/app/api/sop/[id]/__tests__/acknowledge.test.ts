@@ -12,7 +12,12 @@ import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 
 vi.mock("next-auth", () => ({ getServerSession: vi.fn() }));
 vi.mock("@/lib/auth", () => ({ authOptions: {} }));
-vi.mock("@/lib/rbac", () => ({ canUserAccessContent: vi.fn() }));
+vi.mock("@/lib/rbac", async (importOriginal) => ({
+  // isContentRecipient resta quella vera: la regola di destinatario è il fatto in collaudo
+  ...(await importOriginal<typeof import("@/lib/rbac")>()),
+  canUserAccessContent: vi.fn(),
+  getOperativeDepartmentIds: vi.fn(),
+}));
 vi.mock("@/lib/prisma", () => ({
   prisma: {
     content: { findUnique: vi.fn() },
@@ -22,12 +27,13 @@ vi.mock("@/lib/prisma", () => ({
 }));
 
 import { getServerSession } from "next-auth";
-import { canUserAccessContent } from "@/lib/rbac";
+import { canUserAccessContent, getOperativeDepartmentIds } from "@/lib/rbac";
 import { prisma } from "@/lib/prisma";
 import { POST } from "../acknowledge/route";
 
 const mockedSession = vi.mocked(getServerSession);
 const mockedAccess = vi.mocked(canUserAccessContent);
+const mockedOperative = vi.mocked(getOperativeDepartmentIds);
 const mockedPrisma = vi.mocked(prisma, true);
 
 const NOW = new Date("2026-08-31T10:00:00.000Z");
@@ -39,6 +45,8 @@ beforeEach(() => {
 
   mockedSession.mockResolvedValue({ user: { id: "u-1", role: "OPERATOR" } } as never);
   mockedAccess.mockResolvedValue(true as never);
+  // La SOP è rivolta al reparto d-fo, in cui lavora chi legge
+  mockedOperative.mockResolvedValue(["d-fo"] as never);
   mockedPrisma.content.findUnique.mockResolvedValue({
     id: "sop-1",
     type: "SOP",
@@ -46,7 +54,7 @@ beforeEach(() => {
     version: 3,
     propertyId: "p-1",
     createdById: "u-9",
-    targetAudience: [],
+    targetAudience: [{ targetType: "DEPARTMENT", targetRole: null, targetDepartmentId: "d-fo", targetUserId: null }],
   } as never);
   mockedPrisma.sopViewRecord.upsert.mockResolvedValue({
     contentId: "sop-1",
@@ -131,6 +139,17 @@ describe("POST /api/sop/[id]/acknowledge — il click di chi legge", () => {
 
     const res = await POST(request(), params("sop-1"));
     expect(res.status).toBe(404);
+    expect(mockedPrisma.sopViewRecord.upsert).not.toHaveBeenCalled();
+    expect(mockedPrisma.contentAcknowledgment.upsert).not.toHaveBeenCalled();
+  });
+
+  it("chi la consulta da un reparto solo visibile non registra la lettura", async () => {
+    // Può aprirla (canUserAccessContent la concede), ma non è destinatario:
+    // lavora in d-hk, la SOP è rivolta a d-fo.
+    mockedSession.mockResolvedValue({ user: { id: "u-1", role: "HOD" } } as never);
+    mockedOperative.mockResolvedValue(["d-hk"] as never);
+    const res = await POST(request(), params("sop-1"));
+    expect(res.status).toBe(403);
     expect(mockedPrisma.sopViewRecord.upsert).not.toHaveBeenCalled();
     expect(mockedPrisma.contentAcknowledgment.upsert).not.toHaveBeenCalled();
   });

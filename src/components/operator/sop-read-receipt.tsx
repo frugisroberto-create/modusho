@@ -14,6 +14,8 @@ interface Props {
   readAt: string;
   /** Versione a cui si riferisce la lettura (non sempre quella corrente). */
   version: number | undefined;
+  /** «Letta il» per le procedure, «Letto il» per i documenti. */
+  readLabel?: string;
 }
 
 /** Stesso formato di data di prima: giorno, mese, anno, ora e minuti. */
@@ -27,7 +29,7 @@ function formatReadAt(readAt: string): string {
   });
 }
 
-export function SopReadReceipt({ readAt, version }: Props) {
+export function SopReadReceipt({ readAt, version, readLabel = "Letta il" }: Props) {
   return (
     <div className="bg-white border border-ivory-dark">
       <div className="px-5 py-3 bg-ivory border-b border-ivory-dark">
@@ -41,7 +43,7 @@ export function SopReadReceipt({ readAt, version }: Props) {
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
           </svg>
           <p className="text-sm font-ui font-medium text-[#2E7D32]">
-            Letta il {formatReadAt(readAt)} — versione {version}
+            {readLabel} {formatReadAt(readAt)}{version !== undefined ? ` — versione ${version}` : ""}
           </p>
         </div>
       </div>

@@ -30,11 +30,26 @@ export function isGovernanceRole(role: Role): boolean {
   return GOVERNANCE_ROLES.includes(role);
 }
 
+/**
+ * Ruoli per cui la lettura si registra solo se il contenuto è rivolto a loro.
+ * Per operatori e capi reparto un reparto soltanto visibile dà la
+ * consultazione: niente pulsante, niente lettura registrata.
+ */
+export function readingRequiresRecipient(role: Role): boolean {
+  return role === "OPERATOR" || role === "HOD";
+}
+
 export interface ReadPanelInput {
   role: Role;
   contentStatus: ContentStatus;
   /** Lettura già registrata per la versione che conta. */
   alreadyRead: boolean;
+  /**
+   * Il contenuto è rivolto a questa persona. Per chi lo consulta soltanto
+   * (reparto visibile, autore non destinatario) il pannello non compare e il
+   * testo si legge direttamente.
+   */
+  isRecipient: boolean;
 }
 
 /**
@@ -45,9 +60,10 @@ export interface ReadPanelInput {
  * (la rotta rifiuta il resto). Senza questa condizione, un HOD che apre una
  * bozza resta chiuso fuori dal testo da un pulsante che non può funzionare.
  */
-export function showsReadPanel({ role, contentStatus, alreadyRead }: ReadPanelInput): boolean {
+export function showsReadPanel({ role, contentStatus, alreadyRead, isRecipient }: ReadPanelInput): boolean {
   if (alreadyRead) return false;
   if (isGovernanceRole(role)) return false;
+  if (!isRecipient) return false;
   return contentStatus === "PUBLISHED";
 }
 

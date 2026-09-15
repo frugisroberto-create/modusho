@@ -1,6 +1,7 @@
 import { describe, it, expect } from "vitest";
 import {
   showsReadPanel,
+  readingRequiresRecipient,
   buildSopReadWrites,
   classifySopReadClick,
   SOP_READ_ERROR_MESSAGE,
@@ -15,21 +16,21 @@ import {
 
 describe("showsReadPanel — a chi si mostra il pannello", () => {
   it("un OPERATOR che non ha ancora letto una SOP pubblicata lo vede", () => {
-    expect(showsReadPanel({ role: "OPERATOR", contentStatus: "PUBLISHED", alreadyRead: false })).toBe(true);
+    expect(showsReadPanel({ role: "OPERATOR", contentStatus: "PUBLISHED", alreadyRead: false, isRecipient: true })).toBe(true);
   });
 
   it("un HOD si comporta come l'OPERATOR", () => {
-    expect(showsReadPanel({ role: "HOD", contentStatus: "PUBLISHED", alreadyRead: false })).toBe(true);
+    expect(showsReadPanel({ role: "HOD", contentStatus: "PUBLISHED", alreadyRead: false, isRecipient: true })).toBe(true);
   });
 
   it("chi ha già letto vede il testo, non il pannello", () => {
-    expect(showsReadPanel({ role: "OPERATOR", contentStatus: "PUBLISHED", alreadyRead: true })).toBe(false);
-    expect(showsReadPanel({ role: "HOD", contentStatus: "PUBLISHED", alreadyRead: true })).toBe(false);
+    expect(showsReadPanel({ role: "OPERATOR", contentStatus: "PUBLISHED", alreadyRead: true, isRecipient: true })).toBe(false);
+    expect(showsReadPanel({ role: "HOD", contentStatus: "PUBLISHED", alreadyRead: true, isRecipient: true })).toBe(false);
   });
 
   it("HM, ADMIN e SUPER_ADMIN vedono sempre il testo: per loro la lettura si registra da sola", () => {
     for (const role of ["HOTEL_MANAGER", "ADMIN", "SUPER_ADMIN"] as const) {
-      expect(showsReadPanel({ role, contentStatus: "PUBLISHED", alreadyRead: false })).toBe(false);
+      expect(showsReadPanel({ role, contentStatus: "PUBLISHED", alreadyRead: false, isRecipient: true })).toBe(false);
     }
   });
 
@@ -38,7 +39,25 @@ describe("showsReadPanel — a chi si mostra il pannello", () => {
     // pubblicato. Mostrare il pannello qui significherebbe sbarrare la strada
     // con un comando inerte.
     for (const contentStatus of ["DRAFT", "REVIEW_HM", "REVIEW_ADMIN", "RETURNED", "ARCHIVED"] as const) {
-      expect(showsReadPanel({ role: "HOD", contentStatus, alreadyRead: false })).toBe(false);
+      expect(showsReadPanel({ role: "HOD", contentStatus, alreadyRead: false, isRecipient: true })).toBe(false);
+    }
+  });
+});
+
+describe("showsReadPanel — chi consulta senza essere destinatario", () => {
+  it("un HOD che apre una SOP di un reparto solo visibile legge il testo: nessun pannello", () => {
+    expect(showsReadPanel({ role: "HOD", contentStatus: "PUBLISHED", alreadyRead: false, isRecipient: false })).toBe(false);
+  });
+
+  it("vale anche per l'OPERATOR", () => {
+    expect(showsReadPanel({ role: "OPERATOR", contentStatus: "PUBLISHED", alreadyRead: false, isRecipient: false })).toBe(false);
+  });
+
+  it("la condizione di destinatario riguarda solo operatori e capi reparto", () => {
+    expect(readingRequiresRecipient("OPERATOR")).toBe(true);
+    expect(readingRequiresRecipient("HOD")).toBe(true);
+    for (const role of ["CORPORATE", "HOTEL_MANAGER", "ADMIN", "SUPER_ADMIN"] as const) {
+      expect(readingRequiresRecipient(role)).toBe(false);
     }
   });
 });

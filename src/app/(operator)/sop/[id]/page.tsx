@@ -16,6 +16,7 @@ import { ListBackLink } from "@/components/operator/list-back-link";
 import { sanitizeHtml } from "@/lib/sanitize";
 import { showsReadPanel } from "@/lib/sop-read";
 import { recordSopRead } from "@/lib/sop-read-db";
+import { isReadingRecipient } from "@/lib/content-read-db";
 
 interface Props { params: Promise<{ id: string }> }
 
@@ -55,6 +56,13 @@ export default async function SopDetailPage({ params }: Props) {
     targetAudience: content.targetAudience,
   });
   if (!canAccess) notFound();
+
+  // Operatori e capi reparto registrano la lettura solo se la SOP è rivolta a loro:
+  // chi la consulta da un reparto soltanto visibile la legge e basta.
+  const isRecipient = await isReadingRecipient(
+    { id: user.id, role: user.role },
+    { propertyId: content.propertyId, targetAudience: content.targetAudience }
+  );
 
   const isOperator = user.role === "OPERATOR";
   const isHod = user.role === "HOD";
@@ -136,8 +144,8 @@ export default async function SopDetailPage({ params }: Props) {
         </MobileHide>
       </div>
 
-      {/* ── Pannello di lettura: OPERATOR/HOD su SOP pubblicate. HM+ vede sempre il contenuto ── */}
-      {showsReadPanel({ role: user.role, contentStatus: content.status, alreadyRead: acknowledged }) ? (
+      {/* ── Pannello di lettura: OPERATOR/HOD destinatari, su SOP pubblicate. HM+ e chi consulta vedono il contenuto ── */}
+      {showsReadPanel({ role: user.role, contentStatus: content.status, alreadyRead: acknowledged, isRecipient }) ? (
         <SopReadPanel
           contentId={content.id}
           title={content.title}

@@ -4,7 +4,6 @@ import { useState, useEffect, useCallback } from "react";
 import Link from "next/link";
 import { ExportPdfButton } from "@/components/shared/export-pdf-button";
 import { ContentAckRegistry } from "@/components/shared/content-ack-registry";
-import { AcknowledgeButton } from "@/components/operator/acknowledge-button";
 import { useHooContext } from "@/components/hoo/hoo-shell";
 import { useSession } from "next-auth/react";
 import { sanitizeHtml } from "@/lib/sanitize";
@@ -115,7 +114,16 @@ export default function MemoManagementPage() {
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-2 mb-1">
                       {isExpired && <span className="text-xs font-medium px-2 py-0.5 bg-ivory-dark text-charcoal/50">Scaduto</span>}
-                      <button onClick={() => setExpandedMemo(expandedMemo === m.id ? null : m.id)}
+                      <button onClick={() => {
+                          const opening = expandedMemo !== m.id;
+                          setExpandedMemo(opening ? m.id : null);
+                          // Chi apre il memo lo legge: la lettura si registra da sola, come nella pagina Memo
+                          if (opening && m.acknowledgmentRequired && !m.acknowledged) {
+                            fetch(`/api/content/${m.contentId}/acknowledge`, { method: "POST" })
+                              .then((res) => { if (res.ok) fetchMemos(); })
+                              .catch(() => {});
+                          }
+                        }}
                         className="font-medium text-charcoal-dark text-sm truncate hover:text-terracotta transition-colors text-left">
                         {m.title}
                       </button>
@@ -124,11 +132,6 @@ export default function MemoManagementPage() {
                       <>
                         <div className="text-sm text-charcoal prose prose-sm max-w-none mt-2 p-3 bg-ivory border border-ivory-dark whitespace-pre-line"
                           dangerouslySetInnerHTML={{ __html: sanitizeHtml(m.body) }} />
-                        {m.acknowledgmentRequired && (
-                          <div className="mt-3">
-                            <AcknowledgeButton contentId={m.contentId} acknowledged={m.acknowledged} acknowledgedAt={m.acknowledgedAt?.toString() ?? null} />
-                          </div>
-                        )}
                         <ContentAckRegistry contentId={m.contentId} userRole={userRole} userId={userId} propertyId={propertyId} />
                       </>
                     ) : (

@@ -300,7 +300,7 @@ Content {
 - NON seguono il workflow SOP (no DRAFT → REVIEW_HM → ecc.)
 - Vengono pubblicati direttamente (status = PUBLISHED alla creazione)
 - propertyId nullable: se null, il contenuto è di gruppo (visibile a tutte le strutture)
-- Brand Book e Standard Book sono documenti di **consultazione**, NON soggetti a presa visione obbligatoria. Non compaiono nella sezione "Da prendere visione", nella pagina "Presa visione" (compliance), né hanno il bottone "Confermo presa visione" nel dettaglio.
+- Brand Book e Standard Book sono documenti di **consultazione**, NON soggetti a presa visione obbligatoria. Non compaiono nella sezione "Da prendere visione", nella pagina "Presa visione" (compliance), né hanno il pulsante di lettura nel dettaglio.
 
 **Visibilità per tipo:**
 - **Brand Book**: visibile **solo a HOTEL_MANAGER, ADMIN, SUPER_ADMIN**. OPERATOR e HOD NON vedono il Brand Book — è materiale di brand interno destinato alla governance, non operativo. Bloccato sia in lista che in dettaglio.
@@ -855,6 +855,14 @@ Ogni SOP ha uno o più destinatari definiti nel modello `ContentTarget`:
 - **Dettaglio SOP**: lista completa dei destinatari con stato presa visione (chi ha letto, chi no)
 - **Coda approvazioni**: colonna "Destinatari" con indicazione sintetica
 - **Dashboard KPI**: % presa visione calcolata sul numero di destinatari che hanno confermato
+
+### Lettura di SOP, documenti e memo
+
+Non esiste più una conferma da firmare («Confermo presa visione»): **chi apre, legge**.
+- **SOP e documenti**, operatori e capi reparto **destinatari**: un pannello sobrio con **«Clicca qui per leggere la procedura / il documento»**; il click registra la lettura e mostra il testo, poi resta *«Letta/Letto il …»*.
+- **Memo**: aprire il memo registra la lettura; nessun pulsante.
+- **HM, ADMIN, SUPER_ADMIN**: aprire il contenuto registra la lettura da solo.
+- **Chi consulta senza essere destinatario** (reparto solo visibile, autore non destinatario): legge direttamente, **nessun pannello e nessuna lettura registrata**; le rotte `/api/sop/[id]/acknowledge` e `/api/content/[id]/acknowledge` rifiutano. Regola in `isReadingRecipient` (`src/lib/content-read-db.ts`), la stessa della home.
 
 ### Regole di targeting
 

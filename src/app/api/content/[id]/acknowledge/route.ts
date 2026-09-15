@@ -3,6 +3,7 @@ import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { canUserAccessContent } from "@/lib/rbac";
+import { isReadingRecipient, recordContentRead } from "@/lib/content-read-db";
 
 export async function POST(
   request: NextRequest,
@@ -46,6 +47,12 @@ export async function POST(
     return NextResponse.json({ error: "Non sei tra i destinatari di questo contenuto" }, { status: 403 });
   }
 
+  // Chi lo consulta soltanto (reparto visibile) lo legge, ma la lettura non si registra
+  const isRecipient = await isReadingRecipient({ id: userId, role: session.user.role }, content);
+  if (!isRecipient) {
+    return NextResponse.json({ error: "Stai consultando questo contenuto: non sei tra i destinatari, la lettura non si registra" }, { status: 403 });
+  }
+
   // Idempotente: se già confermato, ritorna il record esistente
   const existing = await prisma.contentAcknowledgment.findUnique({
     where: { contentId_userId: { contentId, userId } },
@@ -61,13 +68,7 @@ export async function POST(
     });
   }
 
-  const acknowledgment = await prisma.contentAcknowledgment.create({
-    data: {
-      contentId,
-      userId,
-      required: true,
-    },
-  });
+  const acknowledgment = await recordContentRead({ contentId, userId });
 
   return NextResponse.json({
     data: {

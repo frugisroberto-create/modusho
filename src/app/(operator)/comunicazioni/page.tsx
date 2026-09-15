@@ -5,7 +5,6 @@ import { useSession } from "next-auth/react";
 import { useSearchParams } from "next/navigation";
 import { useOperatorContext } from "@/components/operator/operator-shell";
 import { ExportPdfButton } from "@/components/shared/export-pdf-button";
-import { AcknowledgeButton } from "@/components/operator/acknowledge-button";
 import { ContentAckRegistry } from "@/components/shared/content-ack-registry";
 import { LiveSearchBar } from "@/components/shared/live-search-bar";
 import { sanitizeHtml } from "@/lib/sanitize";
@@ -164,11 +163,6 @@ export default function MemoListPage() {
                     <>
                       <div className="text-sm text-charcoal prose prose-sm max-w-none mt-2 p-3 bg-ivory border border-ivory-dark whitespace-pre-line"
                         dangerouslySetInnerHTML={{ __html: sanitizeHtml(memo.body) }} />
-                      {memo.acknowledgmentRequired && (
-                        <div className="mt-3">
-                          <AcknowledgeButton contentId={memo.contentId} acknowledged={memo.acknowledged} acknowledgedAt={memo.acknowledgedAt?.toString() ?? null} />
-                        </div>
-                      )}
                       {/* Registro presa visione: HM+ sempre, HOD solo per i propri memo */}
                       {(userRole === "HOTEL_MANAGER" || userRole === "ADMIN" || userRole === "SUPER_ADMIN" ||
                         (userRole === "HOD" && memo.createdById === userId)) && (

@@ -8,8 +8,8 @@
  * negli stessi due registri di sempre. Qui cambiano solo le parole e il
  * colore — e il fatto che un click andato male adesso lo dice.
  *
- * Resta separato da AcknowledgeButton perché quello serve anche a memo e
- * documenti, che questa modifica non tocca.
+ * Lo usano anche i documenti, con la loro rotta e il loro testo: il gesto è
+ * lo stesso, «clicca per leggere», e non esiste più una conferma da firmare.
  */
 
 import { useState } from "react";
@@ -23,9 +23,13 @@ import {
 
 interface Props {
   contentId: string;
+  /** Rotta che registra la lettura. Di default quella delle SOP. */
+  endpoint?: string;
+  /** Testo del pulsante. Di default quello delle procedure. */
+  label?: string;
 }
 
-export function SopReadButton({ contentId }: Props) {
+export function SopReadButton({ contentId, endpoint, label = "Clicca qui per leggere la procedura" }: Props) {
   const router = useRouter();
   const [loading, setLoading] = useState(false);
   const [errore, setErrore] = useState<string | null>(null);
@@ -36,7 +40,7 @@ export function SopReadButton({ contentId }: Props) {
 
     let esito: SopReadClickOutcome;
     try {
-      const res = await fetch(`/api/sop/${contentId}/acknowledge`, { method: "POST" });
+      const res = await fetch(endpoint ?? `/api/sop/${contentId}/acknowledge`, { method: "POST" });
       esito = classifySopReadClick(res.status);
     } catch {
       esito = SOP_READ_NETWORK_OUTCOME;
@@ -62,7 +66,7 @@ export function SopReadButton({ contentId }: Props) {
         disabled={loading}
         className="px-6 py-3 text-sm font-ui font-semibold text-white bg-green-read hover:bg-green-read/90 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
       >
-        {loading ? "Apertura in corso..." : "Clicca qui per leggere la procedura"}
+        {loading ? "Apertura in corso..." : label}
       </button>
       {errore && (
         <p role="alert" className="text-sm font-ui text-alert-red">
