@@ -77,13 +77,17 @@ describe("le rotte chiamano il perimetro, non lo riscrivono", () => {
 });
 
 describe("le regole degli altri ruoli restano dove sono sempre state", () => {
-  it("POST /api/memo conserva intatta la restrizione dell'HOD", () => {
+  it("POST /api/memo conserva la restrizione dell'HOD, sui soli reparti operativi", () => {
     const code = source(ROUTES["POST /api/memo"]);
+    const hodBranch = code.slice(code.indexOf('if (role === "HOD") {'));
     expect(code).toContain('if (role === "HOD") {');
     expect(code).toContain(
       "Come HOD puoi targettare solo i tuoi reparti — non sono ammessi ruoli trasversali, utenti specifici o 'tutti gli operatori'"
     );
-    expect(code).toContain("getAccessibleDepartmentIds");
+    // I reparti visibili aggiuntivi non danno il titolo per scrivere
+    expect(hodBranch).toContain("getOperativeDepartmentIds(userId, propertyId)");
+    // Una lista reparti vuota non può scivolare nel fallback "tutti gli operatori"
+    expect(hodBranch).toContain("targetDepartmentIds.length === 0");
   });
 
   it("PUT /api/content/[id] conserva intatti i cancelli di stato per HM e ADMIN", () => {

@@ -254,6 +254,25 @@ export function isContentRecipient(
 }
 
 /**
+ * Chi può modificare e archiviare un memo pubblicato:
+ *  - "manager": HOTEL_MANAGER, ADMIN, SUPER_ADMIN (il perimetro sulla property
+ *    lo verifica la rotta) — può anche metterlo in evidenza ed eliminarlo;
+ *  - "author": l'HOD che l'ha creato — modifica e archivia solo i propri memo;
+ *  - null: nessun permesso.
+ * Funzione pura.
+ */
+export type MemoManagerKind = "manager" | "author" | null;
+
+export function getMemoManagerKind(
+  user: { id: string; role: Role },
+  memo: { createdById: string }
+): MemoManagerKind {
+  if (user.role === "HOTEL_MANAGER" || user.role === "ADMIN" || user.role === "SUPER_ADMIN") return "manager";
+  if (user.role === "HOD" && memo.createdById === user.id) return "author";
+  return null;
+}
+
+/**
  * Registro presa visione: l'utente rientra tra i destinatari del contenuto?
  * Stessa regola di /api/compliance (e delle notifiche di pubblicazione):
  *  - ROLE/X: utenti con quel ruolo esatto
