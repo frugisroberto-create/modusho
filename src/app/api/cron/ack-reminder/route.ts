@@ -2,6 +2,8 @@ import { NextResponse } from "next/server";
 import webpush from "web-push";
 import { prisma } from "@/lib/prisma";
 import { createNotifications } from "@/lib/notifications";
+import { getRolesForRoleTarget } from "@/lib/rbac";
+import type { Role } from "@prisma/client";
 
 const VAPID_PUBLIC_KEY = process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY || "";
 const VAPID_PRIVATE_KEY = process.env.VAPID_PRIVATE_KEY || "";
@@ -178,7 +180,7 @@ async function expandTargets(targets: TargetInput[], propertyId: string): Promis
       if (!propertyUserCache.has(cacheKey)) {
         const users = await prisma.user.findMany({
           where: {
-            role: t.targetRole as "OPERATOR" | "HOD" | "HOTEL_MANAGER",
+            role: { in: getRolesForRoleTarget(t.targetRole as Role) },
             isActive: true,
             propertyAssignments: { some: { propertyId } },
           },

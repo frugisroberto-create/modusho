@@ -188,7 +188,9 @@ export async function GET(request: NextRequest) {
       if (target.targetType === "ROLE") {
         const propertyUsers = await getUsersForProperty(content.propertyId);
         if (target.targetRole === "OPERATOR") {
+          // «Tutti gli operatori» comprende i capi reparto (getRolesForRoleTarget)
           for (const uid of propertyUsers.operators) targetUserIds.add(uid);
+          for (const uid of propertyUsers.hods) targetUserIds.add(uid);
         } else if (target.targetRole === "HOD") {
           for (const uid of propertyUsers.hods) targetUserIds.add(uid);
         } else if (target.targetRole === "HOTEL_MANAGER") {
