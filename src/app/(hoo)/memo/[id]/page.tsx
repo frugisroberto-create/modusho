@@ -4,15 +4,20 @@ import { useState, useEffect } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { AttachmentUploader } from "@/components/shared/attachment-uploader";
 import { ExportPdfButton } from "@/components/shared/export-pdf-button";
+import { useHooContext } from "@/components/hoo/hoo-shell";
 
 export default function EditMemoPage() {
   const { id } = useParams<{ id: string }>();
   const router = useRouter();
+  const { userRole } = useHooContext();
+  // L'HOD gestisce i propri memo dalla pagina Memo operativa
+  const backHref = userRole === "HOD" ? "/comunicazioni" : "/memo";
   const [title, setTitle] = useState("");
   const [body, setBody] = useState("");
   const [contentId, setContentId] = useState("");
   const [expiresAt, setExpiresAt] = useState("");
-  const [isPinned, setIsPinned] = useState(false);
+  const [canDelete, setCanDelete] = useState(false);
+  const [error, setError] = useState("");
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [showDeleteModal, setShowDeleteModal] = useState(false);
@@ -20,12 +25,17 @@ export default function EditMemoPage() {
 
   useEffect(() => {
     async function fetchMemo() {
-      const res = await fetch(`/api/content/${id}`);
+      // Carica i valori reali del memo (scadenza compresa) e i comandi concessi
+      const res = await fetch(`/api/memo/${id}`);
+      const json = await res.json().catch(() => ({}));
       if (res.ok) {
-        const json = await res.json();
         setTitle(json.data.title);
         setBody(json.data.body);
-        setContentId(json.data.id);
+        setContentId(json.data.contentId);
+        setExpiresAt(json.data.expiresAt ? String(json.data.expiresAt).slice(0, 10) : "");
+        setCanDelete(json.permissions?.canDelete === true);
+      } else {
+        setError(json.error ?? "Memo non disponibile");
       }
       setLoading(false);
     }
@@ -34,13 +44,19 @@ export default function EditMemoPage() {
 
   const handleSave = async () => {
     setSaving(true);
+    setError("");
     try {
+      // "In evidenza" non si tocca da qui: non c'è il comando, quindi non si invia
       const res = await fetch(`/api/memo/${id}`, {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ title, body, expiresAt: expiresAt || null, isPinned }),
+        body: JSON.stringify({ title, body, expiresAt: expiresAt || null }),
       });
-      if (res.ok) { router.push("/memo"); router.refresh(); }
+      if (res.ok) { router.push(backHref); router.refresh(); }
+      else {
+        const json = await res.json().catch(() => ({}));
+        setError(json.error ?? "Salvataggio non riuscito");
+      }
     } finally { setSaving(false); }
   };
 
@@ -49,7 +65,7 @@ export default function EditMemoPage() {
     try {
       const res = await fetch(`/api/content/${id}`, { method: "DELETE" });
       if (res.ok) {
-        router.push("/memo");
+        router.push(backHref);
         router.refresh();
       }
     } finally {
@@ -63,6 +79,9 @@ export default function EditMemoPage() {
   return (
     <div className="max-w-2xl space-y-6">
       <h1 className="text-xl font-heading font-medium text-charcoal-dark">Modifica memo</h1>
+      {error && (
+        <div className="px-3 py-2 text-sm font-ui bg-[#FECACA] border-l-4 border-alert-red text-alert-red">{error}</div>
+      )}
       <div className="bg-white border border-ivory-dark p-5 space-y-4">
         <div>
           <label className="block text-sm font-ui font-medium text-charcoal mb-1.5">Titolo</label>
@@ -86,10 +105,12 @@ export default function EditMemoPage() {
         </button>
         <button onClick={() => router.back()} className="btn-outline">Annulla</button>
         {contentId && <ExportPdfButton contentId={contentId} />}
-        <button onClick={() => setShowDeleteModal(true)}
-          className="btn-outline !border-alert-red !text-alert-red hover:!bg-alert-red hover:!text-white ml-auto">
-          Elimina memo
-        </button>
+        {canDelete && (
+          <button onClick={() => setShowDeleteModal(true)}
+            className="btn-outline !border-alert-red !text-alert-red hover:!bg-alert-red hover:!text-white ml-auto">
+            Elimina memo
+          </button>
+        )}
       </div>
 
       {showDeleteModal && (

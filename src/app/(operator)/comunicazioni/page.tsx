@@ -52,6 +52,26 @@ export default function MemoListPage() {
   }, [currentPropertyId, page]);
 
   useEffect(() => { fetchMemos(); }, [fetchMemos]);
+
+  // Modifica e archiviazione: HM in su su tutti i memo, l'HOD solo sui propri
+  // (stessa regola di getMemoManagerKind, applicata dal server).
+  const canManageMemo = (memo: MemoItem) =>
+    userRole === "HOTEL_MANAGER" || userRole === "ADMIN" || userRole === "SUPER_ADMIN" ||
+    (userRole === "HOD" && memo.createdById === userId);
+
+  const handleArchive = async (memo: MemoItem) => {
+    if (!window.confirm(`Archiviare il memo "${memo.title}"? Sparirà dalle viste operative.`)) return;
+    const res = await fetch(`/api/memo/${memo.id}`, {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ archive: true }),
+    });
+    if (res.ok) fetchMemos();
+    else {
+      const json = await res.json().catch(() => ({}));
+      window.alert(json.error ?? "Archiviazione non riuscita");
+    }
+  };
   useEffect(() => { setPage(1); }, [currentPropertyId]);
 
   // Quando arrivano dalla home con ?open=<id>, scrolla al memo.
@@ -164,7 +184,15 @@ export default function MemoListPage() {
                     {memo.expiresAt && <span>Scade: {new Date(memo.expiresAt).toLocaleDateString("it-IT")}</span>}
                   </div>
                 </div>
-                <ExportPdfButton contentId={memo.contentId} />
+                <div className="flex items-center gap-1 shrink-0">
+                  {canManageMemo(memo) && (
+                    <>
+                      <a href={`/memo/${memo.contentId}`} className="px-2 py-1 text-xs font-ui text-terracotta hover:bg-terracotta/10">Modifica</a>
+                      <button onClick={() => handleArchive(memo)} className="px-2 py-1 text-xs font-ui text-alert-red hover:bg-alert-red/10">Archivia</button>
+                    </>
+                  )}
+                  <ExportPdfButton contentId={memo.contentId} />
+                </div>
               </div>
             );
           })}

@@ -343,6 +343,7 @@ PUBLISHED → ARCHIVED (quando sostituita da nuova versione)
 | Archiviare | HOTEL_MANAGER, ADMIN, SUPER_ADMIN |
 | **Modificare dopo pubblicazione** | **HOTEL_MANAGER, ADMIN, SUPER_ADMIN** |
 | **Eliminare (soft delete)** | **HOTEL_MANAGER, ADMIN, SUPER_ADMIN** |
+| **Modificare e archiviare un MEMO pubblicato** | **HOTEL_MANAGER, ADMIN, SUPER_ADMIN** su tutti i memo della property; **HOD solo sui memo creati da lui** |
 
 ### Flusso di invio per ruolo (matrice RACI)
 
@@ -430,6 +431,8 @@ Dopo la pubblicazione, i ruoli HOTEL_MANAGER, ADMIN e SUPER_ADMIN possono:
 - L'eliminazione è reversibile solo da SUPER_ADMIN
 
 **Queste regole valgono per TUTTI i tipi di contenuto**: SOP, DOCUMENT, MEMO.
+
+**Eccezione MEMO — l'HOD autore.** Il memo non ha workflow: l'HOD lo pubblica direttamente. Per questo l'HOD può **modificare e archiviare i memo che ha creato lui** (titolo, testo, scadenza). Non può metterli in evidenza né eliminarli (restano a HM, ADMIN, SUPER_ADMIN) e non può toccare i memo creati da altri. La regola vive in `getMemoManagerKind` (`src/lib/rbac.ts`) ed è applicata da `PUT /api/memo/[id]`.
 
 ## Archiviazione automatica SOP — REGOLE
 
@@ -860,6 +863,11 @@ Ogni SOP ha uno o più destinatari definiti nel modello `ContentTarget`:
 4. I destinatari vengono definiti in fase di creazione e possono essere modificati fino alla pubblicazione.
 5. Dopo la pubblicazione, i destinatari sono FISSI — il sistema genera automaticamente i ContentAcknowledgment obbligatori per tutti i destinatari.
 6. Il modello dati NON cambia: `ContentTarget` supporta già target multipli (relazione uno-a-molti con Content). La modifica è nella UI del form di creazione/modifica.
+7. **Reparti visibili (`viewDepartmentIds`) = sola consultazione**, nel senso stesso della parola. Un reparto visibile permette di **vedere** i contenuti di quel reparto nelle liste, ma:
+   - **non rende destinatari**: i contenuti di quel reparto non entrano nei «da prendere visione», non portano «Da leggere» e non richiedono conferma di lettura;
+   - **non dà il titolo per scrivere**: un HOD può indirizzare memo e contenuti **solo ai propri reparti operativi** (assegnazioni `PropertyAssignment`), mai a un reparto solo visibile. Il selettore mostra solo i reparti operativi (`/api/my-departments?scope=operative`) e il server lo rivalida (`getOperativeDepartmentIds`).
+8. Un HOD deve sempre indicare almeno un proprio reparto come destinatario del memo: una lista vuota è rifiutata (non diventa «tutti gli operatori»).
+9. Il **registro presa visione** elenca solo i destinatari reali, con la stessa regola della pagina Presa visione (`isInTargetAudience`).
 
 ## Ricerca
 

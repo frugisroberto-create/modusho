@@ -20,6 +20,7 @@ import {
   getOperativeDepartmentIds,
   isContentRecipient,
   isInTargetAudience,
+  getMemoManagerKind,
   canUserAccessContent,
   type ContentVisibilityInput,
 } from "../rbac";
@@ -329,5 +330,30 @@ describe("isInTargetAudience", () => {
     const soloUno = [t({ targetType: "USER", targetUserId: "op-1" })];
     expect(isInTargetAudience({ id: "op-1", role: "OPERATOR", assignedDepartmentIds: [] }, soloUno)).toBe(true);
     expect(isInTargetAudience({ id: "op-2", role: "OPERATOR", assignedDepartmentIds: ["dept-fo"] }, soloUno)).toBe(false);
+  });
+});
+
+// ─── Gestione memo pubblicati ──────────────────────────────────────────
+
+describe("getMemoManagerKind", () => {
+  const memoDiSerena = { createdById: "hod-serena" };
+
+  it("HOD autore: modifica e archivia il proprio memo", () => {
+    expect(getMemoManagerKind({ id: "hod-serena", role: "HOD" }, memoDiSerena)).toBe("author");
+  });
+
+  it("HOD non autore: nessun permesso", () => {
+    expect(getMemoManagerKind({ id: "hod-altro", role: "HOD" }, memoDiSerena)).toBeNull();
+  });
+
+  it("Hotel Manager, ADMIN e SUPER_ADMIN: gestiscono tutti i memo", () => {
+    for (const role of ["HOTEL_MANAGER", "ADMIN", "SUPER_ADMIN"] as const) {
+      expect(getMemoManagerKind({ id: "x", role }, memoDiSerena)).toBe("manager");
+    }
+  });
+
+  it("Operatore e Corporate: nessun permesso, anche se autori", () => {
+    expect(getMemoManagerKind({ id: "hod-serena", role: "OPERATOR" }, memoDiSerena)).toBeNull();
+    expect(getMemoManagerKind({ id: "hod-serena", role: "CORPORATE" }, memoDiSerena)).toBeNull();
   });
 });
