@@ -2,7 +2,8 @@ import { NextRequest, NextResponse } from "next/server";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
-import { checkAccess } from "@/lib/rbac";
+import { checkAccess, type ContentVisibilityInput } from "@/lib/rbac";
+import { selectRegistryRecipients } from "@/lib/registry-recipients";
 
 type RouteParams = { params: Promise<{ id: string }> };
 
@@ -149,82 +150,36 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
 async function resolveTargetUsers(content: {
   propertyId: string;
   departmentId: string | null;
-  targetAudience: {
-    targetType: string;
-    targetRole: string | null;
-    targetDepartmentId: string | null;
-    targetUserId: string | null;
-  }[];
+  targetAudience: ContentVisibilityInput["targetAudience"];
 }, filterDepartmentId?: string) {
-  const targets = content.targetAudience;
-
-  // Se c'è un filtro per reparto (es. HOD vede solo il proprio reparto),
-  // mostra solo operatori assegnati a quel reparto specifico
-  if (filterDepartmentId) {
-    return prisma.user.findMany({
-      where: {
-        isActive: true,
-        role: "OPERATOR",
-        propertyAssignments: {
-          some: {
-            propertyId: content.propertyId,
-            departmentId: filterDepartmentId,
-          },
-        },
+  // Candidati: utenti attivi della struttura, con le assegnazioni in quella struttura.
+  // Chi è destinatario lo decide selectRegistryRecipients, con la stessa regola
+  // di Presa visione, notifiche e sollecito.
+  const candidates = await prisma.user.findMany({
+    where: {
+      isActive: true,
+      propertyAssignments: { some: { propertyId: content.propertyId } },
+    },
+    select: {
+      id: true,
+      name: true,
+      role: true,
+      propertyAssignments: {
+        where: { propertyId: content.propertyId },
+        select: { departmentId: true },
       },
-      select: { id: true, name: true, role: true },
-      orderBy: [{ name: "asc" }],
-    });
-  }
-
-  const where: Record<string, unknown> = {
-    isActive: true,
-    propertyAssignments: { some: { propertyId: content.propertyId } },
-  };
-
-  if (targets.length === 0) {
-    if (content.departmentId) {
-      where.propertyAssignments = {
-        some: {
-          propertyId: content.propertyId,
-          OR: [
-            { departmentId: content.departmentId },
-            { departmentId: null },
-          ],
-        },
-      };
-    }
-  } else {
-    const deptTargets = targets
-      .filter((t) => t.targetType === "DEPARTMENT" && t.targetDepartmentId)
-      .map((t) => t.targetDepartmentId!);
-    const roleTargets = targets
-      .filter((t) => t.targetType === "ROLE" && t.targetRole)
-      .map((t) => t.targetRole!);
-
-    if (deptTargets.length > 0 && roleTargets.length === 0) {
-      // Target solo per reparto: include OPERATOR e HOD del reparto
-      where.role = { in: ["OPERATOR", "HOD"] };
-      where.propertyAssignments = {
-        some: {
-          propertyId: content.propertyId,
-          departmentId: { in: deptTargets },
-        },
-      };
-    } else if (deptTargets.length > 0 && roleTargets.length > 0) {
-      // Target misto: reparto + ruolo
-      where.OR = [
-        { role: { in: ["OPERATOR", "HOD"] }, propertyAssignments: { some: { propertyId: content.propertyId, departmentId: { in: deptTargets } } } },
-        { role: { in: roleTargets }, propertyAssignments: { some: { propertyId: content.propertyId } } },
-      ];
-    } else if (roleTargets.length > 0) {
-      where.role = { in: roleTargets };
-    }
-  }
-
-  return prisma.user.findMany({
-    where,
-    select: { id: true, name: true, role: true },
+    },
     orderBy: [{ role: "asc" }, { name: "asc" }],
   });
+
+  return selectRegistryRecipients(
+    candidates.map((u) => ({
+      id: u.id,
+      name: u.name,
+      role: u.role,
+      departmentIds: u.propertyAssignments.map((a) => a.departmentId),
+    })),
+    content,
+    filterDepartmentId
+  );
 }
