@@ -194,9 +194,17 @@ export async function POST(request: NextRequest) {
         error: "Come HOD puoi targettare solo i tuoi reparti — non sono ammessi ruoli trasversali, utenti specifici o 'tutti gli operatori'",
       }, { status: 403 });
     }
-    const { getAccessibleDepartmentIds } = await import("@/lib/rbac");
-    const accessibleDepts = await getAccessibleDepartmentIds(userId, propertyId);
-    const outOfPerimeter = targetDepartmentIds.filter(d => !accessibleDepts.includes(d));
+    // Senza reparti il memo finirebbe a "tutti gli operatori" (fallback sotto):
+    // un HOD deve sempre indicare almeno un proprio reparto.
+    if (targetDepartmentIds.length === 0) {
+      return NextResponse.json({
+        error: "Seleziona almeno uno dei tuoi reparti come destinatario",
+      }, { status: 400 });
+    }
+    // Solo reparti operativi: i reparti visibili aggiuntivi danno consultazione,
+    // non il titolo per scrivere a quegli operatori.
+    const operativeDepts = await getOperativeDepartmentIds(userId, propertyId);
+    const outOfPerimeter = targetDepartmentIds.filter(d => !operativeDepts.includes(d));
     if (outOfPerimeter.length > 0) {
       return NextResponse.json({
         error: "Alcuni reparti destinatari non rientrano nel tuo perimetro",

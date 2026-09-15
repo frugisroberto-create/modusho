@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
-import { getAccessibleDepartmentIds } from "@/lib/rbac";
+import { getAccessibleDepartmentIds, getOperativeDepartmentIds } from "@/lib/rbac";
 import { prisma } from "@/lib/prisma";
 
 export async function GET(request: NextRequest) {
@@ -11,7 +11,13 @@ export async function GET(request: NextRequest) {
   const propertyId = request.nextUrl.searchParams.get("propertyId");
   if (!propertyId) return NextResponse.json({ error: "propertyId richiesto" }, { status: 400 });
 
-  const deptIds = await getAccessibleDepartmentIds(session.user.id, propertyId);
+  // scope=operative: solo i reparti in cui l'utente lavora, senza i reparti
+  // visibili aggiuntivi. Serve dove si sceglie a chi scrivere; i filtri di
+  // consultazione (liste, approvazioni) usano il perimetro completo.
+  const operativeOnly = request.nextUrl.searchParams.get("scope") === "operative";
+  const deptIds = operativeOnly
+    ? await getOperativeDepartmentIds(session.user.id, propertyId)
+    : await getAccessibleDepartmentIds(session.user.id, propertyId);
 
   const departments = await prisma.department.findMany({
     where: { id: { in: deptIds } },

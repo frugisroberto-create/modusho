@@ -107,7 +107,7 @@ export function TargetAudienceSelector({
         const [deptRes, usersRes, myDeptsRes] = await Promise.all([
           fetch(`/api/properties/${propertyId}/departments`),
           fetch(`/api/users?propertyId=${propertyId}&isActive=true&pageSize=50`),
-          fetch(`/api/my-departments?propertyId=${propertyId}`),
+          fetch(`/api/my-departments?propertyId=${propertyId}&scope=operative`),
         ]);
         if (deptRes.ok) {
           const j = await deptRes.json();

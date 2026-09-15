@@ -353,10 +353,10 @@ export async function POST(request: NextRequest) {
         error: "Come HOD puoi targettare solo i tuoi reparti — non sono ammessi ruoli trasversali, utenti specifici o 'tutti gli operatori'",
       }, { status: 403 });
     }
-    // Verifica che ogni reparto target sia accessibile dall'HOD
-    const { getAccessibleDepartmentIds } = await import("@/lib/rbac");
-    const accessibleDepts = await getAccessibleDepartmentIds(userId, propertyId);
-    const outOfPerimeter = tDepts.filter(d => !accessibleDepts.includes(d));
+    // Verifica che ogni reparto target sia un reparto operativo dell'HOD
+    // (i reparti visibili aggiuntivi non danno il titolo per scrivere)
+    const operativeDepts = await getOperativeDepartmentIds(userId, propertyId);
+    const outOfPerimeter = tDepts.filter(d => !operativeDepts.includes(d));
     if (outOfPerimeter.length > 0) {
       return NextResponse.json({
         error: "Alcuni reparti destinatari non rientrano nel tuo perimetro",

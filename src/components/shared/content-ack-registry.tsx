@@ -33,7 +33,7 @@ export function ContentAckRegistry({ contentId, userRole, userId, propertyId }: 
       // HOD: fetch own department first, then pass as filter
       let deptParam = "";
       if (userRole === "HOD" && userId && propertyId) {
-        const deptRes = await fetch(`/api/my-departments?propertyId=${propertyId}`);
+        const deptRes = await fetch(`/api/my-departments?propertyId=${propertyId}&scope=operative`);
         if (deptRes.ok) {
           const deptJson = await deptRes.json();
           if (deptJson.data?.length > 0) {
