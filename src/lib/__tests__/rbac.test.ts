@@ -21,6 +21,7 @@ import {
   isContentRecipient,
   isInTargetAudience,
   getMemoManagerKind,
+  getRolesForRoleTarget,
   canUserAccessContent,
   type ContentVisibilityInput,
 } from "../rbac";
@@ -320,10 +321,11 @@ describe("isInTargetAudience", () => {
     expect(isInTargetAudience({ id: "hod-hk", role: "HOD", assignedDepartmentIds: ["dept-hk"] }, memoFrontOffice)).toBe(false);
   });
 
-  it("tutti gli operatori: solo operatori, come nella pagina Presa visione", () => {
+  it("tutti gli operatori e capi reparto: dentro operatori e HOD, fuori l'Hotel Manager", () => {
     const tutti = [t({ targetType: "ROLE", targetRole: "OPERATOR" })];
     expect(isInTargetAudience({ id: "op-hk", role: "OPERATOR", assignedDepartmentIds: ["dept-hk"] }, tutti)).toBe(true);
-    expect(isInTargetAudience({ id: "hod-hk", role: "HOD", assignedDepartmentIds: ["dept-hk"] }, tutti)).toBe(false);
+    expect(isInTargetAudience({ id: "hod-hk", role: "HOD", assignedDepartmentIds: ["dept-hk"] }, tutti)).toBe(true);
+    expect(isInTargetAudience({ id: "hm-1", role: "HOTEL_MANAGER", assignedDepartmentIds: [] }, tutti)).toBe(false);
   });
 
   it("utente specifico: solo lui", () => {
@@ -355,5 +357,18 @@ describe("getMemoManagerKind", () => {
   it("Operatore e Corporate: nessun permesso, anche se autori", () => {
     expect(getMemoManagerKind({ id: "hod-serena", role: "OPERATOR" }, memoDiSerena)).toBeNull();
     expect(getMemoManagerKind({ id: "hod-serena", role: "CORPORATE" }, memoDiSerena)).toBeNull();
+  });
+});
+
+// ─── «Tutti gli operatori e capi reparto» ──────────────────────────────
+
+describe("getRolesForRoleTarget", () => {
+  it("ROLE/OPERATOR raggiunge operatori e capi reparto", () => {
+    expect(getRolesForRoleTarget("OPERATOR")).toEqual(["OPERATOR", "HOD"]);
+  });
+
+  it("gli altri ruoli valgono per sé", () => {
+    expect(getRolesForRoleTarget("HOD")).toEqual(["HOD"]);
+    expect(getRolesForRoleTarget("HOTEL_MANAGER")).toEqual(["HOTEL_MANAGER"]);
   });
 });

@@ -845,7 +845,7 @@ Ogni SOP deve mostrare CHIARAMENTE due informazioni:
 Ogni SOP ha uno o più destinatari definiti nel modello `ContentTarget`:
 
 - **Per uno o più reparti** (caso più comune): una SOP può essere rivolta a uno, due o più reparti specifici. Per ogni reparto destinatario viene creato un record `ContentTarget` di tipo DEPARTMENT. Esempio: una procedura antincendio rivolta a Front Office + Manutenzione genera 2 record ContentTarget.
-- **Per tutti i reparti** (trasversale): se nella UI si seleziona "Tutti i reparti", viene creato un record ContentTarget di tipo ROLE con `targetRole = OPERATOR` (senza specificare departmentId). Tutti gli operatori della property vedono la SOP.
+- **Per tutti i reparti** (trasversale): se nella UI si seleziona «Tutti gli operatori e capi reparto», viene creato un record ContentTarget di tipo ROLE con `targetRole = OPERATOR` (senza specificare departmentId). **Sono destinatari tutti gli operatori E tutti i capi reparto (HOD) della property**: per tutti è presa visione obbligatoria, ricevono notifica e sollecito, e contano nella pagina Presa visione e nel registro. Regola unica in `getRolesForRoleTarget` (`src/lib/rbac.ts`). Il ruolo trasversale «Tutti gli HOD» resta disponibile per rivolgersi ai soli capi reparto.
 - **Per ruolo**: targeting per ruolo specifico (es. tutti gli HOD della property)
 - **Per utente specifico**: targeting individuale (raro, per casi eccezionali)
 

@@ -66,7 +66,7 @@ const FRASI_RISERVATE = {
 };
 
 /** Le due presenze che si perdono in silenzio, e che quindi vanno pretese. */
-const SEZIONE_TUTTI = "Visibile a ogni operatore della struttura";
+const SEZIONE_TUTTI = "Ogni operatore e ogni capo reparto della struttura deve prenderne visione";
 const SEZIONE_RUOLI = "Ruoli trasversali";
 
 // ─── Impalcatura ─────────────────────────────────────────────────────

@@ -86,7 +86,7 @@ const deny = (reason: string): AudienceVerdict => ({ allowed: false, reason });
  */
 export const AUDIENCE_MESSAGES = {
   everyone:
-    "Come referente corporate puoi rivolgerti soltanto ai reparti di tua competenza: «Tutti gli operatori» non è una scelta disponibile.",
+    "Come referente corporate puoi rivolgerti soltanto ai reparti di tua competenza: «Tutti gli operatori e capi reparto» non è una scelta disponibile.",
   roles:
     "Come referente corporate non puoi rivolgerti a interi ruoli aziendali: scegli i reparti di tua competenza, o le singole persone che vi lavorano.",
   departments:
