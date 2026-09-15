@@ -4,7 +4,7 @@ import { authOptions } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { checkAccess } from "@/lib/rbac";
 import { changeContentStatus } from "@/lib/content-status";
-import { sendContentPublishedPush } from "@/lib/push-notification";
+import { sendContentPublishedPush, returnNotificationRecipients, sendReturnedPush } from "@/lib/push-notification";
 import { z } from "zod/v4";
 
 const reviewSchema = z.object({
@@ -54,7 +54,8 @@ export async function POST(
     where: { id: contentId, isDeleted: false },
     select: {
       id: true, status: true, propertyId: true, departmentId: true, type: true, title: true,
-      sopWorkflow: { select: { id: true } },
+      code: true, createdById: true, submittedById: true,
+      sopWorkflow: { select: { id: true, responsibleId: true, consultedId: true, accountableId: true } },
     },
   });
 
@@ -200,6 +201,26 @@ export async function POST(
       note: note || null,
     },
   });
+
+  // Restituzione: avvisa chi deve riprendere il lavoro — best-effort.
+  // SOP con workflow: R, C e A; altri contenuti: chi l'ha inviato (o l'autore).
+  if (action === "RETURNED") {
+    const wf = content.sopWorkflow;
+    const author = content.submittedById ?? content.createdById;
+    await sendReturnedPush({
+      recipientIds: wf
+        ? returnNotificationRecipients(wf, userId)
+        : (author && author !== userId ? [author] : []),
+      workflowId: wf?.id ?? null,
+      contentId,
+      contentCode: content.code ?? null,
+      contentTitle: content.title,
+      contentType: content.type,
+      actorName: session.user.name,
+      actorRole: session.user.role,
+      note: note ?? "",
+    });
+  }
 
   return NextResponse.json({
     data: { contentId, action: reviewAction, success: true },

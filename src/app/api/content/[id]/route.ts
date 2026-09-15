@@ -5,7 +5,7 @@ import { prisma } from "@/lib/prisma";
 import { checkAccess, canUserManageContentType, getAccessibleDepartmentIds } from "@/lib/rbac";
 import { changeContentStatus } from "@/lib/content-status";
 import { getSubmitTargetStatus } from "@/lib/content-workflow";
-import { sendContentPublishedPush } from "@/lib/push-notification";
+import { sendContentPublishedPush, getContentRecipientUserIds, sendRecipientsAddedPush } from "@/lib/push-notification";
 import { checkAudienceForUser } from "@/lib/target-audience-scope-db";
 import { buildTargetRows, diffTargets, describeTargetChanges, idsInDiff, type TargetRow } from "@/lib/target-diff";
 import { z } from "zod/v4";
@@ -301,6 +301,12 @@ export async function PUT(
   // Aggiornamento ContentTarget — solo se i destinatari cambiano davvero.
   // Replace-all; il perimetro è già stato giudicato sopra, prima delle scritture.
   if (targetDiff?.changed) {
+    // Su un contenuto pubblicato si avvisa chi entra fra i destinatari: serve
+    // l'elenco di prima, calcolato PRIMA di riscrivere i target.
+    const previousRecipientIds = content.status === "PUBLISHED"
+      ? await getContentRecipientUserIds(id, userId)
+      : null;
+
     await prisma.contentTarget.deleteMany({ where: { contentId: id } });
     if (nextTargets.length > 0) {
       await prisma.contentTarget.createMany({ data: nextTargets.map((t) => ({ contentId: id, ...t })) });
@@ -326,6 +332,16 @@ export async function PUT(
           changedById: userId,
           note: `Destinatari modificati — ${summary}`,
         },
+      });
+    }
+
+    if (previousRecipientIds) {
+      await sendRecipientsAddedPush({
+        contentId: id,
+        contentTitle: title ?? content.title,
+        contentType: content.type,
+        actorId: userId,
+        previousRecipientIds,
       });
     }
   }

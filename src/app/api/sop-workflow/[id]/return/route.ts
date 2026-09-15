@@ -4,6 +4,7 @@ import { authOptions } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { canReturn } from "@/lib/sop-workflow";
 import { checkAccess } from "@/lib/rbac";
+import { returnNotificationRecipients, sendReturnedPush } from "@/lib/push-notification";
 import { z } from "zod/v4";
 
 type RouteParams = { params: Promise<{ id: string }> };
@@ -49,7 +50,7 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
       accountableId: true,
       submittedToC: true,
       submittedToA: true,
-      content: { select: { status: true, propertyId: true } },
+      content: { select: { status: true, propertyId: true, code: true, title: true } },
     },
   });
 
@@ -126,6 +127,19 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
       },
     }),
   ]);
+
+  // Notifica a R, C e A (escluso chi restituisce), con la motivazione — best-effort
+  await sendReturnedPush({
+    recipientIds: returnNotificationRecipients(wf, userId),
+    workflowId: wf.id,
+    contentId: wf.contentId,
+    contentCode: wf.content.code ?? null,
+    contentTitle: wf.content.title,
+    contentType: "SOP",
+    actorName: session.user.name,
+    actorRole: session.user.role,
+    note,
+  });
 
   return NextResponse.json({
     data: { returned: true },

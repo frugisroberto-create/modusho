@@ -23,6 +23,12 @@ const CONTENT_TYPE_CONFIG: Record<string, { label: string; route: string }> = {
   STANDARD_BOOK: { label: "Standard Book", route: "/standard-book" },
 };
 
+/** «Nuova procedura», «Nuovo documento», «Nuovo memo»: l'aggettivo concorda. */
+export function newContentLabel(contentType: string): string {
+  const label = CONTENT_TYPE_CONFIG[contentType]?.label || "contenuto";
+  return contentType === "SOP" ? `Nuova ${label}` : `Nuovo ${label}`;
+}
+
 // ─── Funzione generale: push + notifica per contenuto pubblicato ────
 
 /**
@@ -50,7 +56,7 @@ export async function sendContentPublishedPush(params: {
       ? `Aggiornamento ${config?.label || "contenuto"}: ${contentTitle}`
       : contentType === "BRAND_BOOK" || contentType === "STANDARD_BOOK"
         ? `Aggiornamento ${config?.label}: ${contentTitle}`
-        : `Nuovo ${config?.label || "contenuto"}: ${contentTitle}`;
+        : `${newContentLabel(contentType)}: ${contentTitle}`;
 
     // Notifica in-app per tutti i destinatari + chi pubblica (come conferma)
     const notifRecipients = targetUserIds.includes(actorId)
@@ -309,4 +315,159 @@ async function resolveTargetUserIds(contentId: string, excludeUserId: string): P
   // Escludi chi ha pubblicato
   userIds.delete(excludeUserId);
   return [...userIds];
+}
+
+// ─── Consegna comune: notifica in-app + push, best-effort ───────────
+
+type NotificationTypeValue = "CONTENT_PUBLISHED" | "TEXT_SAVED" | "NOTE_ADDED" | "SUBMITTED";
+
+async function deliverToUsers(
+  recipientIds: string[],
+  { body, url, type, data, logTag }: { body: string; url: string; type: NotificationTypeValue; data: Record<string, unknown>; logTag: string }
+) {
+  if (recipientIds.length === 0) return;
+
+  await createNotifications(
+    recipientIds.map((uid) => ({ userId: uid, type, title: "ModusHO", body, url }))
+  );
+
+  if (!VAPID_PUBLIC_KEY || !VAPID_PRIVATE_KEY) return;
+
+  const subscriptions = await prisma.pushSubscription.findMany({
+    where: { userId: { in: recipientIds } },
+    select: { id: true, endpoint: true, p256dh: true, auth: true },
+  });
+  if (subscriptions.length === 0) return;
+
+  const payload = JSON.stringify({ title: "ModusHO", body, data: { ...data, url } });
+  const results = await Promise.allSettled(
+    subscriptions.map(async (sub) => {
+      try {
+        await webpush.sendNotification(
+          { endpoint: sub.endpoint, keys: { p256dh: sub.p256dh, auth: sub.auth } },
+          payload
+        );
+      } catch (err: unknown) {
+        const statusCode = (err as { statusCode?: number })?.statusCode;
+        if (statusCode === 410 || statusCode === 404) {
+          await prisma.pushSubscription.delete({ where: { id: sub.id } }).catch(() => {});
+        }
+        throw err;
+      }
+    })
+  );
+  const sent = results.filter((r) => r.status === "fulfilled").length;
+  const failed = results.filter((r) => r.status === "rejected").length;
+  console.log(`[push] ${logTag}: ${sent} sent, ${failed} failed`);
+}
+
+// ─── Restituzione ────────────────────────────────────────────────────
+
+/** Chi avvisare quando una SOP torna indietro: R, C e A, mai chi restituisce. */
+export function returnNotificationRecipients(
+  wf: { responsibleId: string; consultedId: string | null; accountableId: string },
+  actorId: string
+): string[] {
+  return [...new Set([wf.responsibleId, wf.consultedId, wf.accountableId])]
+    .filter((id): id is string => id !== null && id !== actorId);
+}
+
+/** Il testo della notifica di restituzione, con la motivazione (troncata). */
+export function returnNotificationBody(params: {
+  actorName: string;
+  actorRole: string;
+  contentCode: string | null;
+  contentTitle: string;
+  contentType: string;
+  note: string;
+}): string {
+  const roleTag = ROLE_LABEL[params.actorRole] || params.actorRole;
+  const what = CONTENT_TYPE_CONFIG[params.contentType]?.label ?? "contenuto";
+  const label = params.contentCode ? `${params.contentCode} — ${params.contentTitle}` : params.contentTitle;
+  const reason = params.note.trim().replace(/\s+/g, " ");
+  const short = reason.length > 120 ? `${reason.slice(0, 117)}...` : reason;
+  const article = what === "procedura" ? "la" : "il";
+  return `${roleTag} ${params.actorName} ha restituito ${article} ${what} ${label}: «${short}»`;
+}
+
+/**
+ * Notifica la restituzione. Per le SOP con workflow va a R, C e A (escluso chi
+ * restituisce) e porta all'editor; per gli altri contenuti va all'autore.
+ * Tipo in-app NOTE_ADDED: la restituzione porta sempre una motivazione, e
+ * l'enum non ha un tipo dedicato (aggiungerlo richiederebbe una migrazione).
+ */
+export async function sendReturnedPush(params: {
+  recipientIds: string[];
+  workflowId: string | null;
+  contentId: string;
+  contentCode: string | null;
+  contentTitle: string;
+  contentType: string;
+  actorName: string;
+  actorRole: string;
+  note: string;
+}) {
+  try {
+    const body = returnNotificationBody(params);
+    const url = params.workflowId ? `/sop-workflow/${params.workflowId}` : "/library";
+    await deliverToUsers(params.recipientIds, {
+      body,
+      url,
+      type: "NOTE_ADDED",
+      data: { contentId: params.contentId, workflowId: params.workflowId },
+      logTag: `RETURNED ${params.contentCode ?? params.contentId}`,
+    });
+  } catch (err) {
+    console.error("[push] Error sending RETURNED push:", err);
+  }
+}
+
+// ─── Nuovi destinatari di un contenuto già pubblicato ───────────────
+
+/** I destinatari (utenti) attuali di un contenuto, escluso chi agisce. */
+export async function getContentRecipientUserIds(contentId: string, excludeUserId: string): Promise<string[]> {
+  return resolveTargetUserIds(contentId, excludeUserId);
+}
+
+/** Chi è destinatario adesso e prima non lo era. */
+export function newlyAddedRecipients(previous: string[], current: string[]): string[] {
+  const before = new Set(previous);
+  return [...new Set(current)].filter((id) => !before.has(id));
+}
+
+/**
+ * Dopo una modifica dei destinatari su un contenuto pubblicato, avvisa solo chi
+ * è appena entrato: gli altri il contenuto lo hanno già ricevuto alla
+ * pubblicazione. `previousRecipientIds` va calcolato PRIMA di riscrivere i target.
+ */
+export async function sendRecipientsAddedPush(params: {
+  contentId: string;
+  contentTitle: string;
+  contentType: string;
+  actorId: string;
+  previousRecipientIds: string[];
+}) {
+  try {
+    const current = await resolveTargetUserIds(params.contentId, params.actorId);
+    const added = newlyAddedRecipients(params.previousRecipientIds, current);
+    if (added.length === 0) return;
+
+    const config = CONTENT_TYPE_CONFIG[params.contentType];
+    const label = config?.label || "contenuto";
+    const isBook = params.contentType === "BRAND_BOOK" || params.contentType === "STANDARD_BOOK";
+    const body = isBook
+      ? `Ora puoi consultare — ${label}: ${params.contentTitle}`
+      : `${newContentLabel(params.contentType)} da leggere: ${params.contentTitle}`;
+    const url = params.contentType === "MEMO" ? "/comunicazioni" : `${config?.route || "/sop"}/${params.contentId}`;
+
+    await deliverToUsers(added, {
+      body,
+      url,
+      type: "CONTENT_PUBLISHED",
+      data: { contentId: params.contentId, type: params.contentType },
+      logTag: `RECIPIENTS_ADDED ${params.contentType} "${params.contentTitle}" (+${added.length})`,
+    });
+  } catch (err) {
+    console.error("[push] Error sending RECIPIENTS_ADDED push:", err);
+  }
 }
