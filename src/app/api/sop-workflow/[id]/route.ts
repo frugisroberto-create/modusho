@@ -7,6 +7,7 @@ import {
   isInvolved,
   canEditText,
   canReturn,
+  canEditTargetsInWorkflow,
   canViewDraft,
   needsReview,
 } from "@/lib/sop-workflow";
@@ -45,7 +46,11 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
           department: { select: { id: true, name: true, code: true } },
           createdBy: { select: { id: true, name: true, role: true } },
           targetAudience: {
-            select: { targetType: true, targetRole: true, targetDepartment: { select: { id: true, name: true } } },
+            select: {
+              targetType: true, targetRole: true, targetDepartmentId: true, targetUserId: true,
+              targetDepartment: { select: { id: true, name: true } },
+              targetUser: { select: { id: true, name: true } },
+            },
           },
         },
       },
@@ -109,6 +114,8 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
       canEditText: canEditText(userId, wfInfo, userRole),
       // A da REVIEW_ADMIN, oppure C (l'Hotel Manager) da REVIEW_HM: stessa regola della rotta /return
       canReturn: canReturn(userId, wfInfo),
+      // HM/ADMIN/SUPER_ADMIN o l'Accountable, prima della pubblicazione
+      canEditTargets: canEditTargetsInWorkflow(userId, userRole, wfInfo),
       property: wf.content.property,
       department: wf.content.department,
       createdBy: wf.content.createdBy,

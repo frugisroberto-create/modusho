@@ -166,6 +166,19 @@ export function canApprove(userId: string, wf: SopWorkflowInfo): boolean {
   return userId === wf.accountableId;
 }
 
+/**
+ * Chi modifica i destinatari di una SOP in lavorazione (prima della pubblicazione):
+ * l'Hotel Manager, ADMIN e SUPER_ADMIN — come per la RACI — e l'Accountable (A)
+ * della SOP, qualunque sia il suo ruolo (anche un Corporate). Dopo la
+ * pubblicazione i destinatari si modificano da «Modifica reparto e destinatari».
+ * Il perimetro dei reparti resta quello di target-audience-scope.
+ */
+export function canEditTargetsInWorkflow(userId: string, userRole: string, wf: SopWorkflowInfo): boolean {
+  if (!isDraft(wf.contentStatus)) return false;
+  if (userRole === "HOTEL_MANAGER" || userRole === "ADMIN" || userRole === "SUPER_ADMIN") return true;
+  return userId === wf.accountableId;
+}
+
 /** Only A can modify the review due date */
 export function canModifyReviewDueDate(userId: string, wf: SopWorkflowInfo): boolean {
   return userId === wf.accountableId;

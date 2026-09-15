@@ -861,8 +861,12 @@ Ogni SOP ha uno o più destinatari definiti nel modello `ContentTarget`:
 1. Quando un **HOD** crea una SOP: il target di default è DEPARTMENT = suo reparto. Non può selezionare altri reparti (crea solo per il proprio).
 2. Quando un **HM** crea una SOP: può selezionare uno o più reparti della propria struttura (multi-select con checkbox). Può anche selezionare "Tutti i reparti".
 3. Quando un **ADMIN/SUPER_ADMIN** crea una SOP: multi-select libero su tutti i reparti della property selezionata + opzione "Tutti i reparti".
-4. I destinatari vengono definiti in fase di creazione e possono essere modificati fino alla pubblicazione.
-5. Dopo la pubblicazione, i destinatari sono FISSI — il sistema genera automaticamente i ContentAcknowledgment obbligatori per tutti i destinatari.
+4. I destinatari vengono definiti in fase di creazione e **si possono modificare in ogni momento**, con tracciamento:
+   - **SOP in lavorazione** (DRAFT, REVIEW_HM, REVIEW_ADMIN, RETURNED): li modificano **l'Hotel Manager, ADMIN, SUPER_ADMIN e l'Accountable (A)** della SOP, dal pannello «Destinatari» dell'editor del workflow — come la RACI (`canEditTargetsInWorkflow`, `PUT /api/sop-workflow/[id]/targets`). L'autore HOD li definisce alla creazione e nella bozza.
+   - **Dopo la pubblicazione**: HOTEL_MANAGER, ADMIN, SUPER_ADMIN da «Modifica reparto e destinatari» (`PUT /api/content/[id]`).
+   - Il perimetro dei reparti resta quello di `target-audience-scope` (Corporate e HOD ristretti). Un contenuto in revisione o pubblicato non resta mai senza destinatari.
+   - Ogni modifica fuori dalla bozza lascia traccia in `ContentStatusHistory` (e nella cronologia del workflow) con i destinatari aggiunti e rimossi. Se non cambia nulla, non si scrive nulla.
+5. I nuovi destinatari devono prendere visione; le prese visione già registrate da chi esce dai destinatari restano nello storico.
 6. Il modello dati NON cambia: `ContentTarget` supporta già target multipli (relazione uno-a-molti con Content). La modifica è nella UI del form di creazione/modifica.
 7. **Reparti visibili (`viewDepartmentIds`) = sola consultazione**, nel senso stesso della parola. Un reparto visibile permette di **vedere** i contenuti di quel reparto nelle liste, ma:
    - **non rende destinatari**: i contenuti di quel reparto non entrano nei «da prendere visione», non portano «Da leggere» e non richiedono conferma di lettura;

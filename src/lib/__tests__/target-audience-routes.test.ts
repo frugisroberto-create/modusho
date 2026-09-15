@@ -22,6 +22,7 @@ const ROUTES = {
   "POST /api/content": "src/app/api/content/route.ts",
   "PUT /api/content/[id]": "src/app/api/content/[id]/route.ts",
   "POST /api/memo": "src/app/api/memo/route.ts",
+  "PUT /api/sop-workflow/[id]/targets": "src/app/api/sop-workflow/[id]/targets/route.ts",
 } as const;
 
 function source(relativePath: string): string {
@@ -96,14 +97,15 @@ describe("le regole degli altri ruoli restano dove sono sempre state", () => {
     expect(code).toContain('Solo ADMIN può modificare contenuti in attesa di approvazione finale');
   });
 
-  it("PUT /api/content/[id] giudica il perimetro solo sul ramo DRAFT/RETURNED", () => {
+  it("PUT /api/content/[id] giudica il perimetro su ogni modifica dei destinatari, in ogni stato", () => {
     const code = source(ROUTES["PUT /api/content/[id]"]);
     const verdict = code.indexOf("checkAudienceForUser(");
-    const branch = code.lastIndexOf('content.status === "DRAFT" || content.status === "RETURNED"', verdict);
+    const branch = code.lastIndexOf("if (targetDiff?.changed) {", verdict);
     expect(branch).toBeGreaterThan(-1);
-    // Fra la guardia di stato e la chiamata non c'è spazio per altro:
-    // il perimetro non tocca PUBLISHED, REVIEW_HM, REVIEW_ADMIN, ARCHIVED.
-    expect(verdict - branch).toBeLessThan(200);
+    // La chiamata sta subito dentro la guardia "i destinatari cambiano", non
+    // dentro una guardia di stato: vale anche su REVIEW_HM, REVIEW_ADMIN, PUBLISHED.
+    expect(verdict - branch).toBeLessThan(80);
+    expect(code.slice(branch - 400, branch)).not.toContain('content.status === "DRAFT" || content.status === "RETURNED") && hasTargetUpdate');
   });
 
   it("la shell HOO non fa pagare il perimetro a chi non ce l'ha", () => {

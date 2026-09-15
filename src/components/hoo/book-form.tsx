@@ -27,6 +27,8 @@ export function BookForm({ mode, contentType, backPath, contentId, initialData, 
   const [body, setBody] = useState(initialData?.body ?? "");
   const [propertyId, setPropertyId] = useState(initialData?.propertyId ?? "");
   const [departmentId, setDepartmentId] = useState(initialData?.departmentId ?? "");
+  // In modifica i destinatari si inviano solo dopo averli caricati
+  const [targetsLoaded, setTargetsLoaded] = useState(mode !== "edit");
   const [targetAudience, setTargetAudience] = useState<TargetAudienceState>({
     allDepartments: false,
     departmentIds: initialData?.departmentId ? [initialData.departmentId] : [],
@@ -75,6 +77,7 @@ export function BookForm({ mode, contentType, backPath, contentId, initialData, 
               .filter(t => t.targetType === "USER" && t.targetUserId)
               .map(t => t.targetUserId as string),
           });
+          setTargetsLoaded(true);
         }
       }
       loadTargets();
@@ -112,10 +115,12 @@ export function BookForm({ mode, contentType, backPath, contentId, initialData, 
           method: "PUT", headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
             title, body,
-            targetAllDepartments: targetAudience.allDepartments,
-            targetDepartmentIds: targetAudience.departmentIds,
-            targetRoles: targetAudience.roles,
-            targetUserIds: targetAudience.userIds,
+            ...(targetsLoaded ? {
+              targetAllDepartments: targetAudience.allDepartments,
+              targetDepartmentIds: targetAudience.departmentIds,
+              targetRoles: targetAudience.roles,
+              targetUserIds: targetAudience.userIds,
+            } : {}),
           }),
         });
         if (!res.ok) { const j = await res.json(); setError(j.error || "Errore"); return; }

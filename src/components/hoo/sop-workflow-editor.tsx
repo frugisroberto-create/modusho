@@ -8,6 +8,8 @@ import { SopViewRegistry } from "@/components/shared/sop-view-registry";
 import { UnsavedChangesModal } from "@/components/shared/unsaved-changes-modal";
 import { sanitizeHtml } from "@/lib/sanitize";
 import { useUnsavedChangesGuard } from "@/hooks/use-unsaved-changes-guard";
+import { TargetAudienceSelector, type TargetAudienceState, type TargetRole } from "@/components/shared/target-audience-selector";
+import { useHooContext } from "@/components/hoo/hoo-shell";
 
 // ─── Types ───────────────────────────────────────────────────────────
 
@@ -46,7 +48,16 @@ interface SopWorkflowData {
   responsible: UserInfo;
   consulted: UserInfo | null;
   accountable: UserInfo;
-  targetAudience: { targetType: string; targetRole: string | null; targetDepartment: { id: string; name: string } | null }[];
+  targetAudience: {
+    targetType: string;
+    targetRole: string | null;
+    targetDepartmentId: string | null;
+    targetUserId: string | null;
+    targetDepartment: { id: string; name: string } | null;
+    targetUser: { id: string; name: string } | null;
+  }[];
+  /** HM/ADMIN/SUPER_ADMIN o l'Accountable, prima della pubblicazione */
+  canEditTargets: boolean;
   consultedConfirmedAt: string | null;
   consultedConfirmedVersion: number | null;
   consultedConfirmedNote: string | null;
@@ -521,6 +532,16 @@ export function SopWorkflowEditor({ workflowId, currentUserId, currentUserRole, 
           wf={wf}
           propertyId={wf.property.id}
           onReassigned={fetchWorkflow}
+        />
+      )}
+
+      {/* ── Destinatari (HM/HOO o Accountable) — modificabili in itinere, prima della pubblicazione ── */}
+      {isInLavorazione && (
+        <TargetsPanel
+          wf={wf}
+          currentUserId={currentUserId}
+          currentUserRole={currentUserRole}
+          onSaved={fetchWorkflow}
         />
       )}
 
@@ -1052,6 +1073,111 @@ function ConsultationStatus({ wf, isC, confirmNote, onConfirmNoteChange, onConfi
 
 // ─── Riassegna RACI panel (HM/HOO only) ─────────────────────────────────
 
+// ─── Destinatari in itinere ─────────────────────────────────────────
+
+const TARGET_ROLE_SHORT: Record<string, string> = {
+  OPERATOR: "Tutti gli operatori e capi reparto",
+  HOD: "Tutti gli HOD",
+  HOTEL_MANAGER: "Hotel Manager",
+};
+
+function audienceFromWorkflow(targets: SopWorkflowData["targetAudience"]): TargetAudienceState {
+  return {
+    allDepartments: targets.some((t) => t.targetType === "ROLE" && t.targetRole === "OPERATOR"),
+    roles: targets
+      .filter((t) => t.targetType === "ROLE" && t.targetRole && t.targetRole !== "OPERATOR")
+      .map((t) => t.targetRole as TargetRole),
+    departmentIds: targets.filter((t) => t.targetType === "DEPARTMENT" && t.targetDepartmentId).map((t) => t.targetDepartmentId as string),
+    userIds: targets.filter((t) => t.targetType === "USER" && t.targetUserId).map((t) => t.targetUserId as string),
+  };
+}
+
+function TargetsPanel({ wf, currentUserId, currentUserRole, onSaved }: {
+  wf: SopWorkflowData;
+  currentUserId: string;
+  currentUserRole: string;
+  onSaved: () => Promise<void>;
+}) {
+  const { targetableDepartmentIds } = useHooContext();
+  const [open, setOpen] = useState(false);
+  const [value, setValue] = useState<TargetAudienceState>(() => audienceFromWorkflow(wf.targetAudience));
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState("");
+
+  const summary = wf.targetAudience.length === 0
+    ? "Nessun destinatario"
+    : wf.targetAudience.map((t) =>
+        t.targetType === "ROLE" ? TARGET_ROLE_SHORT[t.targetRole ?? ""] ?? t.targetRole
+        : t.targetType === "DEPARTMENT" ? t.targetDepartment?.name?.trim()
+        : t.targetUser?.name
+      ).filter(Boolean).join(", ");
+
+  const handleSave = async () => {
+    setLoading(true);
+    setError("");
+    try {
+      const res = await fetch(`/api/sop-workflow/${wf.id}/targets`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          targetAllDepartments: value.allDepartments,
+          targetDepartmentIds: value.departmentIds,
+          targetRoles: value.roles,
+          targetUserIds: value.userIds,
+        }),
+      });
+      if (res.ok) {
+        await onSaved();
+        setOpen(false);
+      } else {
+        const json = await res.json().catch(() => ({}));
+        setError(json.error || "Errore nel salvataggio dei destinatari");
+      }
+    } finally { setLoading(false); }
+  };
+
+  if (!open) {
+    return (
+      <div className="bg-ivory border border-ivory-dark p-4 flex items-center justify-between gap-4">
+        <div className="min-w-0">
+          <p className="text-sm font-ui font-medium text-charcoal">Destinatari</p>
+          <p className="text-xs font-ui text-charcoal/60 mt-0.5 truncate">{summary}</p>
+        </div>
+        {wf.canEditTargets && (
+          <button onClick={() => { setValue(audienceFromWorkflow(wf.targetAudience)); setOpen(true); }}
+            className="btn-outline-sm shrink-0">
+            Modifica
+          </button>
+        )}
+      </div>
+    );
+  }
+
+  return (
+    <div className="bg-ivory border border-ivory-dark p-4 space-y-3">
+      <div className="flex items-center justify-between">
+        <p className="text-sm font-ui font-semibold text-charcoal">Modifica destinatari</p>
+        <button onClick={() => { setOpen(false); setError(""); }}
+          className="text-xs font-ui text-charcoal/50 hover:text-charcoal">Annulla</button>
+      </div>
+      <TargetAudienceSelector
+        propertyId={wf.property.id}
+        userRole={currentUserRole}
+        currentUserId={currentUserId}
+        allowedDepartmentIds={targetableDepartmentIds ?? undefined}
+        value={value}
+        onChange={setValue}
+      />
+      {error && <p className="text-xs font-ui text-alert-red">{error}</p>}
+      <div className="flex justify-end">
+        <button onClick={handleSave} disabled={loading} className="btn-primary-sm">
+          {loading ? "Salvataggio..." : "Salva destinatari"}
+        </button>
+      </div>
+    </div>
+  );
+}
+
 function RaciReassignPanel({ wf, propertyId, onReassigned }: {
   wf: SopWorkflowData;
   propertyId: string;
@@ -1497,6 +1623,14 @@ const EVENT_ICON_STYLE: Record<string, string> = {
   REVIEW_DUE_DATE_CHANGED: "bg-alert-yellow",
 };
 
+/** Le azioni senza un tipo di evento proprio si riconoscono da metadata.action. */
+function eventLabel(evt: EventItem): string {
+  const action = (evt.metadata as { action?: string } | null)?.action;
+  if (action === "targets-change") return "Destinatari modificati";
+  if (action === "raci-reassign") return "Ruoli RACI riassegnati";
+  return EVENT_LABELS[evt.eventType] || evt.eventType;
+}
+
 function EventsPanel({ workflowId }: { workflowId: string }) {
   const [events, setEvents] = useState<EventItem[]>([]);
   const [loading, setLoading] = useState(true);
@@ -1532,7 +1666,7 @@ function EventsPanel({ workflowId }: { workflowId: string }) {
           <div className="flex-1 min-w-0">
             <div className="flex items-center gap-2 flex-wrap">
               <span className="text-sm font-ui font-medium text-charcoal-dark">
-                {EVENT_LABELS[evt.eventType] || evt.eventType}
+                {eventLabel(evt)}
               </span>
               <span className="text-xs font-ui text-charcoal/45">— {evt.actor.name}</span>
               <span className="text-xs font-ui text-charcoal/30">{formatRelativeDate(evt.createdAt)}</span>
