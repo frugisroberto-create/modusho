@@ -6,6 +6,7 @@ import {
   getRaciRole,
   isInvolved,
   canEditText,
+  canReturn,
   canViewDraft,
   needsReview,
 } from "@/lib/sop-workflow";
@@ -106,6 +107,8 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
       lastSavedAt: wf.lastSavedAt,
       textVersionCount: wf.textVersionCount,
       canEditText: canEditText(userId, wfInfo, userRole),
+      // A da REVIEW_ADMIN, oppure C (l'Hotel Manager) da REVIEW_HM: stessa regola della rotta /return
+      canReturn: canReturn(userId, wfInfo),
       property: wf.content.property,
       department: wf.content.department,
       createdBy: wf.content.createdBy,

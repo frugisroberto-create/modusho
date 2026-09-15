@@ -13,9 +13,10 @@ const returnSchema = z.object({
 });
 
 /**
- * POST: Restituzione della bozza da parte di A.
- * - Solo A puo' restituire
- * - Solo quando submittedToA = true
+ * POST: Restituzione della bozza al Responsabile (R).
+ * - A da REVIEW_ADMIN (submittedToA = true)
+ * - C, l'Hotel Manager consultato, da REVIEW_HM (submittedToC = true)
+ * - ADMIN e SUPER_ADMIN sempre
  * - Nota obbligatoria
  * - Spegne il flag verso A
  * - La bozza resta la stessa, R riprende il lavoro

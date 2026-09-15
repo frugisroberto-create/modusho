@@ -219,6 +219,16 @@ describe("canReturn", () => {
     expect(canReturn(HM_ID, wf)).toBe(true);
   });
 
+  it("C NON puo restituire quando la SOP e' gia' passata a REVIEW_ADMIN", () => {
+    const wf = makeWf({ contentStatus: "REVIEW_ADMIN", submittedToC: true, submittedToA: true });
+    expect(canReturn(HM_ID, wf)).toBe(false);
+  });
+
+  it("C NON puo restituire se la bozza non gli e' stata sottoposta", () => {
+    const wf = makeWf({ contentStatus: "REVIEW_HM", submittedToC: false });
+    expect(canReturn(HM_ID, wf)).toBe(false);
+  });
+
   it("R NON puo restituire", () => {
     const wf = makeWf({ contentStatus: "REVIEW_ADMIN", submittedToA: true });
     expect(canReturn(HOD_ID, wf)).toBe(false);

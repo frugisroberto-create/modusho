@@ -399,6 +399,7 @@ I reviewer (HM, ADMIN, SUPER_ADMIN) possono modificare direttamente il contenuto
 
 ### Regole RETURNED
 - Una SOP restituita torna allo stato RETURNED (visivamente distinto da DRAFT — l'autore vede subito che c'è un'azione richiesta).
+- Nel workflow RACI possono restituire la bozza al Responsabile (R): **l'Accountable (A)** quando è in REVIEW_ADMIN, e **l'Hotel Manager Consultato (C)** quando R gliel'ha sottoposta ed è in REVIEW_HM. Una volta confermata la consultazione la SOP passa a REVIEW_ADMIN e la restituzione spetta ad A. ADMIN e SUPER_ADMIN possono sempre restituire. La regola vive in `canReturn` (`src/lib/sop-workflow.ts`); l'API del workflow la espone come `canReturn` e l'editor mostra «Restituisci» solo quando il server la accetterebbe.
 - Il sistema traccia chi ha restituito e quando (ContentReview + ContentStatusHistory + SopWorkflowEvent per le SOP).
 - **La nota è obbligatoria** come gate del workflow: senza nota la restituzione è bloccata (400 server-side, bottone disabled lato UI). La motivazione viene salvata sia nell'evento di workflow sia come ContentNote dedicata, in modo che l'autore veda subito perché il contenuto gli è tornato indietro. Questa obbligatorietà è una scelta di governance: restituire senza spiegazione crea conflitto operativo.
 

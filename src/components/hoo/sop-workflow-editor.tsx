@@ -38,6 +38,8 @@ interface SopWorkflowData {
   lastSavedAt: string | null;
   textVersionCount: number;
   canEditText: boolean;
+  /** Il server accetterebbe la restituzione da questo utente (A o C/HM) */
+  canReturn: boolean;
   property: { id: string; name: string; code: string };
   department: { id: string; name: string; code: string } | null;
   createdBy: UserInfo;
@@ -907,6 +909,9 @@ function ActionBar({ wf, isR, isA, isHoo, isAdminOverride, canApproveFlag, canPu
   // canApprove = può approvare nel workflow (dare l'ok formale come A)
   // canPublish = può pubblicare direttamente (rendere visibile agli operatori)
   const canApproveOrPublish = isHoo || canApproveFlag || canPublishFlag;
+  // Il blocco Approva/Restituisci di chi approva; se non compare, la restituzione
+  // del Consultato (HM) ha il suo pulsante — senza doppioni.
+  const showApproveBlock = (isHoo || canApproveFlag) && wf.submittedToA;
 
   return (
     <div className="flex items-center gap-3 flex-wrap bg-white border border-ivory-dark px-5 py-4">
@@ -939,7 +944,7 @@ function ActionBar({ wf, isR, isA, isHoo, isAdminOverride, canApproveFlag, canPu
       )}
 
       {/* Approva (canApprove) — come A, approva formalmente */}
-      {(isHoo || canApproveFlag) && wf.submittedToA && (
+      {showApproveBlock && (
         <>
           <button onClick={onApprove} disabled={actionLoading} className="btn-primary !bg-sage hover:!bg-sage-dark">
             Approva e pubblica
@@ -948,6 +953,13 @@ function ActionBar({ wf, isR, isA, isHoo, isAdminOverride, canApproveFlag, canPu
             Restituisci
           </button>
         </>
+      )}
+
+      {/* Restituisci — il Consultato (HM) a cui R ha sottoposto la bozza, da REVIEW_HM */}
+      {wf.canReturn && !showApproveBlock && (
+        <button onClick={onReturn} disabled={actionLoading} className="btn-outline !border-alert-red !text-alert-red hover:!bg-alert-red hover:!text-white">
+          Restituisci al Responsabile
+        </button>
       )}
 
       {/* Pubblica direttamente (canPublish) — senza passare dal workflow */}
@@ -1463,7 +1475,7 @@ const EVENT_LABELS: Record<string, string> = {
   SUBMITTED_TO_C: "Sottoposta a HM",
   SUBMITTED_TO_A: "Sottoposta a HOO",
   SUBMITTED_TO_C_AND_A: "Sottoposta a HM e HOO",
-  RETURNED_BY_A: "Restituita da A",
+  RETURNED_BY_A: "Restituita al Responsabile",
   APPROVED: "Approvata",
   PUBLISHED: "Pubblicata",
   REVIEW_DUE_DATE_CHANGED: "Scadenza revisione modificata",
