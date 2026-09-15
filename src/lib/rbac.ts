@@ -287,7 +287,8 @@ export function getMemoManagerKind(
  * Registro presa visione: l'utente rientra tra i destinatari del contenuto?
  * Stessa regola di /api/compliance (e delle notifiche di pubblicazione):
  *  - ROLE/X: i ruoli di getRolesForRoleTarget (ROLE/OPERATOR = operatori e capi reparto)
- *  - DEPARTMENT/d: utenti assegnati a quel reparto (assegnazione esplicita)
+ *  - DEPARTMENT/d: operatori e capi reparto assegnati a quel reparto (assegnazione
+ *    esplicita). Corporate e Hotel Manager assegnati al reparto non ne fanno parte.
  *  - USER/u: solo quell'utente
  * I reparti visibili aggiuntivi non contano. Funzione pura.
  */
@@ -298,7 +299,11 @@ export function isInTargetAudience(
   return targetAudience.some((t) => {
     if (t.targetType === "ROLE") return t.targetRole !== null && getRolesForRoleTarget(t.targetRole).includes(user.role);
     if (t.targetType === "USER") return t.targetUserId === user.id;
-    return t.targetDepartmentId !== null && user.assignedDepartmentIds.includes(t.targetDepartmentId);
+    return (
+      t.targetDepartmentId !== null &&
+      (user.role === "OPERATOR" || user.role === "HOD") &&
+      user.assignedDepartmentIds.includes(t.targetDepartmentId)
+    );
   });
 }
 
