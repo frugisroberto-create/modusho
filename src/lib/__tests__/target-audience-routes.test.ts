@@ -12,8 +12,8 @@ import { join } from "node:path";
  * ma "nessuna di queste quattro rotte ha una regola di perimetro propria". È
  * una domanda sul codice, e va posta al codice.
  *
- * Il comportamento vero e proprio — che il perimetro conceda tutto a HOD,
- * Hotel Manager, ADMIN e SUPER_ADMIN e morda solo il CORPORATE — è provato in
+ * Il comportamento vero e proprio — che il perimetro conceda tutto a Hotel
+ * Manager, ADMIN e SUPER_ADMIN e morda il CORPORATE e l'HOD — è provato in
  * `target-audience-scope.test.ts` e `target-audience-scope-db.test.ts`.
  */
 

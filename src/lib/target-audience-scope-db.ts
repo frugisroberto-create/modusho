@@ -21,19 +21,23 @@ import {
 
 /** Carica chi sta destinando, con reparti destinabili e reparti assegnati. */
 export async function loadAudienceActor(userId: string): Promise<AudienceActor | null> {
+  return (await loadAudienceUser(userId))?.actor ?? null;
+}
+
+async function loadAudienceUser(userId: string) {
   const user = await prisma.user.findUnique({
     where: { id: userId },
     select: {
       id: true,
       role: true,
       targetDepartmentIds: true,
-      propertyAssignments: { select: { departmentId: true } },
+      propertyAssignments: { select: { propertyId: true, departmentId: true } },
     },
   });
 
   if (!user) return null;
 
-  return {
+  const actor: AudienceActor = {
     id: user.id,
     role: user.role,
     targetDepartmentIds: user.targetDepartmentIds,
@@ -45,6 +49,22 @@ export async function loadAudienceActor(userId: string): Promise<AudienceActor |
       ),
     ],
   };
+  return { actor, assignments: user.propertyAssignments };
+}
+
+/**
+ * Un HOD assegnato alla struttura senza reparto lavora in tutti i suoi reparti:
+ * il perimetro sono tutti i reparti della struttura (come getOperativeDepartmentIds).
+ */
+function withFullAccessHod(
+  loaded: NonNullable<Awaited<ReturnType<typeof loadAudienceUser>>>,
+  propertyId: string,
+  propertyDepartmentIds: string[]
+): AudienceActor {
+  const { actor, assignments } = loaded;
+  if (actor.role !== "HOD") return actor;
+  const fullAccess = assignments.some((a) => a.propertyId === propertyId && a.departmentId === null);
+  return fullAccess ? { ...actor, assignedDepartmentIds: propertyDepartmentIds } : actor;
 }
 
 /**
@@ -57,11 +77,12 @@ export async function loadTargetableDepartmentIds(
   userId: string,
   propertyId: string
 ): Promise<string[] | null> {
-  const actor = await loadAudienceActor(userId);
-  if (!actor) return [];
-  if (!hasRestrictedAudience(actor.role)) return null;
+  const loaded = await loadAudienceUser(userId);
+  if (!loaded) return [];
+  if (!hasRestrictedAudience(loaded.actor.role)) return null;
 
   const propertyDepartmentIds = await loadPropertyDepartmentIds(propertyId);
+  const actor = withFullAccessHod(loaded, propertyId, propertyDepartmentIds);
   return getTargetableDepartmentIdsInProperty(actor, propertyDepartmentIds);
 }
 
@@ -95,14 +116,15 @@ export async function checkAudienceForUser(
 ): Promise<AudienceVerdict> {
   if (!hasRestrictedAudience(role)) return { allowed: true };
 
-  const actor = await loadAudienceActor(userId);
-  if (!actor) return { allowed: false, reason: "Utente non trovato" };
+  const loaded = await loadAudienceUser(userId);
+  if (!loaded) return { allowed: false, reason: "Utente non trovato" };
 
   const [propertyDepartmentIds, candidates] = await Promise.all([
     loadPropertyDepartmentIds(propertyId),
     loadAudienceCandidates(proposal.userIds),
   ]);
 
+  const actor = withFullAccessHod(loaded, propertyId, propertyDepartmentIds);
   return checkAudienceProposal(actor, proposal, { propertyDepartmentIds, candidates });
 }
 

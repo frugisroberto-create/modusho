@@ -11,7 +11,7 @@ vi.mock("../prisma", () => ({
 import type { Role } from "@prisma/client";
 import { prisma } from "../prisma";
 import { checkAudienceForUser, loadTargetableDepartmentIds } from "../target-audience-scope-db";
-import { AUDIENCE_MESSAGES } from "../target-audience-scope";
+import { AUDIENCE_MESSAGES, HOD_AUDIENCE_MESSAGES } from "../target-audience-scope";
 
 const mockedPrisma = vi.mocked(prisma, true);
 
@@ -48,8 +48,8 @@ const EVERYTHING = {
 
 // ─── Gli altri ruoli attraversano il controllo come se non ci fosse ──
 
-describe("checkAudienceForUser — HOD, HM, ADMIN, SUPER_ADMIN invariati", () => {
-  const roles: Role[] = ["HOD", "HOTEL_MANAGER", "ADMIN", "SUPER_ADMIN"];
+describe("checkAudienceForUser — HM, ADMIN, SUPER_ADMIN invariati", () => {
+  const roles: Role[] = ["HOTEL_MANAGER", "ADMIN", "SUPER_ADMIN"];
 
   for (const role of roles) {
     it(`${role}: concede qualunque proposta, compresi ruoli trasversali e sé stesso`, async () => {
@@ -93,6 +93,45 @@ describe("checkAudienceForUser — HOD, HM, ADMIN, SUPER_ADMIN invariati", () =>
     });
 
     expect(verdetto).toEqual({ allowed: true });
+  });
+});
+
+// ─── Il capo reparto ─────────────────────────────────────────────────
+
+describe("checkAudienceForUser — capo reparto (HOD)", () => {
+  function capoReparto(assignments: { propertyId: string; departmentId: string | null }[]) {
+    mockedPrisma.user.findUnique.mockResolvedValueOnce({
+      id: ME, role: "HOD", targetDepartmentIds: [FB1], propertyAssignments: assignments,
+    } as never);
+    mockedPrisma.department.findMany.mockResolvedValueOnce(p1Departments() as never);
+  }
+  const soloReparti = (departmentIds: string[]) => ({ allDepartments: false, roles: [], departmentIds, userIds: [] });
+
+  it("accetta il reparto in cui lavora", async () => {
+    capoReparto([{ propertyId: P1, departmentId: SALA1 }]);
+    expect(await checkAudienceForUser(ME, "HOD", P1, soloReparti([SALA1]))).toEqual({ allowed: true });
+  });
+
+  it("rifiuta un reparto che non è suo, anche se fra i suoi reparti destinabili", async () => {
+    capoReparto([{ propertyId: P1, departmentId: SALA1 }]);
+    expect(await checkAudienceForUser(ME, "HOD", P1, soloReparti([SALA1, FB1])))
+      .toEqual({ allowed: false, reason: HOD_AUDIENCE_MESSAGES.departments });
+  });
+
+  it("assegnato a tutta la struttura: tutti i reparti sono suoi", async () => {
+    capoReparto([{ propertyId: P1, departmentId: null }]);
+    expect(await checkAudienceForUser(ME, "HOD", P1, soloReparti([FB1, SALA1, PIANI1]))).toEqual({ allowed: true });
+  });
+
+  it("l'assegnazione a tutta un'ALTRA struttura non allarga il perimetro qui", async () => {
+    capoReparto([{ propertyId: "prop-2", departmentId: null }, { propertyId: P1, departmentId: SALA1 }]);
+    expect(await checkAudienceForUser(ME, "HOD", P1, soloReparti([FB1])))
+      .toEqual({ allowed: false, reason: HOD_AUDIENCE_MESSAGES.departments });
+  });
+
+  it("il perimetro per le pagine è lo stesso che applica la rotta", async () => {
+    capoReparto([{ propertyId: P1, departmentId: SALA1 }]);
+    expect(await loadTargetableDepartmentIds(ME, P1)).toEqual([SALA1]);
   });
 });
 
