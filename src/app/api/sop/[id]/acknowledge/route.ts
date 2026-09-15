@@ -4,6 +4,7 @@ import { authOptions } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { canUserAccessContent } from "@/lib/rbac";
 import { recordSopRead } from "@/lib/sop-read-db";
+import { isReadingRecipient } from "@/lib/content-read-db";
 
 type RouteParams = { params: Promise<{ id: string }> };
 
@@ -50,6 +51,12 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
   const canAccess = await canUserAccessContent(userId, session.user.role, content);
   if (!canAccess) {
     return NextResponse.json({ error: "Non sei tra i destinatari di questa SOP" }, { status: 403 });
+  }
+
+  // Chi la consulta soltanto (reparto visibile) la legge, ma la lettura non si registra
+  const isRecipient = await isReadingRecipient({ id: userId, role: session.user.role }, content);
+  if (!isRecipient) {
+    return NextResponse.json({ error: "Stai consultando questa SOP: non sei tra i destinatari, la lettura non si registra" }, { status: 403 });
   }
 
   // Scrittore unico (SopViewRecord + ContentAcknowledgment): la stessa

@@ -20,9 +20,12 @@ interface Props {
   departmentName?: string | null;
   propertyName: string;
   version: number;
+  /** Per i documenti: rotta e testo del pulsante. Di default quelli delle SOP. */
+  readEndpoint?: string;
+  buttonLabel?: string;
 }
 
-export function SopReadPanel({ contentId, title, departmentName, propertyName, version }: Props) {
+export function SopReadPanel({ contentId, title, departmentName, propertyName, version, readEndpoint, buttonLabel }: Props) {
   const contesto = [departmentName, propertyName, `versione ${version}`].filter(Boolean).join(" · ");
 
   return (
@@ -38,7 +41,7 @@ export function SopReadPanel({ contentId, title, departmentName, propertyName, v
           <p className="text-sm font-ui text-charcoal/60 mt-1">{contesto}</p>
         </div>
         <div className="flex justify-center">
-          <SopReadButton contentId={contentId} />
+          <SopReadButton contentId={contentId} endpoint={readEndpoint} label={buttonLabel} />
         </div>
       </div>
     </div>

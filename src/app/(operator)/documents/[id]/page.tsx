@@ -2,7 +2,10 @@ import { notFound, redirect } from "next/navigation";
 import { getSessionUser } from "@/lib/session";
 import { prisma } from "@/lib/prisma";
 import { canUserAccessContent } from "@/lib/rbac";
-import { AcknowledgeButton } from "@/components/operator/acknowledge-button";
+import { SopReadPanel } from "@/components/operator/sop-read-panel";
+import { SopReadReceipt } from "@/components/operator/sop-read-receipt";
+import { isReadingRecipient, recordContentRead } from "@/lib/content-read-db";
+import { isGovernanceRole, showsReadPanel } from "@/lib/sop-read";
 import { ContentActions } from "@/components/hoo/content-actions";
 import { ContentTimeline } from "@/components/shared/content-timeline";
 import { ContentAckRegistry } from "@/components/shared/content-ack-registry";
@@ -40,8 +43,22 @@ export default async function DocumentDetailPage({ params }: Props) {
   });
   if (!canAccess) notFound();
 
-  const acknowledged = content.acknowledgments.length > 0;
+  let acknowledged = content.acknowledgments.length > 0;
   const acknowledgedAt = content.acknowledgments[0]?.acknowledgedAt?.toISOString() ?? null;
+  const isGovernance = isGovernanceRole(user.role);
+
+  // Come per le SOP: HM/ADMIN/SUPER_ADMIN leggono aprendo, la lettura si registra da sola.
+  if (isGovernance && !acknowledged) {
+    await recordContentRead({ contentId: content.id, userId: user.id });
+    acknowledged = true;
+  }
+
+  // Operatori e capi reparto: pannello «Clicca qui per leggere» solo se destinatari.
+  const isRecipient = await isReadingRecipient(
+    { id: user.id, role: user.role },
+    { propertyId: content.propertyId, targetAudience: content.targetAudience }
+  );
+  const readPanel = showsReadPanel({ role: user.role, contentStatus: content.status, alreadyRead: acknowledged, isRecipient });
 
   return (
     <div className="max-w-3xl mx-auto py-6">
@@ -72,16 +89,33 @@ export default async function DocumentDetailPage({ params }: Props) {
         </div>
       </div>
 
-      <article
-        className="prose prose-gray max-w-none mb-8 bg-ivory-medium border border-ivory-dark p-4 sm:p-6 font-body"
-        dangerouslySetInnerHTML={{ __html: sanitizeHtml(content.body) }}
-      />
+      {readPanel ? (
+        <SopReadPanel
+          contentId={content.id}
+          title={content.title}
+          departmentName={content.department?.name}
+          propertyName={content.property.name}
+          version={content.version}
+          readEndpoint={`/api/content/${content.id}/acknowledge`}
+          buttonLabel="Clicca qui per leggere il documento"
+        />
+      ) : (
+        <>
+          <article
+            className="prose prose-gray max-w-none mb-8 bg-ivory-medium border border-ivory-dark p-4 sm:p-6 font-body"
+            dangerouslySetInnerHTML={{ __html: sanitizeHtml(content.body) }}
+          />
 
-      <AttachmentUploader contentId={content.id} canEdit={false} />
+          <AttachmentUploader contentId={content.id} canEdit={false} />
 
-      <div className="border-t border-ivory-dark pt-6">
-        <AcknowledgeButton contentId={content.id} acknowledged={acknowledged} acknowledgedAt={acknowledgedAt} />
-      </div>
+          {/* Lettura registrata — solo OPERATOR/HOD/CORPORATE */}
+          {!isGovernance && acknowledged && acknowledgedAt && (
+            <div className="mt-6">
+              <SopReadReceipt readAt={acknowledgedAt} version={undefined} readLabel="Letto il" />
+            </div>
+          )}
+        </>
+      )}
 
       {/* Registro presa visione: HM+ sempre, HOD solo per i propri contenuti */}
       {(user.role === "HOTEL_MANAGER" || user.role === "ADMIN" || user.role === "SUPER_ADMIN" ||
