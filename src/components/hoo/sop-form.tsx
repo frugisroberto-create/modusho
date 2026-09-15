@@ -46,6 +46,9 @@ export function SopForm({ mode, contentId, initialData, userRole, currentUserId,
   const [body, setBody] = useState(initialData?.body || "");
   const [propertyId, setPropertyId] = useState(initialData?.propertyId || "");
   const [departmentId, setDepartmentId] = useState(initialData?.departmentId || "");
+  // In modifica i destinatari si inviano solo dopo averli caricati: salvare
+  // prima sovrascriverebbe quelli veri con i valori iniziali del modulo.
+  const [targetsLoaded, setTargetsLoaded] = useState(mode !== "edit");
   const [targetAudience, setTargetAudience] = useState<TargetAudienceState>({
     // Nascondere un interruttore acceso lo rende obbligatorio: chi non può
     // usare "Tutti gli operatori" non deve nemmeno partire con quello acceso.
@@ -187,6 +190,7 @@ export function SopForm({ mode, contentId, initialData, userRole, currentUserId,
             .filter(t => t.targetType === "USER" && t.targetUserId)
             .map(t => t.targetUserId as string);
           setTargetAudience({ allDepartments, departmentIds, roles, userIds });
+          setTargetsLoaded(true);
         }
       }
       loadTargets();
@@ -295,10 +299,12 @@ export function SopForm({ mode, contentId, initialData, userRole, currentUserId,
         const payload = {
           title, body,
           departmentId: departmentId || null,
-          targetAllDepartments: targetAudience.allDepartments,
-          targetDepartmentIds: targetAudience.departmentIds,
-          targetRoles: targetAudience.roles,
-          targetUserIds: targetAudience.userIds,
+          ...(targetsLoaded ? {
+            targetAllDepartments: targetAudience.allDepartments,
+            targetDepartmentIds: targetAudience.departmentIds,
+            targetRoles: targetAudience.roles,
+            targetUserIds: targetAudience.userIds,
+          } : {}),
         };
         const res = await fetch(`/api/content/${contentId}`, {
           method: "PUT",

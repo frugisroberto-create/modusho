@@ -7,6 +7,7 @@ import { changeContentStatus } from "@/lib/content-status";
 import { getSubmitTargetStatus } from "@/lib/content-workflow";
 import { sendContentPublishedPush } from "@/lib/push-notification";
 import { checkAudienceForUser } from "@/lib/target-audience-scope-db";
+import { buildTargetRows, diffTargets, describeTargetChanges, idsInDiff, type TargetRow } from "@/lib/target-diff";
 import { z } from "zod/v4";
 
 export async function GET(
@@ -144,7 +145,10 @@ export async function PUT(
 
   const content = await prisma.content.findUnique({
     where: { id, isDeleted: false },
-    select: { id: true, status: true, propertyId: true, departmentId: true, type: true, version: true, title: true, body: true, publishedAt: true },
+    select: {
+      id: true, status: true, propertyId: true, departmentId: true, type: true, version: true, title: true, body: true, publishedAt: true,
+      targetAudience: { select: { targetType: true, targetRole: true, targetDepartmentId: true, targetUserId: true } },
+    },
   });
 
   if (!content) {
@@ -184,18 +188,38 @@ export async function PUT(
 
   const { title, body, departmentId, sendToReview, publishDirectly, requireNewAcknowledgment, revisionNote } = parsed.data;
 
-  // Perimetro dei destinatari — solo il ramo che riscrive davvero i target
-  // (DRAFT/RETURNED). Si giudica QUI, prima di qualunque scrittura: un rifiuto
-  // a metà lascerebbe il titolo aggiornato e i destinatari vecchi.
-  // La regola vive in target-audience-scope.ts; per HOD, HM, ADMIN e
-  // SUPER_ADMIN questa chiamata concede senza guardare nulla.
+  // Destinatari: si modificano in ogni stato in cui l'utente può modificare il
+  // contenuto (i cancelli di stato sopra decidono chi). Dopo la pubblicazione
+  // quindi HM, ADMIN e SUPER_ADMIN. Il perimetro si giudica QUI, prima di
+  // qualunque scrittura: un rifiuto a metà lascerebbe il titolo aggiornato e i
+  // destinatari vecchi. La regola vive in target-audience-scope.ts.
   const hasTargetUpdate =
     parsed.data.targetDepartmentIds !== undefined ||
     parsed.data.targetAllDepartments !== undefined ||
     parsed.data.targetRoles !== undefined ||
     parsed.data.targetUserIds !== undefined;
 
-  if ((content.status === "DRAFT" || content.status === "RETURNED") && hasTargetUpdate) {
+  const isDraftLike = content.status === "DRAFT" || content.status === "RETURNED";
+  const nextTargets = hasTargetUpdate
+    ? buildTargetRows({
+        allDepartments: parsed.data.targetAllDepartments ?? false,
+        roles: parsed.data.targetRoles ?? [],
+        departmentIds: parsed.data.targetDepartmentIds ?? [],
+        userIds: parsed.data.targetUserIds ?? [],
+      })
+    : [];
+  const targetDiff = hasTargetUpdate
+    ? diffTargets(content.targetAudience as TargetRow[], nextTargets)
+    : null;
+
+  // Un contenuto già in revisione o pubblicato non resta senza destinatari:
+  // sparirebbe a tutti. (Brand Book e Standard Book possono, per scelta.)
+  const needsRecipients = content.type === "SOP" || content.type === "DOCUMENT" || content.type === "MEMO";
+  if (targetDiff?.changed && !isDraftLike && needsRecipients && nextTargets.length === 0) {
+    return NextResponse.json({ error: "Indica almeno un destinatario" }, { status: 400 });
+  }
+
+  if (targetDiff?.changed) {
     const audience = await checkAudienceForUser(userId, role, content.propertyId, {
       allDepartments: parsed.data.targetAllDepartments ?? false,
       roles: parsed.data.targetRoles ?? [],
@@ -274,30 +298,35 @@ export async function PUT(
     }
   }
 
-  // Aggiornamento ContentTarget (solo se non ancora pubblicato)
-  // Replace-all: se uno qualsiasi dei campi target è presente, riscrive tutti i
-  // target. Il perimetro è già stato giudicato sopra, prima delle scritture.
-  if ((content.status === "DRAFT" || content.status === "RETURNED") && hasTargetUpdate) {
+  // Aggiornamento ContentTarget — solo se i destinatari cambiano davvero.
+  // Replace-all; il perimetro è già stato giudicato sopra, prima delle scritture.
+  if (targetDiff?.changed) {
     await prisma.contentTarget.deleteMany({ where: { contentId: id } });
-
-    const targetsToCreate: { contentId: string; targetType: "ROLE" | "DEPARTMENT" | "USER"; targetRole?: "OPERATOR" | "HOD" | "HOTEL_MANAGER"; targetDepartmentId?: string; targetUserId?: string }[] = [];
-
-    if (parsed.data.targetAllDepartments) {
-      targetsToCreate.push({ contentId: id, targetType: "ROLE", targetRole: "OPERATOR" });
-    }
-    for (const r of (parsed.data.targetRoles ?? [])) {
-      if (r === "OPERATOR" && parsed.data.targetAllDepartments) continue;
-      targetsToCreate.push({ contentId: id, targetType: "ROLE", targetRole: r });
-    }
-    for (const deptId of (parsed.data.targetDepartmentIds ?? [])) {
-      targetsToCreate.push({ contentId: id, targetType: "DEPARTMENT", targetDepartmentId: deptId });
-    }
-    for (const uid of (parsed.data.targetUserIds ?? [])) {
-      targetsToCreate.push({ contentId: id, targetType: "USER", targetUserId: uid });
+    if (nextTargets.length > 0) {
+      await prisma.contentTarget.createMany({ data: nextTargets.map((t) => ({ contentId: id, ...t })) });
     }
 
-    if (targetsToCreate.length > 0) {
-      await prisma.contentTarget.createMany({ data: targetsToCreate });
+    // Fuori dalla bozza la modifica resta in cronologia, con che cosa è cambiato.
+    // Chi entra deve prendere visione; le prese visione di chi esce restano registrate.
+    if (!isDraftLike) {
+      const { departmentIds: deptIds, userIds } = idsInDiff(targetDiff);
+      const [depts, users] = await Promise.all([
+        deptIds.length ? prisma.department.findMany({ where: { id: { in: deptIds } }, select: { id: true, name: true } }) : [],
+        userIds.length ? prisma.user.findMany({ where: { id: { in: userIds } }, select: { id: true, name: true } }) : [],
+      ]);
+      const summary = describeTargetChanges(targetDiff, {
+        departments: new Map(depts.map((d) => [d.id, d.name])),
+        users: new Map(users.map((u) => [u.id, u.name])),
+      });
+      await prisma.contentStatusHistory.create({
+        data: {
+          contentId: id,
+          fromStatus: content.status,
+          toStatus: content.status,
+          changedById: userId,
+          note: `Destinatari modificati — ${summary}`,
+        },
+      });
     }
   }
 

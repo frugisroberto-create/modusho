@@ -4,6 +4,7 @@ import {
   canEditText,
   canSubmit,
   canReturn,
+  canEditTargetsInWorkflow,
   canApprove,
   canAddNote,
   canManageAttachments,
@@ -348,5 +349,34 @@ describe("needsReview", () => {
 
   it("SOP pubblicata senza reviewDueDate -> false", () => {
     expect(needsReview({ contentStatus: "PUBLISHED", reviewDueDate: null })).toBe(false);
+  });
+});
+
+// ─── canEditTargetsInWorkflow ──────────────────────────────────────────
+
+describe("canEditTargetsInWorkflow", () => {
+  it("HM, ADMIN e SUPER_ADMIN modificano i destinatari in ogni stato di lavorazione", () => {
+    for (const contentStatus of ["DRAFT", "REVIEW_HM", "REVIEW_ADMIN", "RETURNED"] as const) {
+      const wf = makeWf({ contentStatus });
+      expect(canEditTargetsInWorkflow("un-hm-qualsiasi", "HOTEL_MANAGER", wf), contentStatus).toBe(true);
+      expect(canEditTargetsInWorkflow("un-admin", "ADMIN", wf), contentStatus).toBe(true);
+      expect(canEditTargetsInWorkflow("un-sa", "SUPER_ADMIN", wf), contentStatus).toBe(true);
+    }
+  });
+
+  it("l'Accountable li modifica anche se non è HM o HOO (es. un Corporate)", () => {
+    const wf = makeWf({ contentStatus: "REVIEW_ADMIN", accountableId: "corp-a" });
+    expect(canEditTargetsInWorkflow("corp-a", "CORPORATE", wf)).toBe(true);
+  });
+
+  it("R (HOD) e un Corporate che non è Accountable non li modificano", () => {
+    const wf = makeWf({ contentStatus: "DRAFT", accountableId: "corp-a" });
+    expect(canEditTargetsInWorkflow(HOD_ID, "HOD", wf)).toBe(false);
+    expect(canEditTargetsInWorkflow("altro-corp", "CORPORATE", wf)).toBe(false);
+  });
+
+  it("dopo la pubblicazione non passano da qui", () => {
+    const wf = makeWf({ contentStatus: "PUBLISHED" });
+    expect(canEditTargetsInWorkflow("un-hm", "HOTEL_MANAGER", wf)).toBe(false);
   });
 });
