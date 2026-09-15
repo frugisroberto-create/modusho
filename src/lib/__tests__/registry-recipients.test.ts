@@ -15,6 +15,7 @@ const people: RegistryCandidate[] = [
   { id: "hod-hk", name: "Governante", role: "HOD", departmentIds: ["hk"] },
   { id: "op-hk", name: "Cameriera", role: "OPERATOR", departmentIds: ["hk"] },
   { id: "hm", name: "Hotel Manager", role: "HOTEL_MANAGER", departmentIds: [null] },
+  { id: "corp-fb", name: "Corporate F&B", role: "CORPORATE", departmentIds: ["fb"] },
 ];
 const ids = (xs: RegistryCandidate[]) => xs.map((x) => x.id).sort();
 
@@ -22,6 +23,11 @@ describe("selectRegistryRecipients", () => {
   it("destinatari per reparto: operatori e capi reparto di quei reparti, nessun altro", () => {
     const content = { departmentId: "fo", targetAudience: [t({ targetDepartmentId: "fo" }), t({ targetDepartmentId: "fb" })] };
     expect(ids(selectRegistryRecipients(people, content))).toEqual(["hod-fb", "hod-fo", "op-fo"]);
+  });
+
+  it("un Corporate assegnato a un reparto destinatario non compare (come in Presa visione)", () => {
+    const content = { departmentId: "fo", targetAudience: [t({ targetDepartmentId: "fb" })] };
+    expect(ids(selectRegistryRecipients(people, content))).toEqual(["hod-fb"]);
   });
 
   it("utente specifico: solo lui (prima il registro elencava tutta la struttura)", () => {
