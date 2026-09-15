@@ -868,6 +868,7 @@ Ogni SOP ha uno o più destinatari definiti nel modello `ContentTarget`:
    - **non rende destinatari**: i contenuti di quel reparto non entrano nei «da prendere visione», non portano «Da leggere» e non richiedono conferma di lettura;
    - **non dà il titolo per scrivere**: un HOD può indirizzare memo e contenuti **solo ai propri reparti operativi** (assegnazioni `PropertyAssignment`), mai a un reparto solo visibile. Il selettore mostra solo i reparti operativi (`/api/my-departments?scope=operative`) e il server lo rivalida (`getOperativeDepartmentIds`).
 8. Un HOD deve sempre indicare almeno un proprio reparto come destinatario del memo: una lista vuota è rifiutata (non diventa «tutti gli operatori»).
+   Più in generale l'HOD indica come destinatari **solo reparti interi fra i propri reparti operativi**: niente «Tutti gli operatori e capi reparto», ruoli trasversali o singole persone. Se è assegnato a tutta la struttura, sono suoi tutti i reparti di quella struttura. La regola vive nel controllo centralizzato `checkAudienceForUser` (`src/lib/target-audience-scope.ts` / `-db.ts`), che ogni rotta chiama prima di scrivere i `ContentTarget`: SOP (workflow e legacy), documenti, memo, modifica delle bozze.
 9. Il **registro presa visione** elenca solo i destinatari reali, con la stessa regola della pagina Presa visione (`isInTargetAudience`).
 
 ## Ricerca

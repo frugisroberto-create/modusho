@@ -10,7 +10,9 @@ import {
   filterTargetableUsers,
   checkAudienceProposal,
   isNominableUserRole,
+  canTargetUsers,
   AUDIENCE_MESSAGES,
+  HOD_AUDIENCE_MESSAGES,
   type AudienceActor,
   type AudienceProposal,
   type AudienceContext,
@@ -61,13 +63,17 @@ function context(overrides: Partial<AudienceContext> = {}): AudienceContext {
   return { propertyDepartmentIds: P1_DEPTS, candidates: [], ...overrides };
 }
 
-const OTHER_ROLES: Role[] = ["HOD", "HOTEL_MANAGER", "ADMIN", "SUPER_ADMIN"];
+const OTHER_ROLES: Role[] = ["HOTEL_MANAGER", "ADMIN", "SUPER_ADMIN"];
 
 // ─── Chi è ristretto ─────────────────────────────────────────────────
 
 describe("hasRestrictedAudience", () => {
   it("restringe il CORPORATE", () => {
     expect(hasRestrictedAudience("CORPORATE")).toBe(true);
+  });
+
+  it("restringe il capo reparto (HOD)", () => {
+    expect(hasRestrictedAudience("HOD")).toBe(true);
   });
 
   it("non restringe nessun altro ruolo", () => {
@@ -395,7 +401,7 @@ describe("checkAudienceProposal — CORPORATE", () => {
 
 // ─── Gli altri ruoli non subiscono nulla di nuovo ────────────────────
 
-describe("checkAudienceProposal — HOD, HM, ADMIN, SUPER_ADMIN invariati", () => {
+describe("checkAudienceProposal — HM, ADMIN, SUPER_ADMIN invariati", () => {
   const everything = proposal({
     allDepartments: true,
     roles: ["HOD", "HOTEL_MANAGER"],
@@ -415,11 +421,54 @@ describe("checkAudienceProposal — HOD, HM, ADMIN, SUPER_ADMIN invariati", () =
     expect(checkAudienceProposal(hm, everything, context())).toEqual({ allowed: true });
   });
 
-  it("un HOD con targetDepartmentIds valorizzati resta comunque non ristretto", () => {
-    // Il campo esiste su tutti gli utenti: non deve iniziare a mordere qui.
-    const hod = actor("HOD", { targetDepartmentIds: [FB1] });
-    expect(checkAudienceProposal(hod, proposal({ departmentIds: [PIANI1] }), context())).toEqual({
-      allowed: true,
-    });
+});
+
+// ─── Il capo reparto: solo i reparti in cui lavora ───────────────────
+
+describe("checkAudienceProposal — capo reparto (HOD)", () => {
+  // Il capo ricevimento: lavora al ricevimento, consulta (visibili) cucina e sala.
+  const capoRicevimento = () =>
+    actor("HOD", { assignedDepartmentIds: [RICEV1], targetDepartmentIds: [FB1, SALA1] });
+
+  it("il perimetro sono i reparti assegnati, mai targetDepartmentIds", () => {
+    expect(getTargetableDepartmentIds(capoRicevimento())).toEqual([RICEV1]);
+  });
+
+  it("accetta i propri reparti", () => {
+    expect(checkAudienceProposal(capoRicevimento(), proposal({ departmentIds: [RICEV1] }), context()))
+      .toEqual({ allowed: true });
+  });
+
+  it("rifiuta un reparto che non è suo (il caso HO1-FO-009 con F&B)", () => {
+    expect(checkAudienceProposal(capoRicevimento(), proposal({ departmentIds: [RICEV1, FB1] }), context()))
+      .toEqual({ allowed: false, reason: HOD_AUDIENCE_MESSAGES.departments });
+  });
+
+  it("rifiuta «Tutti gli operatori e capi reparto» e i ruoli trasversali", () => {
+    expect(checkAudienceProposal(capoRicevimento(), proposal({ allDepartments: true }), context()))
+      .toEqual({ allowed: false, reason: HOD_AUDIENCE_MESSAGES.everyone });
+    expect(checkAudienceProposal(capoRicevimento(), proposal({ roles: ["HOD"] }), context()))
+      .toEqual({ allowed: false, reason: HOD_AUDIENCE_MESSAGES.roles });
+  });
+
+  it("rifiuta singoli utenti, anche del proprio reparto", () => {
+    expect(canTargetUsers("HOD")).toBe(false);
+    const verdict = checkAudienceProposal(
+      capoRicevimento(),
+      proposal({ userIds: ["op-ricev"] }),
+      context({ candidates: [persona("op-ricev", [RICEV1])] })
+    );
+    expect(verdict).toEqual({ allowed: false, reason: HOD_AUDIENCE_MESSAGES.users });
+  });
+
+  it("senza reparti assegnati non destina nulla", () => {
+    const hod = actor("HOD", { assignedDepartmentIds: [] });
+    expect(checkAudienceProposal(hod, proposal({ departmentIds: [RICEV1] }), context()))
+      .toEqual({ allowed: false, reason: HOD_AUDIENCE_MESSAGES.empty });
+  });
+
+  it("al corporate i messaggi restano quelli di sempre", () => {
+    expect(checkAudienceProposal(headOfFb(), proposal({ allDepartments: true }), context()))
+      .toEqual({ allowed: false, reason: AUDIENCE_MESSAGES.everyone });
   });
 });

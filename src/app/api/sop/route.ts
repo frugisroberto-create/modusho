@@ -11,6 +11,7 @@ import { authOptions } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { checkAccess, canUserManageContentType } from "@/lib/rbac";
 import { resolveRaciRoles } from "@/lib/sop-workflow";
+import { checkAudienceForUser } from "@/lib/target-audience-scope-db";
 import { z } from "zod/v4";
 
 const createSopSchema = z.object({
@@ -59,6 +60,17 @@ export async function POST(request: NextRequest) {
   const hasAccess = await checkAccess(userId, "HOD", propertyId, departmentId);
   if (!hasAccess) {
     return NextResponse.json({ error: "Accesso negato a questa property/reparto" }, { status: 403 });
+  }
+
+  // Perimetro dei destinatari: la stessa regola di tutte le altre rotte
+  const audience = await checkAudienceForUser(userId, role, propertyId, {
+    allDepartments: parsed.data.targetAllDepartments,
+    roles: [],
+    departmentIds: parsed.data.targetDepartmentIds,
+    userIds: [],
+  });
+  if (!audience.allowed) {
+    return NextResponse.json({ error: audience.reason }, { status: 403 });
   }
 
   // HOD can only create SOPs for their own department (enforced by checkAccess above)

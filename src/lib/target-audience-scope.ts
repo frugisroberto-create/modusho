@@ -28,12 +28,20 @@
  * struttura — non si destina nulla. Il ripiego chiude, non apre: è proprio il
  * caso in cui aprire sarebbe l'errore.
  *
+ * ── Il capo reparto (HOD) ─────────────────────────────────────────────
+ *
+ * L'HOD scrive per i reparti in cui lavora. Il suo perimetro sono i reparti
+ * OPERATIVI (PropertyAssignment), mai i reparti visibili aggiuntivi e mai
+ * `targetDepartmentIds`: un reparto che può solo consultare non gli dà il titolo
+ * per rivolgersi a quegli operatori. Non dispone di «Tutti gli operatori e capi
+ * reparto», dei ruoli trasversali, né di singoli utenti: indica reparti interi.
+ * Se è assegnato a tutta la struttura, il suo perimetro sono tutti i reparti
+ * (lo calcola il ponte con il database, come `getOperativeDepartmentIds`).
+ *
  * ── Chi NON è toccato ──────────────────────────────────────────────────
  *
- * HOD, HOTEL_MANAGER, ADMIN e SUPER_ADMIN non hanno qui alcuna restrizione:
- * `hasRestrictedAudience` risponde di no e ogni giudizio è concesso. Le regole
- * che li riguardano (per esempio quella dell'HOD sui memo) vivono dove sono
- * sempre vissute e questo modulo non le tocca né le sostituisce.
+ * HOTEL_MANAGER, ADMIN e SUPER_ADMIN non hanno qui alcuna restrizione:
+ * `hasRestrictedAudience` risponde di no e ogni giudizio è concesso.
  */
 
 import type { Role } from "@prisma/client";
@@ -101,6 +109,27 @@ export const AUDIENCE_MESSAGES = {
     "In questa struttura non hai reparti di competenza: chiedi all'amministratore di assegnarteli prima di destinare un contenuto.",
 } as const;
 
+/** Gli stessi rifiuti, detti a un capo reparto. */
+export const HOD_AUDIENCE_MESSAGES = {
+  everyone:
+    "Come capo reparto puoi rivolgerti soltanto ai tuoi reparti: «Tutti gli operatori e capi reparto» non è una scelta disponibile.",
+  roles:
+    "Come capo reparto non puoi rivolgerti a interi ruoli aziendali: scegli fra i tuoi reparti.",
+  departments:
+    "Uno o più reparti destinatari non sono reparti in cui lavori: i reparti che puoi solo consultare non si possono indicare come destinatari.",
+  users:
+    "Come capo reparto indichi come destinatari i tuoi reparti interi, non singole persone.",
+  userRole: AUDIENCE_MESSAGES.userRole,
+  self: AUDIENCE_MESSAGES.self,
+  empty:
+    "In questa struttura non hai reparti assegnati: chiedi all'amministratore di assegnarteli prima di destinare un contenuto.",
+} as const;
+
+/** I messaggi giusti per chi sta scrivendo. */
+export function getAudienceMessages(role: Role) {
+  return role === "HOD" ? HOD_AUDIENCE_MESSAGES : AUDIENCE_MESSAGES;
+}
+
 // ─── Utilità ─────────────────────────────────────────────────────────
 
 const unique = (values: string[]): string[] => [...new Set(values)];
@@ -110,11 +139,16 @@ const unique = (values: string[]): string[] => [...new Set(values)];
 /**
  * Chi ha un perimetro destinatari ristretto.
  *
- * Solo il CORPORATE. È deliberato che sia una sola riga: se un domani un altro
- * ruolo dovrà essere ristretto, si cambia qui e le quattro rotte seguono.
+ * Il CORPORATE (reparti di competenza) e l'HOD (reparti in cui lavora). È
+ * deliberato che sia una sola riga: le rotte seguono da qui.
  */
 export function hasRestrictedAudience(role: Role): boolean {
-  return role === "CORPORATE";
+  return role === "CORPORATE" || role === "HOD";
+}
+
+/** Può indicare singoli utenti come destinatari? L'HOD no: indica reparti interi. */
+export function canTargetUsers(role: Role): boolean {
+  return role !== "HOD";
 }
 
 /**
@@ -125,6 +159,8 @@ export function hasRestrictedAudience(role: Role): boolean {
  */
 export function getTargetableDepartmentIds(actor: AudienceActor): string[] | null {
   if (!hasRestrictedAudience(actor.role)) return null;
+  // L'HOD: solo i reparti in cui lavora, mai i reparti destinabili o visibili.
+  if (actor.role === "HOD") return unique(actor.assignedDepartmentIds);
   // I reparti destinabili hanno la precedenza; senza di essi vale
   // l'assegnazione. In nessun caso «tutti».
   const base = actor.targetDepartmentIds.length > 0
@@ -231,28 +267,31 @@ export function checkAudienceProposal(
   // compilatore e per chi un giorno cambierà `hasRestrictedAudience`.
   if (perimeter === null) return ALLOW;
 
-  if (proposal.allDepartments) return deny(AUDIENCE_MESSAGES.everyone);
-  if (proposal.roles.length > 0) return deny(AUDIENCE_MESSAGES.roles);
+  const messages = getAudienceMessages(actor.role);
+
+  if (proposal.allDepartments) return deny(messages.everyone);
+  if (proposal.roles.length > 0) return deny(messages.roles);
+  if (!canTargetUsers(actor.role) && proposal.userIds.length > 0) return deny(messages.users);
 
   const wantsSomething = proposal.departmentIds.length > 0 || proposal.userIds.length > 0;
-  if (perimeter.length === 0 && wantsSomething) return deny(AUDIENCE_MESSAGES.empty);
+  if (perimeter.length === 0 && wantsSomething) return deny(messages.empty);
 
   const outOfPerimeter = proposal.departmentIds.filter((id) => !perimeter.includes(id));
-  if (outOfPerimeter.length > 0) return deny(AUDIENCE_MESSAGES.departments);
+  if (outOfPerimeter.length > 0) return deny(messages.departments);
 
-  if (proposal.userIds.includes(actor.id)) return deny(AUDIENCE_MESSAGES.self);
+  if (proposal.userIds.includes(actor.id)) return deny(messages.self);
 
   const byId = new Map(context.candidates.map((c) => [c.id, c]));
   for (const userId of proposal.userIds) {
     const candidate = byId.get(userId);
     // Un utente che il ponte non ha trovato è fuori dalla struttura o non
     // esiste: in nessuno dei due casi è destinabile.
-    if (!candidate) return deny(AUDIENCE_MESSAGES.users);
+    if (!candidate) return deny(messages.users);
     // Due motivi diversi meritano due frasi diverse: dire "non lavora nei tuoi
     // reparti" a chi ci lavora davvero manderebbe il direttore a cercare un
     // problema che non c'è.
-    if (!isNominableUserRole(candidate.role)) return deny(AUDIENCE_MESSAGES.userRole);
-    if (!isTargetableUser(actor.id, candidate, perimeter)) return deny(AUDIENCE_MESSAGES.users);
+    if (!isNominableUserRole(candidate.role)) return deny(messages.userRole);
+    if (!isTargetableUser(actor.id, candidate, perimeter)) return deny(messages.users);
   }
 
   return ALLOW;
