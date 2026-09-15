@@ -235,6 +235,17 @@ export interface ContentVisibilityInput {
 }
 
 /**
+ * Ruoli raggiunti da un destinatario di tipo ROLE.
+ * «Tutti gli operatori» (ROLE/OPERATOR) comprende anche i capi reparto: un HOD
+ * conosce sempre le procedure che vincolano gli operatori. Gli altri ruoli
+ * valgono per sé. È la sola regola: la applicano home, pagina Memo, Presa
+ * visione, registro, notifiche e sollecito.
+ */
+export function getRolesForRoleTarget(targetRole: Role): Role[] {
+  return targetRole === "OPERATOR" ? ["OPERATOR", "HOD"] : [targetRole];
+}
+
+/**
  * OPERATOR/HOD: l'utente è destinatario del contenuto, e quindi deve prenderne
  * visione? Conta solo ciò che gli è rivolto (tutti gli operatori, il suo ruolo,
  * lui stesso, un suo reparto operativo). Un reparto visibile aggiuntivo gli
@@ -247,7 +258,7 @@ export function isContentRecipient(
   targetAudience: ContentVisibilityInput["targetAudience"]
 ): boolean {
   return targetAudience.some((t) => {
-    if (t.targetType === "ROLE") return t.targetRole === "OPERATOR" || t.targetRole === user.role;
+    if (t.targetType === "ROLE") return t.targetRole !== null && getRolesForRoleTarget(t.targetRole).includes(user.role);
     if (t.targetType === "USER") return t.targetUserId === user.id;
     return t.targetDepartmentId !== null && operativeDepartmentIds.includes(t.targetDepartmentId);
   });
@@ -275,7 +286,7 @@ export function getMemoManagerKind(
 /**
  * Registro presa visione: l'utente rientra tra i destinatari del contenuto?
  * Stessa regola di /api/compliance (e delle notifiche di pubblicazione):
- *  - ROLE/X: utenti con quel ruolo esatto
+ *  - ROLE/X: i ruoli di getRolesForRoleTarget (ROLE/OPERATOR = operatori e capi reparto)
  *  - DEPARTMENT/d: utenti assegnati a quel reparto (assegnazione esplicita)
  *  - USER/u: solo quell'utente
  * I reparti visibili aggiuntivi non contano. Funzione pura.
@@ -285,7 +296,7 @@ export function isInTargetAudience(
   targetAudience: ContentVisibilityInput["targetAudience"]
 ): boolean {
   return targetAudience.some((t) => {
-    if (t.targetType === "ROLE") return t.targetRole === user.role;
+    if (t.targetType === "ROLE") return t.targetRole !== null && getRolesForRoleTarget(t.targetRole).includes(user.role);
     if (t.targetType === "USER") return t.targetUserId === user.id;
     return t.targetDepartmentId !== null && user.assignedDepartmentIds.includes(t.targetDepartmentId);
   });

@@ -63,7 +63,7 @@ interface TargetAudienceSelectorProps {
 }
 
 const ROLE_LABELS: Record<TargetRole, string> = {
-  OPERATOR: "Tutti gli operatori",
+  OPERATOR: "Tutti gli operatori e capi reparto",
   HOD: "Tutti gli HOD (Head of Department)",
   HOTEL_MANAGER: "Hotel Manager",
 };
@@ -274,7 +274,7 @@ export function TargetAudienceSelector({
       {restricted && (
         <p className="text-xs font-ui text-charcoal/55 border-l-2 border-terracotta/40 pl-2.5">
           Come referente corporate ti rivolgi ai reparti di tua competenza e alle persone che
-          vi lavorano. «Tutti gli operatori» e i ruoli trasversali non sono fra le tue scelte:
+          vi lavorano. «Tutti gli operatori e capi reparto» e i ruoli trasversali non sono fra le tue scelte:
           per questo qui sotto non li trovi.
         </p>
       )}
@@ -291,7 +291,7 @@ export function TargetAudienceSelector({
             {strandedEveryone && (
               <button type="button" onClick={dropEveryone}
                 className="text-[11px] font-ui font-medium px-2 py-1 bg-alert-red/10 text-alert-red rounded hover:bg-alert-red/20 transition-colors">
-                Tutti gli operatori ×
+                Tutti gli operatori e capi reparto ×
               </button>
             )}
             {strandedRoles.length > 0 && (
@@ -315,7 +315,7 @@ export function TargetAudienceSelector({
         <div className="flex flex-wrap gap-1.5 mb-3 pb-3 border-b border-ivory-dark">
           {value.allDepartments && (
             <span className="text-[11px] font-ui font-medium px-2 py-1 bg-terracotta/10 text-terracotta rounded">
-              Tutti gli operatori
+              Tutti gli operatori e capi reparto
             </span>
           )}
           {value.departmentIds.map(dId => {
@@ -345,8 +345,8 @@ export function TargetAudienceSelector({
           <label className="flex items-center gap-3 py-2.5 px-3 border border-ivory-dark cursor-pointer hover:bg-ivory-medium/30 transition-colors">
             <input type="checkbox" checked={value.allDepartments} onChange={toggleAllDepartments} className="w-4 h-4 accent-terracotta" />
             <div>
-              <span className="text-sm font-ui font-medium text-charcoal">Tutti gli operatori</span>
-              <p className="text-xs text-charcoal/45">Visibile a ogni operatore della struttura</p>
+              <span className="text-sm font-ui font-medium text-charcoal">Tutti gli operatori e capi reparto</span>
+              <p className="text-xs text-charcoal/45">Ogni operatore e ogni capo reparto della struttura deve prenderne visione</p>
             </div>
           </label>
         </div>
@@ -372,7 +372,7 @@ export function TargetAudienceSelector({
                   className={`w-4 h-4 accent-terracotta disabled:opacity-40 ${coveredByAll ? "opacity-40" : ""}`} />
                 <span className={`text-sm font-ui text-charcoal ${coveredByAll ? "opacity-40" : ""}`}>{dept.name}</span>
                 {coveredByAll && (
-                  <span className="text-[11px] font-ui text-charcoal/40 ml-1">già incluso in &quot;Tutti gli operatori&quot;</span>
+                  <span className="text-[11px] font-ui text-charcoal/40 ml-1">già incluso in &quot;Tutti gli operatori e capi reparto&quot;</span>
                 )}
                 <span className={`text-xs text-charcoal/40 ml-auto font-ui ${coveredByAll ? "opacity-40" : ""}`}>{dept.code}</span>
               </label>
@@ -393,15 +393,23 @@ export function TargetAudienceSelector({
         <div>
           <p className="text-xs font-ui font-semibold uppercase tracking-wider text-charcoal/70 mb-1.5">Ruoli trasversali</p>
           <div className="border border-ivory-dark divide-y divide-ivory-dark/50">
-            {(["HOD", "HOTEL_MANAGER"] as TargetRole[]).map((role) => (
-              <label key={role} className="flex items-center gap-3 py-2 px-3 cursor-pointer hover:bg-ivory-medium/30 transition-colors">
-                <input type="checkbox"
-                  checked={value.roles.includes(role)}
-                  onChange={() => toggleRole(role)}
-                  className="w-4 h-4 accent-terracotta" />
-                <span className="text-sm font-ui text-charcoal">{ROLE_LABELS[role]}</span>
-              </label>
-            ))}
+            {(["HOD", "HOTEL_MANAGER"] as TargetRole[]).map((role) => {
+              // I capi reparto sono già compresi in «Tutti gli operatori e capi reparto»
+              const coveredByAll = role === "HOD" && value.allDepartments;
+              return (
+                <label key={role} className={`flex items-center gap-3 py-2 px-3 transition-colors ${coveredByAll ? "cursor-not-allowed bg-ivory-medium/30" : "cursor-pointer hover:bg-ivory-medium/30"}`}>
+                  <input type="checkbox"
+                    checked={coveredByAll || value.roles.includes(role)}
+                    disabled={coveredByAll}
+                    onChange={() => toggleRole(role)}
+                    className="w-4 h-4 accent-terracotta disabled:opacity-40" />
+                  <span className={`text-sm font-ui text-charcoal ${coveredByAll ? "opacity-40" : ""}`}>{ROLE_LABELS[role]}</span>
+                  {coveredByAll && (
+                    <span className="text-[11px] font-ui text-charcoal/40 ml-1">già incluso in &quot;Tutti gli operatori e capi reparto&quot;</span>
+                  )}
+                </label>
+              );
+            })}
           </div>
         </div>
       )}

@@ -1,6 +1,8 @@
 import webpush from "web-push";
 import { prisma } from "./prisma";
 import { createNotifications } from "./notifications";
+import { getRolesForRoleTarget } from "./rbac";
+import type { Role } from "@prisma/client";
 
 // Configura VAPID
 const VAPID_PUBLIC_KEY = process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY || "";
@@ -285,7 +287,7 @@ async function resolveTargetUserIds(contentId: string, excludeUserId: string): P
     } else if (t.targetType === "ROLE" && t.targetRole) {
       const users = await prisma.user.findMany({
         where: {
-          role: t.targetRole as "OPERATOR" | "HOD" | "HOTEL_MANAGER" | "ADMIN" | "SUPER_ADMIN",
+          role: { in: getRolesForRoleTarget(t.targetRole as Role) },
           isActive: true,
           propertyAssignments: { some: { propertyId: content.propertyId } },
         },
