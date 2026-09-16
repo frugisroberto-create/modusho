@@ -5,7 +5,6 @@ import Link from "next/link";
 
 interface PropertyItem {
   id: string; name: string; code: string; tagline: string | null; city: string;
-  sopTotal: number; sopPublished: number; ackRate: number | null;
 }
 
 export default function PropertiesPage() {

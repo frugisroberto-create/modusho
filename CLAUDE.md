@@ -666,7 +666,13 @@ Solo segnalazioni ad alta utilità manageriale:
 - SOP restituite
 - SOP approvate nel periodo
 - Tempo medio di attraversamento del workflow (totale + per singolo stato)
-- Tasso di presa visione (% operatori che hanno confermato lettura)
+- Tasso di presa visione: prese visione fatte su prese visione dovute. Il
+  denominatore sono le PERSONE destinatarie di ogni contenuto pubblicato,
+  sommate contenuto per contenuto; il numeratore le letture che arrivano da
+  quelle stesse persone. Per costruzione non supera il 100%, e vale `null` —
+  «non applicabile» — quando non c'è nessun obbligo. La regola sta in
+  `src/lib/recipient-set.ts` e la usano il cruscotto (tasso e allarme «sotto il
+  50%») e la pagina Presa visione: non va riscritta altrove.
 
 **Sezione 5 — Confronto per hotel**
 Vista comparativa per property: SOP totali, pubblicate, in review, restituite, % avanzamento, ultimo avanzamento

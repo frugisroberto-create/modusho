@@ -18,6 +18,9 @@ interface DashboardData {
     avgWorkflowDays: number | null;
     avgTimePerStatus: Record<string, number | null>;
     ackRate: number | null;
+    /** Prese visione fatte e dovute: il tasso senza il contesto non dice niente. */
+    ackDone: number;
+    ackRequired: number;
   };
   propertyComparison: {
     id: string; name: string; code: string;
@@ -106,6 +109,7 @@ export default function GovernanceDashboardPage() {
     ...data.alerts.emptyDepts.map(a => ({ ...a, _key: `emptyDepts:${a.id}` })),
     ...data.alerts.highReturnHotels.map(a => ({ ...a, _key: `highReturnHotels:${a.id}` })),
     ...data.alerts.lowAckContents.map(a => ({ ...a, _key: `lowAckContents:${a.id}` })),
+    ...data.alerts.noRecipients.map(a => ({ ...a, _key: `noRecipients:${a.id}` })),
   ].filter((alert) => {
     if (!departmentFilter) return true;
     // Quando un reparto è selezionato, mostra solo alert con department
@@ -177,6 +181,13 @@ export default function GovernanceDashboardPage() {
           <p className="text-[12px] font-ui uppercase tracking-wider text-charcoal/50 mb-3">Tasso presa visione</p>
           <p className={`text-[42px] font-heading font-semibold leading-tight ${ackRate !== null && ackRate < 70 ? "text-terracotta" : "text-sage"}`}>
             {ackRate !== null ? `${ackRate}%` : "n/d"}
+          </p>
+          {/* Il denominatore accanto al numero: una percentuale su sei letture
+              dovute non è la stessa cosa che su seicento. */}
+          <p className="text-[12px] font-ui text-charcoal/45 mt-2">
+            {ackRate !== null
+              ? `${data.kpi.ackDone} prese visione su ${data.kpi.ackRequired} dovute`
+              : "Nessuna presa visione dovuta"}
           </p>
         </div>
       </div>
@@ -323,7 +334,7 @@ export default function GovernanceDashboardPage() {
             { label: "Restituite", value: data.kpi.sopReturned },
             { label: "Approvate nel periodo", value: data.kpi.sopApprovedInPeriod },
             { label: "Tempo medio workflow", value: data.kpi.avgWorkflowDays != null ? `${data.kpi.avgWorkflowDays}g` : "n/d" },
-            { label: "Tasso presa visione", value: data.kpi.ackRate != null ? `${data.kpi.ackRate}%` : "n/d" },
+            { label: "Tasso presa visione", value: data.kpi.ackRate != null ? `${data.kpi.ackRate}% (${data.kpi.ackDone}/${data.kpi.ackRequired})` : "n/d" },
           ].map((kpi) => (
             <div key={kpi.label} className="bg-ivory border border-ivory-dark p-4">
               <p className="text-[11px] font-ui uppercase tracking-wider text-charcoal/40 mb-1">{kpi.label}</p>
