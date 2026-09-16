@@ -1,8 +1,25 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import Link from "next/link";
+import { usePathname, useSearchParams } from "next/navigation";
 import { useHooContext } from "@/components/hoo/hoo-shell";
+import {
+  applyDepartment,
+  applyPage,
+  applyProperty,
+  applyState,
+  applyType,
+  buildComplianceApiQuery,
+  buildComplianceQuery,
+  COMPLIANCE_STATES,
+  COMPLIANCE_STATE_LABELS,
+  parseComplianceState,
+  reconcileDepartment,
+  type ComplianceStateName,
+  type ComplianceTypeFilter,
+  type ComplianceUrlState,
+} from "@/lib/compliance-url-state";
 
 interface ComplianceItem {
   id: string;
@@ -13,6 +30,7 @@ interface ComplianceItem {
   property: { id: string; name: string; code: string };
   targetCount: number;
   ackedCount: number;
+  state: ComplianceStateName;
 }
 
 interface Department {
@@ -28,7 +46,9 @@ interface Property {
   departments?: Department[];
 }
 
-type ContentTypeFilter = "" | "SOP" | "DOCUMENT" | "MEMO";
+type StateCounts = Record<ComplianceStateName, number>;
+
+const EMPTY_COUNTS: StateCounts = { aperta: 0, completata: 0, "senza-destinatari": 0 };
 
 const TYPE_LABELS: Record<string, string> = {
   SOP: "SOP",
@@ -40,6 +60,22 @@ const TYPE_BADGE_CLASSES: Record<string, string> = {
   SOP: "badge-sop",
   DOCUMENT: "badge-document",
   MEMO: "badge-memo",
+};
+
+/** Cosa dice la pagina quando un elenco è vuoto: il motivo, non solo il fatto. */
+const EMPTY_MESSAGES: Record<ComplianceStateName, { title: string; detail: string }> = {
+  aperta: {
+    title: "Tutte le prese visione sono complete",
+    detail: "Nessun contenuto in attesa di essere letto. Le righe chiuse sono in «Completate».",
+  },
+  completata: {
+    title: "Nessuna presa visione completata",
+    detail: "Nessun contenuto è stato letto da tutti i suoi destinatari.",
+  },
+  "senza-destinatari": {
+    title: "Nessun contenuto senza destinatari",
+    detail: "Ogni contenuto pubblicato ha almeno una persona che può prenderne visione.",
+  },
 };
 
 function getDetailHref(item: ComplianceItem): string {
@@ -64,24 +100,49 @@ function TypeBadge({ type }: { type: string }) {
 
 export default function CompliancePage() {
   const { userRole } = useHooContext();
+  const pathname = usePathname();
+  const searchParams = useSearchParams();
+
+  // ── Stato dei filtri ──────────────────────────────────────────────────────
+  // Seminato UNA VOLTA dall'indirizzo (initializer lazy). Da qui in poi la
+  // direzione è unica, stato → URL: l'indirizzo non rialimenta mai lo stato.
+  const [state, setState] = useState<ComplianceUrlState>(() => parseComplianceState(searchParams));
+
   const [items, setItems] = useState<ComplianceItem[]>([]);
+  const [counts, setCounts] = useState<StateCounts>(EMPTY_COUNTS);
   const [total, setTotal] = useState(0);
-  const [page, setPage] = useState(1);
   const [loading, setLoading] = useState(true);
   const [properties, setProperties] = useState<Property[]>([]);
-  const [propertyFilter, setPropertyFilter] = useState("");
-  const [departmentFilter, setDepartmentFilter] = useState("");
-  const [typeFilter, setTypeFilter] = useState<ContentTypeFilter>("");
   const pageSize = 20;
 
+  // ── Unico punto che scrive l'indirizzo ────────────────────────────────────
+  // `replaceState` sostituisce la voce di cronologia invece di aggiungerne una:
+  // dopo dieci filtraggi il tasto indietro esce dalla pagina in un colpo solo.
+  useEffect(() => {
+    const query = buildComplianceQuery(state);
+    const url = query ? `${pathname}?${query}` : pathname;
+    if (url !== window.location.pathname + window.location.search) {
+      window.history.replaceState(null, "", url);
+    }
+  }, [state, pathname]);
+
+  // Le strutture accessibili. Chi ne ha una sola non deve sceglierla.
+  const propertiesLoaded = useRef(false);
   useEffect(() => {
     async function fetchProperties() {
       const res = await fetch("/api/properties");
-      if (res.ok) {
-        const json = await res.json();
-        setProperties(json.data);
-        if (json.data.length === 1) setPropertyFilter(json.data[0].id);
-      }
+      if (!res.ok) return;
+      const json = await res.json();
+      setProperties(json.data);
+      if (propertiesLoaded.current) return;
+      propertiesLoaded.current = true;
+      setState((s) => {
+        const seeded = json.data.length === 1 ? applyProperty(s, json.data[0].id) : s;
+        const departmentIds: string[] = (json.data as Property[])
+          .filter((p) => !seeded.propertyId || p.id === seeded.propertyId)
+          .flatMap((p) => p.departments?.map((d) => d.id) ?? []);
+        return reconcileDepartment(seeded, departmentIds);
+      });
     }
     fetchProperties();
   }, []);
@@ -89,35 +150,54 @@ export default function CompliancePage() {
   const fetchItems = useCallback(async () => {
     setLoading(true);
     try {
-      const params = new URLSearchParams({
-        page: page.toString(),
-        pageSize: pageSize.toString(),
-      });
-      if (propertyFilter) params.set("propertyId", propertyFilter);
-      if (departmentFilter) params.set("departmentId", departmentFilter);
-      if (typeFilter) params.set("type", typeFilter);
-
-      const res = await fetch(`/api/compliance?${params}`);
+      const res = await fetch(`/api/compliance?${buildComplianceApiQuery(state, pageSize)}`);
       if (res.ok) {
         const json = await res.json();
         setItems(json.data);
         setTotal(json.meta.total);
+        setCounts(json.meta.counts ?? EMPTY_COUNTS);
       }
     } finally {
       setLoading(false);
     }
-  }, [page, propertyFilter, departmentFilter, typeFilter]);
+  }, [state]);
 
   useEffect(() => { fetchItems(); }, [fetchItems]);
-  useEffect(() => { setPage(1); }, [propertyFilter, departmentFilter, typeFilter]);
 
   const totalPages = Math.ceil(total / pageSize);
-
-  const selectedProperty = properties.find((p) => p.id === propertyFilter);
+  const selectedProperty = properties.find((p) => p.id === state.propertyId);
+  const showPropertyColumn =
+    (userRole === "ADMIN" || userRole === "SUPER_ADMIN") && properties.length > 1;
+  const empty = EMPTY_MESSAGES[state.state];
 
   return (
     <div className="max-w-5xl space-y-4">
-      <h1 className="text-xl font-heading font-medium text-charcoal-dark">Presa visione</h1>
+      <div>
+        <h1 className="text-xl font-heading font-medium text-charcoal-dark">Presa visione</h1>
+        {/* La riga che toglie il sospetto che archiviare cancelli qualcosa */}
+        <p className="text-sm font-ui text-charcoal/45 mt-1">
+          Ogni contenuto pubblicato resta in elenco. Le righe non spariscono: cambiano stato.
+        </p>
+      </div>
+
+      {/* Linguette di stato: i conteggi valgono per i filtri scelti, e mostrano
+          che le righe chiuse ci sono ancora */}
+      <div className="flex gap-1 bg-ivory border border-ivory-dark p-0.5 w-fit flex-wrap">
+        {COMPLIANCE_STATES.map((name) => (
+          <button
+            key={name}
+            onClick={() => setState((s) => applyState(s, name))}
+            className={`px-3 py-1.5 text-sm font-ui transition-colors ${
+              state.state === name ? "bg-charcoal-dark text-white" : "text-charcoal hover:bg-ivory-dark"
+            }`}
+          >
+            {COMPLIANCE_STATE_LABELS[name]}
+            <span className={`ml-2 tabular-nums ${state.state === name ? "text-white/70" : "text-charcoal/45"}`}>
+              {counts[name]}
+            </span>
+          </button>
+        ))}
+      </div>
 
       {/* Filtri */}
       <div className="flex items-end gap-4 flex-wrap">
@@ -127,8 +207,8 @@ export default function CompliancePage() {
               Struttura
             </label>
             <select
-              value={propertyFilter}
-              onChange={(e) => { setPropertyFilter(e.target.value); setDepartmentFilter(""); }}
+              value={state.propertyId}
+              onChange={(e) => setState((s) => applyProperty(s, e.target.value))}
               className="text-sm font-ui border border-ivory-dark px-3 py-2 bg-white"
             >
               <option value="">Tutte le strutture</option>
@@ -144,10 +224,10 @@ export default function CompliancePage() {
             Reparto
           </label>
           <select
-            value={departmentFilter}
-            onChange={(e) => setDepartmentFilter(e.target.value)}
-            className={`text-sm font-ui border border-ivory-dark px-3 py-2 bg-white ${!propertyFilter ? "text-charcoal/35" : ""}`}
-            disabled={!propertyFilter}
+            value={state.departmentId}
+            onChange={(e) => setState((s) => applyDepartment(s, e.target.value))}
+            className={`text-sm font-ui border border-ivory-dark px-3 py-2 bg-white ${!state.propertyId ? "text-charcoal/35" : ""}`}
+            disabled={!state.propertyId}
           >
             <option value="">Tutti i reparti</option>
             {selectedProperty?.departments?.map((d) => (
@@ -161,8 +241,8 @@ export default function CompliancePage() {
             Tipo
           </label>
           <select
-            value={typeFilter}
-            onChange={(e) => setTypeFilter(e.target.value as ContentTypeFilter)}
+            value={state.type}
+            onChange={(e) => setState((s) => applyType(s, e.target.value as ComplianceTypeFilter))}
             className="text-sm font-ui border border-ivory-dark px-3 py-2 bg-white"
           >
             <option value="">Tutti i tipi</option>
@@ -182,11 +262,18 @@ export default function CompliancePage() {
         </div>
       ) : items.length === 0 ? (
         <div className="py-16 text-center">
-          <p className="text-lg font-heading text-charcoal-dark mb-2">Tutte le prese visione sono complete</p>
-          <p className="text-sm font-ui text-charcoal/40">Nessun contenuto con presa visione incompleta.</p>
+          <p className="text-lg font-heading text-charcoal-dark mb-2">{empty.title}</p>
+          <p className="text-sm font-ui text-charcoal/40">{empty.detail}</p>
         </div>
       ) : (
         <div className="bg-white border border-ivory-dark overflow-hidden">
+          {state.state === "senza-destinatari" && (
+            <p className="px-4 py-3 text-[12px] font-ui text-charcoal bg-[#FDF3D7] border-b border-ivory-dark">
+              Questi contenuti sono pubblicati ma non hanno nessuna persona fra i destinatari: nessuno
+              può prenderne visione. Succede quando un reparto resta senza personale attivo, o quando i
+              destinatari non sono mai stati scelti. Si risolve sul contenuto, scegliendo i destinatari.
+            </p>
+          )}
           <table className="w-full text-sm">
             <thead>
               <tr className="bg-ivory border-b border-ivory-dark text-left">
@@ -202,7 +289,7 @@ export default function CompliancePage() {
                 <th className="py-3 px-4 text-[11px] font-ui font-semibold uppercase tracking-wider text-charcoal/45">
                   Reparto
                 </th>
-                {(userRole === "ADMIN" || userRole === "SUPER_ADMIN") && properties.length > 1 && (
+                {showPropertyColumn && (
                   <th className="py-3 px-4 text-[11px] font-ui font-semibold uppercase tracking-wider text-charcoal/45">
                     Struttura
                   </th>
@@ -252,7 +339,7 @@ export default function CompliancePage() {
                         {item.department?.name ?? "—"}
                       </span>
                     </td>
-                    {(userRole === "ADMIN" || userRole === "SUPER_ADMIN") && properties.length > 1 && (
+                    {showPropertyColumn && (
                       <td className="py-3 px-4">
                         <span className="text-[11px] font-ui text-charcoal/50">
                           {item.property.code}
@@ -260,17 +347,21 @@ export default function CompliancePage() {
                       </td>
                     )}
                     <td className="py-3 px-4 text-right">
-                      <div className="flex items-center justify-end gap-2">
-                        <div className="w-20 h-1.5 bg-ivory-dark overflow-hidden hidden sm:block">
-                          <div
-                            className={`h-full transition-all ${pct >= 100 ? "bg-sage" : pct >= 50 ? "bg-[#D4A017]" : "bg-terracotta"}`}
-                            style={{ width: `${pct}%` }}
-                          />
+                      {item.targetCount === 0 ? (
+                        <span className="text-[12px] font-ui text-alert-red">Nessun destinatario</span>
+                      ) : (
+                        <div className="flex items-center justify-end gap-2">
+                          <div className="w-20 h-1.5 bg-ivory-dark overflow-hidden hidden sm:block">
+                            <div
+                              className={`h-full transition-all ${pct >= 100 ? "bg-sage" : pct >= 50 ? "bg-[#D4A017]" : "bg-terracotta"}`}
+                              style={{ width: `${pct}%` }}
+                            />
+                          </div>
+                          <span className="text-[12px] font-ui font-semibold text-charcoal-dark tabular-nums">
+                            {item.ackedCount} / {item.targetCount}
+                          </span>
                         </div>
-                        <span className="text-[12px] font-ui font-semibold text-charcoal-dark tabular-nums">
-                          {item.ackedCount} / {item.targetCount}
-                        </span>
-                      </div>
+                      )}
                     </td>
                   </tr>
                 );
@@ -284,19 +375,19 @@ export default function CompliancePage() {
       {totalPages > 1 && (
         <div className="flex items-center justify-between pt-2">
           <p className="text-sm text-charcoal/45 font-ui">
-            Pagina {page} di {totalPages} ({total} risultati)
+            Pagina {state.page} di {totalPages} ({total} risultati)
           </p>
           <div className="flex gap-2">
             <button
-              onClick={() => setPage((p) => Math.max(1, p - 1))}
-              disabled={page <= 1}
+              onClick={() => setState((s) => applyPage(s, s.page - 1))}
+              disabled={state.page <= 1}
               className="px-3 py-1.5 text-sm border border-ivory-dark hover:bg-ivory-dark disabled:opacity-50 font-ui"
             >
               Precedente
             </button>
             <button
-              onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
-              disabled={page >= totalPages}
+              onClick={() => setState((s) => applyPage(s, Math.min(totalPages, s.page + 1)))}
+              disabled={state.page >= totalPages}
               className="px-3 py-1.5 text-sm border border-ivory-dark hover:bg-ivory-dark disabled:opacity-50 font-ui"
             >
               Successivo
