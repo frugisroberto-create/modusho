@@ -106,7 +106,10 @@ export default async function DocumentDetailPage({ params }: Props) {
             dangerouslySetInnerHTML={{ __html: sanitizeHtml(content.body) }}
           />
 
-          <AttachmentUploader contentId={content.id} canEdit={false} />
+          {/* Su un documento il file È il contenuto: il riquadro di lettura si
+              apre da sé, senza chiedere un clic per vedere l'unica cosa che
+              c'è da leggere. */}
+          <AttachmentUploader contentId={content.id} canEdit={false} autoViewFirstDocument />
 
           {/* Lettura registrata — solo OPERATOR/HOD/CORPORATE */}
           {!isGovernance && acknowledged && acknowledgedAt && (
