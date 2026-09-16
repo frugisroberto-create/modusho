@@ -35,22 +35,16 @@ export async function GET(request: NextRequest) {
         departments = p.departments.filter(d => accessibleDeptIds.includes(d.id));
       }
 
-      const [sopTotal, sopPublished, ackCount, publishedCount] = await Promise.all([
-        prisma.content.count({ where: { propertyId: p.id, type: "SOP" } }),
-        prisma.content.count({ where: { propertyId: p.id, type: "SOP", status: "PUBLISHED" } }),
-        prisma.contentAcknowledgment.count({ where: { content: { propertyId: p.id, status: "PUBLISHED" } } }),
-        prisma.content.count({ where: { propertyId: p.id, status: "PUBLISHED" } }),
-      ]);
-      const operatorCount = await prisma.user.count({
-        where: { role: "OPERATOR", isActive: true, propertyAssignments: { some: { propertyId: p.id } } },
-      });
-      const expectedAcks = publishedCount * operatorCount;
+      // Niente KPI qui. C'era un terzo tasso di presa visione — letture di
+      // qualunque contenuto pubblicato diviso (contenuti × operatori) — che non
+      // era d'accordo né con il cruscotto né con la pagina Presa visione, e che
+      // nessuna pagina mostrava: questa rotta la chiamano dodici schermate solo
+      // per riempire le tendine. Il tasso vive in `recipient-set.ts` e lo
+      // espone il cruscotto, una volta sola.
       return {
         id: p.id, name: p.name, code: p.code, tagline: p.tagline, city: p.city,
         address: p.address, description: p.description, website: p.website,
         departments,
-        sopTotal, sopPublished,
-        ackRate: expectedAcks > 0 ? Math.round((ackCount / expectedAcks) * 100) : null,
       };
     })
   );

@@ -4,6 +4,8 @@ import { authOptions } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { Prisma } from "@prisma/client";
 import { getAccessiblePropertyIds } from "@/lib/rbac";
+import { computeCoverage, RECIPIENT_COVERAGE_SELECT } from "@/lib/recipient-set-db";
+import { ackRate, sumCoverage } from "@/lib/recipient-set";
 import { z } from "zod/v4";
 
 const querySchema = z.object({
@@ -63,10 +65,9 @@ export async function GET(request: NextRequest) {
     deptsWithPublished,
     allDepts,
     highReturnHotels,
-    lowAckContents,
+    ackCoverageContents,
     avgWorkflowTime,
     avgTimePerStatus,
-    ackStats,
   ] = await Promise.all([
     // Properties (sempre tutte le accessibili per il select)
     prisma.property.findMany({
@@ -162,27 +163,19 @@ export async function GET(request: NextRequest) {
       HAVING COUNT(*) > 3
     `,
 
-    // Contenuti con presa visione < 50%
-    prisma.$queryRaw<{ id: string; title: string; propertyName: string; ackRate: number }[]>`
-      SELECT c.id, c.title, p.name as "propertyName",
-        CASE WHEN total_ops.cnt = 0 THEN 0
-             ELSE ROUND((ack.cnt::numeric / total_ops.cnt) * 100)
-        END as "ackRate"
-      FROM "Content" c
-      JOIN "Property" p ON p.id = c."propertyId"
-      LEFT JOIN LATERAL (SELECT COUNT(*)::int as cnt FROM "ContentAcknowledgment" ca WHERE ca."contentId" = c.id) ack ON true
-      LEFT JOIN LATERAL (
-        SELECT COUNT(DISTINCT pa."userId")::int as cnt
-        FROM "PropertyAssignment" pa JOIN "User" u ON u.id = pa."userId"
-        WHERE pa."propertyId" = c."propertyId" AND u."role" = 'OPERATOR' AND u."isActive" = true
-          AND (c."departmentId" IS NULL OR pa."departmentId" IS NULL OR pa."departmentId" = c."departmentId")
-      ) total_ops ON true
-      WHERE c.status = 'PUBLISHED' AND c."isDeleted" = false AND c.type IN ('SOP', 'DOCUMENT')
-        AND c."propertyId" = ANY(${filteredPropertyIds})
-        ${deptCond}
-        AND total_ops.cnt > 0 AND (ack.cnt::numeric / total_ops.cnt) < 0.5
-      ORDER BY "ackRate" ASC LIMIT 10
-    `,
+    // Contenuti soggetti a presa visione: destinatari e letture.
+    // Il conto lo fa `recipient-set`, non più una lateral che contava tutte le
+    // letture sopra i soli operatori del reparto.
+    prisma.content.findMany({
+      where: { ...pf, isDeleted: false, status: "PUBLISHED", type: { in: ["SOP", "DOCUMENT"] } },
+      select: {
+        id: true,
+        title: true,
+        propertyId: true,
+        property: { select: { name: true } },
+        ...RECIPIENT_COVERAGE_SELECT,
+      },
+    }),
 
     // Tempo medio workflow
     prisma.$queryRaw<{ avg_days: number | null }[]>`
@@ -205,13 +198,42 @@ export async function GET(request: NextRequest) {
       GROUP BY h1."toStatus"
     `,
 
-    // Tasso presa visione
-    prisma.$queryRaw<{ total_required: number; total_acked: number }[]>`
-      SELECT
-        (SELECT COUNT(*)::int FROM "Content" c WHERE c.status = 'PUBLISHED' AND c."isDeleted" = false AND c.type IN ('SOP', 'DOCUMENT') AND c."propertyId" = ANY(${filteredPropertyIds}) ${deptCond}) as total_required,
-        (SELECT COUNT(DISTINCT ca."contentId" || '-' || ca."userId")::int FROM "ContentAcknowledgment" ca JOIN "Content" c ON c.id = ca."contentId" WHERE c."isDeleted" = false AND c."propertyId" = ANY(${filteredPropertyIds}) ${deptCond}) as total_acked
-    `,
   ]);
+
+  // ══════════════════════════════════════════════════════════════
+  // PRESA VISIONE: una regola sola per il tasso e per gli allarmi
+  // ══════════════════════════════════════════════════════════════
+  // `computeCoverage` risolve i destinatari di ogni contenuto e conta le letture
+  // che arrivano da loro. Numeratore e denominatore parlano della stessa
+  // popolazione: il tasso non può più superare il 100%, e un contenuto letto da
+  // chi non era destinatario non sparisce più dagli allarmi.
+  const ackRows = await computeCoverage(ackCoverageContents);
+  const ackTotals = sumCoverage(ackRows.map((r) => r.coverage));
+
+  const lowAckContents = ackRows
+    .filter((r) => r.state !== "senza-destinatari" && r.coverage.done * 2 < r.coverage.required)
+    .map((r) => ({
+      id: r.content.id,
+      title: r.content.title,
+      propertyName: r.content.property.name,
+      ackRate: ackRate(r.coverage) ?? 0,
+      done: r.coverage.done,
+      required: r.coverage.required,
+    }))
+    .sort((a, b) => a.ackRate - b.ackRate)
+    .slice(0, 10);
+
+  // Contenuti pubblicati i cui destinatari non risolvono nessuna persona (per
+  // esempio un reparto rimasto senza personale attivo). Non sono «completati»:
+  // sono contenuti che nessuno può leggere, e finché restano così non entrano
+  // in nessun conto. Vanno visti.
+  const noRecipientContents = ackRows
+    .filter((r) => r.state === "senza-destinatari")
+    .map((r) => ({
+      id: r.content.id,
+      title: r.content.title,
+      propertyName: r.content.property.name,
+    }));
 
   // ══════════════════════════════════════════════════════════════
   // Post-processing (no DB calls)
@@ -267,8 +289,14 @@ export async function GET(request: NextRequest) {
       message: `${h.returnCount} SOP restituite nel periodo`,
     })),
     lowAckContents: lowAckContents.map(c => ({
-      id: c.id, title: c.title, property: c.propertyName, ackRate: Number(c.ackRate),
-      severity: "critical" as const, message: `Presa visione al ${c.ackRate}%`,
+      id: c.id, title: c.title, property: c.propertyName, ackRate: c.ackRate,
+      severity: "critical" as const,
+      message: `Presa visione al ${c.ackRate}% — ${c.done} su ${c.required} destinatari`,
+    })),
+    noRecipients: noRecipientContents.map(c => ({
+      id: c.id, title: c.title, property: c.propertyName,
+      severity: "critical" as const,
+      message: "Nessun destinatario: nessuno può prenderne visione",
     })),
   };
 
@@ -284,7 +312,11 @@ export async function GET(request: NextRequest) {
     sopApprovedInPeriod,
     avgWorkflowDays: avgWorkflowTime[0]?.avg_days != null ? Number(avgWorkflowTime[0].avg_days) : null,
     avgTimePerStatus: Object.fromEntries(avgTimePerStatus.map(r => [r.status, r.avg_days != null ? Number(r.avg_days) : null])),
-    ackRate: ackStats[0]?.total_required ? Math.round((ackStats[0].total_acked / ackStats[0].total_required) * 100) : null,
+    // Percentuale di prese visione dovute che sono state fatte. `null` quando
+    // non c'è nessun obbligo: zero destinatari non fa «zero per cento».
+    ackRate: ackRate(ackTotals),
+    ackDone: ackTotals.done,
+    ackRequired: ackTotals.required,
   };
 
   // ══════════════════════════════════════════════════════════════
