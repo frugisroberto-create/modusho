@@ -147,7 +147,9 @@ describe("computeCoverage", () => {
       }),
     ]);
 
-    const secondCall = mockedPrisma.propertyAssignment.findMany.mock.calls[1][0];
+    const secondCall = mockedPrisma.propertyAssignment.findMany.mock.calls[1]?.[0] as {
+      where: { departmentId: unknown; user: { role: unknown; isActive: unknown } };
+    };
     expect(secondCall.where.departmentId).toEqual({ in: [FB] });
     // Una riga DEPARTMENT non riguarda hotel manager e corporate assegnati al reparto
     expect(secondCall.where.user.role).toEqual({ in: ["OPERATOR", "HOD"] });
