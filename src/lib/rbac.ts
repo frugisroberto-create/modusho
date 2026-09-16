@@ -246,6 +246,18 @@ export function getRolesForRoleTarget(targetRole: Role): Role[] {
 }
 
 /**
+ * Il contrario di getRolesForRoleTarget: quali destinatari «per ruolo»
+ * raggiungono una persona con questo ruolo. Un capo reparto è raggiunto sia da
+ * ROLE/HOD sia da «Tutti gli operatori e capi reparto» (ROLE/OPERATOR).
+ * Serve dove il filtro si scrive in SQL e non si possono chiamare le regole
+ * riga per riga (la ricerca full-text).
+ */
+export function getRoleTargetsReaching(role: Role): Role[] {
+  const roles: Role[] = ["OPERATOR", "HOD", "HOTEL_MANAGER", "ADMIN", "SUPER_ADMIN", "CORPORATE"];
+  return roles.filter((target) => getRolesForRoleTarget(target).includes(role));
+}
+
+/**
  * OPERATOR/HOD: l'utente è destinatario del contenuto, e quindi deve prenderne
  * visione? Conta solo ciò che gli è rivolto (tutti gli operatori, il suo ruolo,
  * lui stesso, un suo reparto operativo). Un reparto visibile aggiuntivo gli

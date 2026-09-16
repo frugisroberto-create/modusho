@@ -3,7 +3,7 @@ import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { Prisma } from "@prisma/client";
-import { getAccessiblePropertyIds, getAccessibleDepartmentIds } from "@/lib/rbac";
+import { getAccessiblePropertyIds, getAccessibleDepartmentIds, getRoleTargetsReaching } from "@/lib/rbac";
 import { z } from "zod/v4";
 
 const searchSchema = z.object({
@@ -91,35 +91,58 @@ export async function GET(request: NextRequest) {
     ? Prisma.sql`AND c."type"::text != 'BRAND_BOOK'`
     : Prisma.empty;
 
-  // Status filter:
-  //  - OPERATOR: only PUBLISHED
-  //  - HOD/HM/ADMIN/SUPER_ADMIN: all active states (PUBLISHED + DRAFT + REVIEW_*+RETURNED)
-  //    Always excluded: ARCHIVED (never returned in search)
-  const statusCondition = (session.user.role === "OPERATOR" || status === "PUBLISHED")
-    ? Prisma.sql`AND c.status::text = 'PUBLISHED'`
-    : Prisma.sql`AND c.status::text != 'ARCHIVED'`;
-
-  // Visibility filter:
-  //  - OPERATOR: filter by ContentTarget (targetAudience): ROLE/OPERATOR,
-  //    USER/<userId>, DEPARTMENT in perimeter. Il check ROLE/<userRole> è
-  //    ridondante quando userRole === OPERATOR (già coperto dalla prima
-  //    condizione), quindi evitiamo il parametro enum — Postgres non fa cast
-  //    implicito text → "Role" dentro prepared statements.
-  //  - HOD/HM/ADMIN/SUPER_ADMIN: legacy department-based filter (search in
-  //    drafts perimeter).
-  const isOperator = session.user.role === "OPERATOR";
+  // Perimetro della ricerca — la stessa regola delle liste, scritta in SQL.
+  //
+  //  - OPERATOR e HOD: trovano i contenuti PUBBLICATI che li raggiungono, cioè
+  //    quelli rivolti al loro ruolo («Tutti gli operatori e capi reparto»
+  //    comprende gli HOD), a loro personalmente, o a uno dei reparti che
+  //    vedono (operativi e visibili: i visibili danno la consultazione).
+  //    L'HOD trova inoltre le bozze e le revisioni che può davvero aprire:
+  //    quelle che ha creato e quelle in cui è R, C o A. Prima trovava, di
+  //    qualunque autore, tutto ciò che aveva un reparto suo o nessun reparto —
+  //    memo compresi, che reparto non ne hanno mai.
+  //  - HM, ADMIN, SUPER_ADMIN e CORPORATE: filtro per reparto, come prima.
+  //
+  // I confronti sugli enum passano da ::text: dentro un prepared statement
+  // Postgres non fa il cast implicito text → "Role"/"ContentStatus".
+  const userRole = session.user.role;
   const userIdParam = session.user.id;
-  const visibilityCondition = isOperator
-    ? Prisma.sql`AND EXISTS (
+  const isTargetedRole = userRole === "OPERATOR" || userRole === "HOD";
+  const roleTargets = getRoleTargetsReaching(userRole) as string[];
+
+  const reachedByTargets = Prisma.sql`EXISTS (
         SELECT 1 FROM "ContentTarget" ct
         WHERE ct."contentId" = c.id
           AND (
-            (ct."targetType" = 'ROLE' AND ct."targetRole" = 'OPERATOR')
-            OR (ct."targetType" = 'USER' AND ct."targetUserId" = ${userIdParam})
-            OR (ct."targetType" = 'DEPARTMENT' AND ct."targetDepartmentId" = ANY(${departmentFilter}))
+            (ct."targetType"::text = 'ROLE' AND ct."targetRole"::text = ANY(${roleTargets}))
+            OR (ct."targetType"::text = 'USER' AND ct."targetUserId" = ${userIdParam})
+            OR (ct."targetType"::text = 'DEPARTMENT' AND ct."targetDepartmentId" = ANY(${departmentFilter}))
           )
-      )`
-    : Prisma.sql`AND (c."departmentId" IS NULL OR c."departmentId" = ANY(${departmentFilter}))`;
+      )`;
+
+  const ownDraft = Prisma.sql`(
+        c."createdById" = ${userIdParam}
+        OR EXISTS (
+          SELECT 1 FROM "SopWorkflow" w
+          WHERE w."contentId" = c.id
+            AND (w."responsibleId" = ${userIdParam} OR w."consultedId" = ${userIdParam} OR w."accountableId" = ${userIdParam})
+        )
+      )`;
+
+  const statusCondition = isTargetedRole
+    ? Prisma.empty
+    : (status === "PUBLISHED"
+        ? Prisma.sql`AND c.status::text = 'PUBLISHED'`
+        : Prisma.sql`AND c.status::text != 'ARCHIVED'`);
+
+  const visibilityCondition = userRole === "OPERATOR"
+    ? Prisma.sql`AND c.status::text = 'PUBLISHED' AND ${reachedByTargets}`
+    : userRole === "HOD"
+      ? Prisma.sql`AND (
+          (c.status::text = 'PUBLISHED' AND ${reachedByTargets})
+          OR (c.status::text NOT IN ('PUBLISHED', 'ARCHIVED') AND ${ownDraft})
+        )`
+      : Prisma.sql`AND (c."departmentId" IS NULL OR c."departmentId" = ANY(${departmentFilter}))`;
 
   // Full-text search with PostgreSQL (safe parameterized query)
   try {
