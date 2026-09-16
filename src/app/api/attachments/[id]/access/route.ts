@@ -1,25 +1,26 @@
 /**
  * GET /api/attachments/[id]/access
  *
- * Generates a presigned GET URL for secure file access.
- * RBAC is inherited from the content madre — no attachment-level permissions.
+ * Indirizzo firmato, a vita breve, per far arrivare il file all'utente: i byte
+ * vanno dal bucket al browser senza passare dal server.
  *
- * Flow:
- * 1. Authenticate user
- * 2. Load attachment + content madre
- * 3. Verify RBAC on content madre (same rules as content visibility)
- * 4. Generate presigned GET URL (120s TTL)
- * 5. Return { url, fileName, mimeType }
+ * Il permesso non è dell'allegato, è del contenuto a cui appartiene, e lo
+ * decide `loadAccessibleAttachment` — lo stesso che usa la vista a schermo.
+ *
+ * PDF e immagini arrivano con disposizione "inline": il browser li mostra
+ * invece di scaricarli, e sono quelli che la pagina incornicia nel riquadro di
+ * lettura. Word ed Excel restano "attachment", perché il browser non saprebbe
+ * che farsene: per leggerli a schermo c'è `/api/attachments/[id]/view`.
  */
 
 import { NextRequest, NextResponse } from "next/server";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
-import { prisma } from "@/lib/prisma";
-import { canUserAccessContent } from "@/lib/rbac";
+import { loadAccessibleAttachment } from "@/lib/attachments/access-db";
 import { getPresignedDownloadUrl } from "@/lib/attachments/storage";
+import { getViewMode } from "@/lib/attachments/viewable";
 
-const PRESIGNED_TTL = 30; // seconds
+const PRESIGNED_TTL = 30; // secondi
 
 export async function GET(
   request: NextRequest,
@@ -31,72 +32,22 @@ export async function GET(
   }
 
   const { id: attachmentId } = await params;
-
-  // 1. Load attachment with content madre
-  const attachment = await prisma.attachment.findUnique({
-    where: { id: attachmentId },
-    select: {
-      id: true,
-      storageKey: true,
-      originalFileName: true,
-      mimeType: true,
-      kind: true,
-      contentId: true,
-      content: {
-        select: {
-          id: true,
-          status: true,
-          propertyId: true,
-          departmentId: true,
-          createdById: true,
-          isDeleted: true,
-          targetAudience: {
-            select: { targetType: true, targetRole: true, targetDepartmentId: true, targetUserId: true },
-          },
-        },
-      },
-    },
+  const access = await loadAccessibleAttachment(attachmentId, {
+    id: session.user.id,
+    role: session.user.role,
   });
-
-  if (!attachment) {
-    return NextResponse.json({ error: "Allegato non trovato" }, { status: 404 });
+  if (!access.ok) {
+    return NextResponse.json({ error: access.error }, { status: access.status });
   }
 
-  const content = attachment.content;
+  const { attachment } = access;
+  // `?download=1` forza il salvataggio anche per PDF e immagini: la vista a
+  // schermo li mostra già nella pagina, e chi chiede «Scarica» vuole il file,
+  // non un'altra scheda aperta.
+  const forceDownload = request.nextUrl.searchParams.get("download") === "1";
+  const disposition =
+    !forceDownload && getViewMode(attachment.mimeType) === "file" ? "inline" : "attachment";
 
-  // 2. Content deleted check
-  if (content.isDeleted) {
-    return NextResponse.json({ error: "Contenuto non disponibile" }, { status: 404 });
-  }
-
-  // 3. RBAC — same rules as content visibility
-  const userId = session.user.id;
-  const userRole = session.user.role;
-
-  // Status-based visibility (same as GET /api/content/[id])
-  if (content.status !== "PUBLISHED") {
-    if (userRole === "OPERATOR") {
-      return NextResponse.json({ error: "Allegato non trovato" }, { status: 404 });
-    }
-    // HOD can access attachments of any content in their property/department (checked below)
-  }
-
-  // RBAC: same logic as content detail page (property + targetAudience)
-  const hasAccess = await canUserAccessContent(userId, userRole, {
-    propertyId: content.propertyId,
-    createdById: content.createdById,
-    targetAudience: content.targetAudience,
-  });
-
-  if (!hasAccess) {
-    return NextResponse.json({ error: "Allegato non trovato" }, { status: 404 });
-  }
-
-  // 4. Determine disposition: inline for images/PDF, attachment for DOCX/XLSX
-  const INLINE_MIMES = ["image/jpeg", "image/png", "image/webp", "application/pdf"];
-  const disposition = INLINE_MIMES.includes(attachment.mimeType) ? "inline" : "attachment";
-
-  // 5. Generate presigned GET URL
   try {
     const url = await getPresignedDownloadUrl(
       attachment.storageKey,

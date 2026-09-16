@@ -188,6 +188,30 @@ export async function getPresignedDownloadUrl(
 }
 
 // ---------------------------------------------------------------------------
+// Download (server-side)
+// ---------------------------------------------------------------------------
+
+/**
+ * Scarica i byte di un oggetto sul server.
+ *
+ * Serve solo a chi deve LEGGERE il contenuto del file per trasformarlo — la
+ * vista a schermo di Word ed Excel, che il browser non sa mostrare. Per far
+ * arrivare un file all'utente resta l'indirizzo firmato: i byte non passano
+ * dal server senza motivo.
+ */
+export async function downloadFromStorage(storageKey: string): Promise<Buffer> {
+  const client = getS3Client();
+  const bucket = getBucketName();
+
+  const response = await client.send(
+    new GetObjectCommand({ Bucket: bucket, Key: storageKey })
+  );
+
+  if (!response.Body) throw new Error(`Oggetto senza contenuto: ${storageKey}`);
+  return Buffer.from(await response.Body.transformToByteArray());
+}
+
+// ---------------------------------------------------------------------------
 // Delete
 // ---------------------------------------------------------------------------
 

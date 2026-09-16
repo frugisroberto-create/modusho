@@ -1,6 +1,8 @@
 "use client";
 
 import { useState, useEffect, useCallback, useRef } from "react";
+import { AttachmentViewer } from "@/components/shared/attachment-viewer";
+import { isViewable } from "@/lib/attachments/viewable";
 
 interface AttachmentItem {
   id: string;
@@ -25,6 +27,12 @@ interface UploadingFile {
 interface AttachmentUploaderProps {
   contentId: string;
   canEdit: boolean;
+  /**
+   * Apre da sé il riquadro di lettura del primo documento mostrabile.
+   * Lo usa la pagina di un documento, dove il file È il contenuto: chiedere un
+   * clic in più per vedere l'unica cosa che c'è da leggere non ha senso.
+   */
+  autoViewFirstDocument?: boolean;
 }
 
 const MIME_LABELS: Record<string, string> = {
@@ -41,9 +49,13 @@ function formatSize(bytes: number): string {
 }
 
 /** Fetches a presigned GET URL for an attachment (on demand). */
-async function getAccessUrl(attachmentId: string): Promise<string | null> {
+async function getAccessUrl(
+  attachmentId: string,
+  options?: { download?: boolean }
+): Promise<string | null> {
   try {
-    const res = await fetch(`/api/attachments/${attachmentId}/access`);
+    const query = options?.download ? "?download=1" : "";
+    const res = await fetch(`/api/attachments/${attachmentId}/access${query}`);
     if (res.ok) {
       const json = await res.json();
       return json.data.url;
@@ -52,12 +64,15 @@ async function getAccessUrl(attachmentId: string): Promise<string | null> {
   return null;
 }
 
-export function AttachmentUploader({ contentId, canEdit }: AttachmentUploaderProps) {
+export function AttachmentUploader({ contentId, canEdit, autoViewFirstDocument }: AttachmentUploaderProps) {
   const [attachments, setAttachments] = useState<AttachmentItem[]>([]);
   const [uploading, setUploading] = useState<UploadingFile[]>([]);
   const [loading, setLoading] = useState(true);
   // Cache presigned URLs per attachment (expire client-side after 90s)
   const [imageUrls, setImageUrls] = useState<Record<string, string>>({});
+  // Quale documento è aperto nel riquadro di lettura. Uno alla volta: due
+  // documenti aperti insieme sono due telai pesanti e nessuna attenzione.
+  const [openDocumentId, setOpenDocumentId] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const fetchAttachments = useCallback(async () => {
@@ -74,9 +89,16 @@ export function AttachmentUploader({ contentId, canEdit }: AttachmentUploaderPro
           if (url) urls[img.id] = url;
         }));
         setImageUrls(urls);
+
+        if (autoViewFirstDocument) {
+          const first = (json.data as AttachmentItem[]).find(
+            (a) => a.kind === "DOCUMENT" && isViewable(a.mimeType)
+          );
+          if (first) setOpenDocumentId((current) => current ?? first.id);
+        }
       }
     } finally { setLoading(false); }
-  }, [contentId]);
+  }, [contentId, autoViewFirstDocument]);
 
   useEffect(() => { fetchAttachments(); }, [fetchAttachments]);
 
@@ -146,10 +168,27 @@ export function AttachmentUploader({ contentId, canEdit }: AttachmentUploaderPro
     }
   };
 
+  /** Apre l'immagine a grandezza piena in una scheda nuova. */
   const handleOpenFile = async (attachmentId: string) => {
-    // Open window synchronously (before await) to avoid popup blocker
+    // La finestra si apre PRIMA dell'attesa, altrimenti il browser la blocca
     const w = window.open("about:blank", "_blank");
     const url = await getAccessUrl(attachmentId);
+    if (url && w) {
+      w.location.href = url;
+    } else if (w) {
+      w.close();
+    }
+  };
+
+  /**
+   * Scarica il file. Resta anche per ciò che si può leggere a schermo: la
+   * vista è una resa, il file è l'originale, e chi deve stamparlo o mandarlo
+   * vuole quello.
+   */
+  const handleDownloadFile = async (attachmentId: string) => {
+    // La finestra si apre PRIMA dell'attesa, altrimenti il browser la blocca
+    const w = window.open("about:blank", "_blank");
+    const url = await getAccessUrl(attachmentId, { download: true });
     if (url && w) {
       w.location.href = url;
     } else if (w) {
@@ -233,27 +272,42 @@ export function AttachmentUploader({ contentId, canEdit }: AttachmentUploaderPro
         <div>
           <p className="text-[11px] font-ui uppercase tracking-wider text-charcoal/45 mb-2">Documenti</p>
           <div className="border border-ivory-dark bg-white divide-y divide-ivory-medium">
-            {documents.map((doc) => (
-              <div key={doc.id} className="flex items-center gap-3 px-4 py-3">
-                <svg className="w-5 h-5 text-charcoal/40 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-                </svg>
-                <div className="flex-1 min-w-0">
-                  <p className="text-sm font-ui text-charcoal-dark truncate">{doc.originalFileName}</p>
-                  <p className="text-[10px] font-ui text-charcoal/35">{MIME_LABELS[doc.mimeType] || doc.mimeType} · {formatSize(doc.fileSize)}</p>
+            {documents.map((doc) => {
+              const viewable = isViewable(doc.mimeType);
+              const open = openDocumentId === doc.id;
+              return (
+                <div key={doc.id}>
+                  <div className="flex items-center gap-3 px-4 py-3">
+                    <svg className="w-5 h-5 text-charcoal/40 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                    </svg>
+                    <div className="flex-1 min-w-0">
+                      <p className="text-sm font-ui text-charcoal-dark truncate">{doc.originalFileName}</p>
+                      <p className="text-[10px] font-ui text-charcoal/35">{MIME_LABELS[doc.mimeType] || doc.mimeType} · {formatSize(doc.fileSize)}</p>
+                    </div>
+                    {viewable && (
+                      <button onClick={() => setOpenDocumentId(open ? null : doc.id)}
+                        className="text-[11px] font-ui font-semibold uppercase tracking-wider text-terracotta hover:text-terracotta-light transition-colors shrink-0">
+                        {open ? "Chiudi" : "Vedi a schermo"}
+                      </button>
+                    )}
+                    <button onClick={() => handleDownloadFile(doc.id)}
+                      className="text-[11px] font-ui font-semibold uppercase tracking-wider text-charcoal/50 hover:text-charcoal transition-colors shrink-0">
+                      Scarica
+                    </button>
+                    {canEdit && (
+                      <button onClick={() => handleDelete(doc.id)}
+                        className="text-[11px] font-ui text-alert-red/60 hover:text-alert-red transition-colors shrink-0 ml-2">
+                        Rimuovi
+                      </button>
+                    )}
+                  </div>
+                  {open && (
+                    <AttachmentViewer attachmentId={doc.id} fileName={doc.originalFileName} mimeType={doc.mimeType} />
+                  )}
                 </div>
-                <button onClick={() => handleOpenFile(doc.id)}
-                  className="text-[11px] font-ui font-semibold uppercase tracking-wider text-terracotta hover:text-terracotta-light transition-colors shrink-0">
-                  {doc.mimeType === "application/pdf" || doc.mimeType.startsWith("image/") ? "Apri" : "Scarica"}
-                </button>
-                {canEdit && (
-                  <button onClick={() => handleDelete(doc.id)}
-                    className="text-[11px] font-ui text-alert-red/60 hover:text-alert-red transition-colors shrink-0 ml-2">
-                    Rimuovi
-                  </button>
-                )}
-              </div>
-            ))}
+              );
+            })}
           </div>
         </div>
       )}
