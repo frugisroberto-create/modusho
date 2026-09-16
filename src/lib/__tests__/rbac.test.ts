@@ -22,6 +22,7 @@ import {
   isInTargetAudience,
   getMemoManagerKind,
   getRolesForRoleTarget,
+  getRoleTargetsReaching,
   canUserAccessContent,
   type ContentVisibilityInput,
 } from "../rbac";
@@ -370,5 +371,28 @@ describe("getRolesForRoleTarget", () => {
   it("gli altri ruoli valgono per sé", () => {
     expect(getRolesForRoleTarget("HOD")).toEqual(["HOD"]);
     expect(getRolesForRoleTarget("HOTEL_MANAGER")).toEqual(["HOTEL_MANAGER"]);
+  });
+});
+
+describe("getRoleTargetsReaching — quali destinatari «per ruolo» raggiungono una persona", () => {
+  it("un capo reparto è raggiunto dal proprio ruolo e da «tutti gli operatori e capi reparto»", () => {
+    expect(getRoleTargetsReaching("HOD").sort()).toEqual(["HOD", "OPERATOR"]);
+  });
+
+  it("un operatore solo da «tutti gli operatori e capi reparto»", () => {
+    expect(getRoleTargetsReaching("OPERATOR")).toEqual(["OPERATOR"]);
+  });
+
+  it("gli altri ruoli solo dal proprio", () => {
+    expect(getRoleTargetsReaching("HOTEL_MANAGER")).toEqual(["HOTEL_MANAGER"]);
+    expect(getRoleTargetsReaching("CORPORATE")).toEqual(["CORPORATE"]);
+  });
+
+  it("è l'inverso esatto di getRolesForRoleTarget", () => {
+    for (const target of ["OPERATOR", "HOD", "HOTEL_MANAGER"] as const) {
+      for (const role of getRolesForRoleTarget(target)) {
+        expect(getRoleTargetsReaching(role), `${target} → ${role}`).toContain(target);
+      }
+    }
   });
 });
