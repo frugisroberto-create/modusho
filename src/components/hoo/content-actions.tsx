@@ -34,7 +34,13 @@ export function ContentActions({ contentId, contentType, contentStatus, userRole
   // SUPER_ADMIN/ADMIN possono sempre agire; gli altri servono canEdit
   const isAdmin = userRole === "ADMIN" || userRole === "SUPER_ADMIN";
   const canAct = isAdmin || ((userRole === "HOTEL_MANAGER" || userRole === "CORPORATE") && canEdit);
-  if (!canAct) return null;
+
+  // Stampare è leggere, non modificare: il tasto non dipende da canEdit. Prima
+  // stava dentro i comandi di gestione, e un Hotel Manager senza permesso di
+  // modifica restava senza «Stampa». Un contenuto archiviato non si stampa
+  // (lo decide `print-access.ts`): il tasto non lo promette.
+  const printButton = contentStatus !== "ARCHIVED" ? <ExportPdfButton contentId={contentId} /> : null;
+  if (!canAct) return printButton;
 
   const handleArchive = async () => {
     if (archiveNote.length < 5) return;
@@ -61,7 +67,7 @@ export function ContentActions({ contentId, contentType, contentStatus, userRole
   return (
     <>
       <div className="flex items-center gap-2 flex-wrap">
-        <ExportPdfButton contentId={contentId} />
+        {printButton}
 
         {(contentStatus === "PUBLISHED" || (contentStatus !== "ARCHIVED")) && (
           <button onClick={() => contentStatus === "PUBLISHED" && contentType === "SOP" ? setEditModal(true) : router.push(editHref)} className="btn-outline-sm">

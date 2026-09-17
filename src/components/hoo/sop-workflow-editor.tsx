@@ -3,6 +3,7 @@
 import { useState, useEffect, useCallback, useRef } from "react";
 import { useRouter } from "next/navigation";
 import { AttachmentUploader } from "@/components/shared/attachment-uploader";
+import { ExportPdfButton } from "@/components/shared/export-pdf-button";
 import { SopEditor } from "@/components/shared/sop-editor";
 import { SopViewRegistry } from "@/components/shared/sop-view-registry";
 import { UnsavedChangesModal } from "@/components/shared/unsaved-changes-modal";
@@ -442,7 +443,7 @@ export function SopWorkflowEditor({ workflowId, currentUserId, currentUserRole, 
   return (
     <div className="space-y-6">
       {/* ── Testata ── */}
-      <SopHeader wf={wf} />
+      <SopHeader wf={wf} hasUnsavedChanges={dirty} />
 
       {/* ── Workflow status banner ── */}
       <WorkflowStatusBanner wf={wf} />
@@ -726,7 +727,7 @@ export function SopWorkflowEditor({ workflowId, currentUserId, currentUserRole, 
 
 // ─── Sub-components ──────────────────────────────────────────────────
 
-function SopHeader({ wf }: { wf: SopWorkflowData }) {
+function SopHeader({ wf, hasUnsavedChanges }: { wf: SopWorkflowData; hasUnsavedChanges: boolean }) {
   const STATUS_LABEL: Record<string, string> = {
     DRAFT: "Bozza",
     REVIEW_HM: "In attesa di consultazione",
@@ -761,8 +762,23 @@ function SopHeader({ wf }: { wf: SopWorkflowData }) {
         )}
       </div>
 
-      {/* Row 2: title */}
-      <h1 className="text-2xl font-heading font-semibold text-charcoal-dark">{wf.title}</h1>
+      {/* Row 2: title + Stampa */}
+      <div className="flex items-start justify-between gap-4">
+        <h1 className="text-2xl font-heading font-semibold text-charcoal-dark">{wf.title}</h1>
+        {/* Una bozza si stampa con la scritta BOZZA su ogni pagina (lo fa la
+            rotta di stampa). Un'archiviata non si stampa. */}
+        {wf.contentStatus !== "ARCHIVED" && (
+          <div className="flex flex-col items-end gap-1 shrink-0">
+            <ExportPdfButton contentId={wf.contentId} />
+            {/* La stampa legge ciò che è salvato: chi ha modifiche aperte deve saperlo */}
+            {hasUnsavedChanges && (
+              <span className="hidden sm:inline text-[11px] font-ui text-[#E65100]">
+                Stampa l&apos;ultima versione salvata
+              </span>
+            )}
+          </div>
+        )}
+      </div>
 
       {/* Row 3: RACI roles */}
       <div className="flex items-center gap-4 flex-wrap">
