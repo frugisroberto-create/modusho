@@ -7,7 +7,6 @@ import { ValidityBadge } from "@/components/shared/validity-badge";
 import { ContentTimeline } from "@/components/shared/content-timeline";
 import { SopViewRegistry } from "@/components/shared/sop-view-registry";
 import { AttachmentUploader } from "@/components/shared/attachment-uploader";
-import { ExportPdfButton } from "@/components/shared/export-pdf-button";
 import Link from "next/link";
 import { sanitizeHtml } from "@/lib/sanitize";
 
@@ -77,7 +76,8 @@ export default async function HooSopDetailPage({ params }: Props) {
         </div>
 
         <div className="flex items-center gap-2">
-          {content.status === "PUBLISHED" && <ExportPdfButton contentId={content.id} />}
+          {/* «Stampa» è dentro ContentActions, per ogni ruolo e ogni stato
+              stampabile: qui compariva una seconda volta. */}
           <ContentActions contentId={content.id} contentType={content.type} contentStatus={content.status} userRole={user.role} canEdit={user.canEdit} />
         </div>
       </div>

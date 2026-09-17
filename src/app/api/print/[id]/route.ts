@@ -2,7 +2,8 @@ import { NextRequest, NextResponse } from "next/server";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
-import { canUserAccessContent } from "@/lib/rbac";
+import { canUserAccessContent, checkAccess } from "@/lib/rbac";
+import { decidePrintAccess, PRINT_STATUS_LABELS } from "@/lib/print-access";
 import { getPresignedDownloadUrl } from "@/lib/attachments/storage";
 
 const TYPE_LABELS: Record<string, string> = { SOP: "SOP", DOCUMENT: "Documento", MEMO: "Memo" };
@@ -41,21 +42,46 @@ export async function GET(
       targetAudience: {
         select: { targetType: true, targetRole: true, targetDepartmentId: true, targetUserId: true },
       },
+      sopWorkflow: {
+        select: { responsibleId: true, consultedId: true, accountableId: true, submittedToC: true, submittedToA: true },
+      },
     },
   });
 
-  if (!content || content.status !== "PUBLISHED") {
+  if (!content) {
     return new NextResponse("Contenuto non trovato", { status: 404 });
   }
 
-  const canAccess = await canUserAccessContent(session.user.id, session.user.role, {
-    propertyId: content.propertyId,
-    createdById: content.createdBy.id,
-    targetAudience: content.targetAudience,
+  // Chi può stampare, e se è una bozza: la regola sta in `print-access.ts`.
+  // Qui si caricano solo i fatti che le servono.
+  const userId = session.user.id;
+  const role = session.user.role;
+  const isPublished = content.status === "PUBLISHED";
+  const [canSeePublished, hasPropertyAccess] = await Promise.all([
+    isPublished
+      ? canUserAccessContent(userId, role, {
+          propertyId: content.propertyId,
+          createdById: content.createdBy.id,
+          targetAudience: content.targetAudience,
+        })
+      : Promise.resolve(false),
+    isPublished ? Promise.resolve(false) : checkAccess(userId, "OPERATOR", content.propertyId),
+  ]);
+
+  const verdict = decidePrintAccess({
+    status: content.status,
+    userId,
+    role,
+    canSeePublished,
+    hasPropertyAccess,
+    workflow: content.sopWorkflow ? { contentStatus: content.status, ...content.sopWorkflow } : null,
   });
-  if (!canAccess) {
+  // Ciò che non si può stampare non esiste: 404, come prima.
+  if (!verdict.allowed) {
     return new NextResponse("Contenuto non trovato", { status: 404 });
   }
+  const isDraft = verdict.draft;
+  const draftLabel = PRINT_STATUS_LABELS[content.status] ?? "Bozza";
 
   const typeLabel = TYPE_LABELS[content.type] || content.type;
   const publishDate = content.publishedAt
@@ -84,12 +110,26 @@ export async function GET(
   p.push('<html lang="it">');
   p.push('<head>');
   p.push('<meta charset="utf-8">');
-  p.push('<title>' + esc(content.title) + '</title>');
+  p.push('<title>' + (isDraft ? 'BOZZA — ' : '') + esc(content.title) + '</title>');
   p.push('<style>');
   p.push('@page { margin: 15mm 12mm; }');
+  if (isDraft) {
+    // `position: fixed` si ripete su ogni pagina stampata: la scritta non si
+    // perde staccando un foglio dagli altri.
+    p.push('.draft-watermark { position: fixed; top: 45%; left: 0; right: 0; text-align: center; transform: rotate(-30deg); font-family: Helvetica, Arial, sans-serif; font-size: 96px; font-weight: bold; letter-spacing: 12px; color: rgba(192, 57, 43, 0.12); pointer-events: none; z-index: 0; }');
+    p.push('@media print { .draft-watermark { -webkit-print-color-adjust: exact; print-color-adjust: exact; } }');
+  }
   p.push('</style>');
   p.push('</head>');
   p.push('<body style="font-family:Georgia,serif;color:#333;margin:0;padding:20px 30px;font-size:14px;line-height:1.7;">');
+
+  if (isDraft) {
+    p.push('<div class="draft-watermark">BOZZA</div>');
+    p.push('<div style="font-family:Helvetica,Arial,sans-serif;border:2px solid #C0392B;color:#C0392B;padding:10px 14px;margin-bottom:20px;font-size:12px;line-height:1.5;">');
+    p.push('<strong style="letter-spacing:1px;text-transform:uppercase;">Bozza non approvata &middot; ' + esc(draftLabel) + '</strong><br>');
+    p.push('Questa procedura non è ancora in vigore e può cambiare. Non distribuirla al personale e non applicarla. Versione ' + esc(String(content.version)) + '.');
+    p.push('</div>');
+  }
 
   // Header line
   p.push('<table width="100%" cellpadding="0" cellspacing="0" style="border-bottom:2px solid #964733;padding-bottom:12px;margin-bottom:24px;">');
@@ -109,7 +149,8 @@ export async function GET(
   // Meta
   const metaParts = [esc(content.property.name)];
   if (content.department) metaParts.push(esc(content.department.name));
-  if (publishDate) metaParts.push(esc(publishDate));
+  if (isDraft) metaParts.push(esc(draftLabel));
+  else if (publishDate) metaParts.push(esc(publishDate));
   p.push('<p style="font-family:Helvetica,Arial,sans-serif;font-size:11px;color:#888;margin:0 0 24px 0;padding-bottom:12px;border-bottom:1px solid #ddd;">' + metaParts.join(' &middot; ') + '</p>');
 
   // Body — raw HTML content
@@ -146,7 +187,7 @@ export async function GET(
   p.push('<table width="100%" cellpadding="0" cellspacing="0" style="margin-top:36px;padding-top:10px;border-top:1px solid #ddd;">');
   p.push('<tr>');
   p.push('<td style="font-family:Helvetica,Arial,sans-serif;font-size:9px;color:#aaa;">' + esc(content.property.name) + '</td>');
-  p.push('<td style="font-family:Helvetica,Arial,sans-serif;font-size:9px;color:#aaa;text-align:right;">Esportato il ' + esc(exportDate) + '</td>');
+  p.push('<td style="font-family:Helvetica,Arial,sans-serif;font-size:9px;color:#aaa;text-align:right;">' + (isDraft ? 'BOZZA NON APPROVATA &middot; ' : '') + 'Esportato il ' + esc(exportDate) + '</td>');
   p.push('</tr></table>');
 
   p.push('</body></html>');
